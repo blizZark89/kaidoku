@@ -41,3 +41,12 @@ services:
 ```shell
 docker compose up -d --build
 ```
+
+
+## Update:
+```shell
+cd ~/kaidoku
+git pull origin main
+docker compose up -d --build
+```
+
