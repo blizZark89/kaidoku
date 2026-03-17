@@ -11,6 +11,7 @@ RUN apt-get update -qqy && \
         poppler-utils \
         libpoppler-dev \
         unzip \
+        zstd \
         curl \
         cargo \
         && \
