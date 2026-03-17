@@ -29,9 +29,9 @@ services:
     environment:
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860
-      - KH_ENABLE_USER_MANAGEMENT=true
-      - KH_ADMIN_USER=admin
-      - KH_USER_CAN_CREATE_USER=true
+      - KH_FEATURE_USER_MANAGEMENT=True
+      - KH_FEATURE_USER_MANAGEMENT_ADMIN=admin
+      - KH_FEATURE_USER_MANAGEMENT_PASSWORD=admin
     volumes:
       - ./kaidoku_app_data:/app/ktem_app_data
     ports:
