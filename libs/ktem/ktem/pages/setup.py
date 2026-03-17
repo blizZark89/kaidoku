@@ -55,7 +55,7 @@ class SetupPage(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
-        gr.Markdown(f"# Welcome to {self._app.app_name} first setup!")
+        gr.Markdown(f"# Willkommen beim ersten Setup von {self._app.app_name}!")
         self.radio_model = gr.Radio(
             [
                 ("Cohere API (*free registration*) - recommended", "cohere"),
@@ -63,12 +63,12 @@ class SetupPage(BasePage):
                 ("OpenAI API (for GPT-based models)", "openai"),
                 ("Local LLM (for completely *private RAG*)", "ollama"),
             ],
-            label="Select your model provider",
+            label="Wähle deinen Modellanbieter",
             value="cohere",
             info=(
-                "Note: You can change this later. "
-                "If you are not sure, go with the first option "
-                "which fits most normal users."
+                "Hinweis: Du kannst das später ändern. "
+                "Wenn du unsicher bist, nimm die erste Option. "
+                "Sie passt für die meisten Nutzer."
             ),
             interactive=True,
         )
@@ -111,18 +111,17 @@ class SetupPage(BasePage):
         with gr.Column(visible=False) as self.ollama_option:
             gr.Markdown(
                 (
-                    "#### Setup Ollama\n\n"
-                    "Download and install Ollama from "
-                    "https://ollama.com/. Check out latest models at "
-                    "https://ollama.com/library. "
+                    "#### Ollama einrichten\n\n"
+                    "Lade Ollama von https://ollama.com/ herunter und installiere es. "
+                    "Aktuelle Modelle findest du unter https://ollama.com/library. "
                 )
             )
             self.ollama_model_name = gr.Textbox(
-                label="LLM model name",
+                label="LLM-Modellname",
                 value=config("LOCAL_MODEL", default="qwen2.5:7b"),
             )
             self.ollama_emb_model_name = gr.Textbox(
-                label="Embedding model name",
+                label="Embedding-Modellname",
                 value=config("LOCAL_MODEL_EMBEDDINGS", default="nomic-embed-text"),
             )
 
@@ -131,9 +130,9 @@ class SetupPage(BasePage):
         )
 
         with gr.Row():
-            self.btn_finish = gr.Button("Proceed", variant="primary")
+            self.btn_finish = gr.Button("Weiter", variant="primary")
             self.btn_skip = gr.Button(
-                "I am an advance user. Skip this.", variant="stop"
+                "Ich bin ein fortgeschrittener Nutzer. Überspringen.", variant="stop"
             )
 
     def on_register_events(self):
@@ -197,7 +196,7 @@ class SetupPage(BasePage):
     ):
         log_content = ""
         if not radio_model_value:
-            gr.Info("Skip setup models.")
+            gr.Info("Modell-Setup übersprungen.")
             yield gr.value(visible=False)
             return
 
@@ -384,10 +383,10 @@ class SetupPage(BasePage):
             yield log_content
 
         if llm_output and emb_output:
-            gr.Info("Setup models completed successfully!")
+            gr.Info("Modell-Setup erfolgreich abgeschlossen!")
         else:
             raise gr.Error(
-                "Setup models failed. Please verify your connection and API key."
+                "Modell-Setup fehlgeschlagen. Bitte prüfe Verbindung und API-Key."
             )
 
     def update_default_settings(self, radio_model_value, default_settings):

@@ -37,14 +37,14 @@ class IndexManagement(BasePage):
         self._app = app
         self.manager: IndexManager = app.index_manager
         self.spec_desc_default = (
-            "# Spec description\n\nSelect an index to view the spec description."
+            "# Spezifikationsbeschreibung\n\nWähle einen Index aus, um seine Spezifikation anzuzeigen."
         )
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Tab(label="View"):
+        with gr.Tab(label="Ansehen"):
             self.index_list = gr.DataFrame(
-                headers=["id", "name", "index type"],
+                headers=["id", "name", "Indextyp"],
                 interactive=False,
                 column_widths=[10, 30, 60],
             )
@@ -54,55 +54,55 @@ class IndexManagement(BasePage):
                 with gr.Row():
                     with gr.Column():
                         self.edit_name = gr.Textbox(
-                            label="Index name",
+                            label="Indexname",
                         )
                         self.edit_spec = gr.Textbox(
-                            label="Index config",
-                            info="Admin configuration of the Index in YAML format",
+                            label="Index-Konfiguration",
+                            info="Administratorkonfiguration des Index im YAML-Format",
                             lines=10,
                         )
 
                         gr.Markdown(
-                            "IMPORTANT: Changing or deleting the index will require "
-                            "restarting the system. Some config settings will require "
-                            "rebuilding the index for the index to work properly."
+                            "WICHTIG: Das Ändern oder Löschen des Index erfordert "
+                            "einen Neustart des Systems. Manche Konfigurationen "
+                            "verlangen außerdem einen Neuaufbau des Index."
                         )
                         with gr.Row():
                             self.btn_edit_save = gr.Button(
-                                "Save", min_width=10, variant="primary"
+                                "Speichern", min_width=10, variant="primary"
                             )
                             self.btn_delete = gr.Button(
-                                "Delete", min_width=10, variant="stop"
+                                "Löschen", min_width=10, variant="stop"
                             )
                             with gr.Row(visible=False) as self._delete_confirm:
                                 self.btn_delete_yes = gr.Button(
-                                    "Confirm Delete",
+                                    "Löschen bestätigen",
                                     variant="stop",
                                     min_width=10,
                                 )
-                                self.btn_delete_no = gr.Button("Cancel", min_width=10)
-                            self.btn_close = gr.Button("Close", min_width=10)
+                                self.btn_delete_no = gr.Button("Abbrechen", min_width=10)
+                            self.btn_close = gr.Button("Schließen", min_width=10)
 
                     with gr.Column():
-                        self.edit_spec_desc = gr.Markdown("# Spec description")
+                        self.edit_spec_desc = gr.Markdown("# Spezifikationsbeschreibung")
 
-        with gr.Tab(label="Add"):
+        with gr.Tab(label="Hinzufügen"):
             with gr.Row():
                 with gr.Column(scale=2):
                     self.name = gr.Textbox(
-                        label="Index name",
-                        info="Must be unique and non-empty.",
+                        label="Indexname",
+                        info="Muss eindeutig und darf nicht leer sein.",
                     )
-                    self.index_type = gr.Dropdown(label="Index type")
+                    self.index_type = gr.Dropdown(label="Indextyp")
                     self.spec = gr.Textbox(
-                        label="Specification",
-                        info="Specification of the index in YAML format.",
+                        label="Spezifikation",
+                        info="Spezifikation des Index im YAML-Format.",
                     )
                     gr.Markdown(
-                        "<mark>Note</mark>: "
-                        "After creating index, please restart the app"
+                        "<mark>Hinweis</mark>: "
+                        "Bitte die App nach dem Erstellen des Index neu starten"
                     )
-                    self.btn_new = gr.Button("Add", variant="primary")
+                    self.btn_new = gr.Button("Hinzufügen", variant="primary")
 
                 with gr.Column(scale=3):
                     self.spec_desc = gr.Markdown(self.spec_desc_default)
@@ -242,11 +242,11 @@ class IndexManagement(BasePage):
         """Create the index"""
         name = name.strip()
         if not name:
-            raise gr.Error("Name must not be empty")
+            raise gr.Error("Name darf nicht leer sein")
 
         existing_names = {idx.name for idx in self.manager.indices}
         if name in existing_names:
-            raise gr.Error(f"Index '{name}' already exists. Please use a unique name.")
+            raise gr.Error(f"Index '{name}' existiert bereits. Bitte einen eindeutigen Namen verwenden.")
 
         try:
             self.manager.build_index(
@@ -254,9 +254,9 @@ class IndexManagement(BasePage):
                 config=yaml.load(config, Loader=YAMLNoDateSafeLoader),
                 index_type=index_type,
             )
-            gr.Info(f'Index "{name}" created successfully. Please restart the app!')
+            gr.Info(f'Index "{name}" erfolgreich erstellt. Bitte die App neu starten!')
         except Exception as e:
-            raise gr.Error(f'Failed to create index "{name}": {e}')
+            raise gr.Error(f'Index "{name}" konnte nicht erstellt werden: {e}')
 
     def list_indices(self):
         """List the indices constructed by the user"""
@@ -265,14 +265,14 @@ class IndexManagement(BasePage):
             record = {}
             record["id"] = item.id
             record["name"] = item.name
-            record["index type"] = item.__class__.__name__
+            record["Indextyp"] = item.__class__.__name__
             items.append(record)
 
         if items:
             indices_list = pd.DataFrame.from_records(items)
         else:
             indices_list = pd.DataFrame.from_records(
-                [{"id": "-", "name": "-", "index type": "-"}]
+                [{"id": "-", "name": "-", "Indextyp": "-"}]
             )
 
         return indices_list
@@ -280,7 +280,7 @@ class IndexManagement(BasePage):
     def select_index(self, index_list, ev: gr.SelectData) -> int:
         """Return the index id"""
         if ev.value == "-" and ev.index[0] == 0:
-            gr.Info("No index is constructed. Please create one first!")
+            gr.Info("Es wurde noch kein Index erstellt. Bitte zuerst einen anlegen!")
             return -1
 
         if not ev.selected:
@@ -316,30 +316,30 @@ class IndexManagement(BasePage):
     def update_index(self, selected_index_id: int, name: str, config: str):
         name = name.strip()
         if not name:
-            raise gr.Error("Name must not be empty")
+            raise gr.Error("Name darf nicht leer sein")
 
         # Check uniqueness (excluding current index)
         for idx in self.manager.indices:
             if idx.name == name and idx.id != selected_index_id:
                 raise gr.Error(
-                    f"Index '{name}' already exists. Please use a unique name."
+                    f"Index '{name}' existiert bereits. Bitte einen eindeutigen Namen verwenden."
                 )
 
         try:
             spec = yaml.load(config, Loader=YAMLNoDateSafeLoader)
             self.manager.update_index(selected_index_id, name, spec)
-            gr.Info(f'Index "{name}" updated successfully. Please restart the app!')
+            gr.Info(f'Index "{name}" erfolgreich aktualisiert. Bitte die App neu starten!')
         except gr.Error:
             raise
         except Exception as e:
-            raise gr.Error(f'Failed to save index "{name}": {e}')
+            raise gr.Error(f'Index "{name}" konnte nicht gespeichert werden: {e}')
 
     def delete_index(self, selected_index_id):
         try:
             self.manager.delete_index(selected_index_id)
-            gr.Info("Delete index successfully. Please restart the app!")
+            gr.Info("Index erfolgreich gelöscht. Bitte die App neu starten!")
         except Exception as e:
-            gr.Warning(f"Fail to delete index: {e}")
+            gr.Warning(f"Index konnte nicht gelöscht werden: {e}")
             return selected_index_id
 
         return -1

@@ -11,7 +11,7 @@ from .manager import mcp_manager
 
 logger = logging.getLogger(__name__)
 
-TOOLS_DEFAULT = "# Available Tools\n\nSelect or add an MCP server to view its tools."
+TOOLS_DEFAULT = "# Verfügbare Werkzeuge\n\nWähle oder füge einen MCP-Server hinzu, um seine Werkzeuge anzuzeigen."
 
 MCP_SERVERS_KEY = "mcpServers"
 
@@ -27,7 +27,7 @@ class MCPManagement(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Tab(label="View"):
+        with gr.Tab(label="Ansehen"):
             self.mcp_list = gr.DataFrame(
                 headers=["name", "config"],
                 interactive=False,
@@ -39,7 +39,7 @@ class MCPManagement(BasePage):
                 with gr.Row():
                     with gr.Column():
                         self.edit_config = gr.Code(
-                            label="Configuration (JSON)",
+                            label="Konfiguration (JSON)",
                             language="json",
                             lines=10,
                         )
@@ -47,33 +47,33 @@ class MCPManagement(BasePage):
                         with gr.Row(visible=False) as self._selected_panel_btn:
                             with gr.Column():
                                 self.btn_edit_save = gr.Button(
-                                    "Save", min_width=10, variant="primary"
+                                    "Speichern", min_width=10, variant="primary"
                                 )
                             with gr.Column():
                                 self.btn_delete = gr.Button(
-                                    "Delete", min_width=10, variant="stop"
+                                    "Löschen", min_width=10, variant="stop"
                                 )
                                 with gr.Row():
                                     self.btn_delete_yes = gr.Button(
-                                        "Confirm Delete",
+                                        "Löschen bestätigen",
                                         variant="stop",
                                         visible=False,
                                         min_width=10,
                                     )
                                     self.btn_delete_no = gr.Button(
-                                        "Cancel", visible=False, min_width=10
+                                        "Abbrechen", visible=False, min_width=10
                                     )
                             with gr.Column():
-                                self.btn_close = gr.Button("Close", min_width=10)
+                                self.btn_close = gr.Button("Schließen", min_width=10)
 
                     with gr.Column():
                         self.edit_tools_display = gr.Markdown(TOOLS_DEFAULT)
 
-        with gr.Tab(label="Add"):
+        with gr.Tab(label="Hinzufügen"):
             with gr.Row():
                 with gr.Column(scale=2):
                     self.config = gr.Code(
-                        label="Configuration (JSON)",
+                        label="Konfiguration (JSON)",
                         language="json",
                         lines=10,
                         value=EXAMPLE_CONFIG,
@@ -82,7 +82,7 @@ class MCPManagement(BasePage):
                         "<br/>"
                     )  # Fix: Prevent the overflow of the gr.Code affect click button
                     with gr.Row():
-                        self.btn_new = gr.Button("Add MCP Servers", variant="primary")
+                        self.btn_new = gr.Button("MCP-Server hinzufügen", variant="primary")
 
                 with gr.Column(scale=3):
                     self.add_tools_display = gr.Markdown(TOOLS_DEFAULT)

@@ -24,12 +24,12 @@ class LLMManagement(BasePage):
     def __init__(self, app):
         self._app = app
         self.spec_desc_default = (
-            "# Spec description\n\nSelect an LLM to view the spec description."
+            "# Spezifikationsbeschreibung\n\nWähle ein LLM aus, um seine Spezifikation anzuzeigen."
         )
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Tab(label="View"):
+        with gr.Tab(label="Ansehen"):
             self.llm_list = gr.DataFrame(
                 headers=["name", "vendor", "default"],
                 interactive=False,
@@ -41,7 +41,7 @@ class LLMManagement(BasePage):
                 with gr.Row():
                     with gr.Column():
                         self.edit_default = gr.Checkbox(
-                            label="Set default",
+                            label="Als Standard festlegen",
                             info=(
                                 "Set this LLM as default. If no default is set, "
                                 "a random LLM will be used. "
@@ -51,79 +51,79 @@ class LLMManagement(BasePage):
                         )
                         self.edit_name = gr.Textbox(
                             label="Name",
-                            info="Edit to rename this LLM.",
+                            info="Zum Umbenennen dieses LLM bearbeiten.",
                         )
                         self.edit_spec = gr.Textbox(
-                            label="Specification",
-                            info="Specification of the LLM in YAML format",
+                            label="Spezifikation",
+                            info="Spezifikation des LLM im YAML-Format",
                             lines=10,
                         )
 
                         with gr.Accordion(
-                            label="Test connection", visible=False, open=False
+                            label="Verbindung testen", visible=False, open=False
                         ) as self._check_connection_panel:
                             with gr.Row():
                                 with gr.Column(scale=4):
-                                    self.connection_logs = gr.HTML("Logs")
+                                    self.connection_logs = gr.HTML("Protokoll")
 
                                 with gr.Column(scale=1):
                                     self.btn_test_connection = gr.Button(
-                                        "Test",
+                                        "Testen",
                                     )
 
                         with gr.Row(visible=False) as self._selected_panel_btn:
                             with gr.Column():
                                 self.btn_edit_save = gr.Button(
-                                    "Save", min_width=10, variant="primary"
+                                    "Speichern", min_width=10, variant="primary"
                                 )
                             with gr.Column():
                                 self.btn_delete = gr.Button(
-                                    "Delete", min_width=10, variant="stop"
+                                    "Löschen", min_width=10, variant="stop"
                                 )
                                 with gr.Row():
                                     self.btn_delete_yes = gr.Button(
-                                        "Confirm Delete",
+                                        "Löschen bestätigen",
                                         variant="stop",
                                         visible=False,
                                         min_width=10,
                                     )
                                     self.btn_delete_no = gr.Button(
-                                        "Cancel", visible=False, min_width=10
+                                        "Abbrechen", visible=False, min_width=10
                                     )
                             with gr.Column():
-                                self.btn_close = gr.Button("Close", min_width=10)
+                                self.btn_close = gr.Button("Schließen", min_width=10)
 
                     with gr.Column():
-                        self.edit_spec_desc = gr.Markdown("# Spec description")
+                        self.edit_spec_desc = gr.Markdown("# Spezifikationsbeschreibung")
 
-        with gr.Tab(label="Add"):
+        with gr.Tab(label="Hinzufügen"):
             with gr.Row():
                 with gr.Column(scale=2):
                     self.name = gr.Textbox(
-                        label="LLM name",
+                        label="LLM-Name",
                         info=(
                             "Must be unique. The name will be used to identify the LLM."
                         ),
                     )
                     self.llm_choices = gr.Dropdown(
-                        label="LLM vendors",
+                        label="LLM-Anbieter",
                         info=(
                             "Choose the vendor for the LLM. Each vendor has different "
                             "specification."
                         ),
                     )
                     self.spec = gr.Textbox(
-                        label="Specification",
-                        info="Specification of the LLM in YAML format",
+                        label="Spezifikation",
+                        info="Spezifikation des LLM im YAML-Format",
                     )
                     self.default = gr.Checkbox(
-                        label="Set default",
+                        label="Als Standard festlegen",
                         info=(
                             "Set this LLM as default. This default LLM will be used "
                             "by default across the application."
                         ),
                     )
-                    self.btn_new = gr.Button("Add LLM", variant="primary")
+                    self.btn_new = gr.Button("LLM hinzufügen", variant="primary")
 
                 with gr.Column(scale=3):
                     self.spec_desc = gr.Markdown(self.spec_desc_default)

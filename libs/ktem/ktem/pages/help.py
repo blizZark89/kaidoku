@@ -58,22 +58,22 @@ class HelpPage:
                 f"{self.remote_content_url}/v{self.app_version}/docs/about.md"
             )
         if about_md:
-            with gr.Accordion("About"):
+            with gr.Accordion("Über"):
                 if self.app_version:
                     about_md = f"Version: {self.app_version}\n\n{about_md}"
                 gr.Markdown(about_md)
 
         if KH_DEMO_MODE:
-            with gr.Accordion("Create Your Own Space"):
+            with gr.Accordion("Eigenen Space erstellen"):
                 gr.Markdown(
-                    "This is a demo with limited functionality. "
-                    "Use **Create space** button to install Kotaemon "
-                    "in your own space with all features "
-                    "(including upload and manage your private "
-                    "documents securely)."
+                    "Dies ist eine Demo mit eingeschränktem Funktionsumfang. "
+                    "Nutze die Schaltfläche **Space erstellen**, um Kotaemon "
+                    "mit allen Funktionen in deinem eigenen Space zu installieren "
+                    "(einschließlich sicherem Hochladen und Verwalten privater "
+                    "Dokumente)."
                 )
                 gr.Button(
-                    value="Create Your Own Space",
+                    value="Eigenen Space erstellen",
                     link=HF_SPACE_URL,
                     variant="primary",
                     size="lg",
@@ -88,7 +88,7 @@ class HelpPage:
                 f"{self.remote_content_url}/v{self.app_version}/docs/usage.md"
             )
         if user_guide_md:
-            with gr.Accordion("User Guide", open=not KH_DEMO_MODE):
+            with gr.Accordion("Benutzerhandbuch", open=not KH_DEMO_MODE):
                 gr.Markdown(user_guide_md)
 
         if self.app_version:
@@ -115,5 +115,5 @@ class HelpPage:
                     fi.write(changelogs)
 
             if changelogs:
-                with gr.Accordion(f"Changelogs (v{self.app_version})"):
+                with gr.Accordion(f"Änderungsprotokoll (v{self.app_version})"):
                     gr.Markdown(changelogs)

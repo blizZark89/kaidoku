@@ -15,31 +15,31 @@ class ReportIssue(BasePage):
         with gr.Accordion(label="Feedback", open=False, elem_id="report-accordion"):
             self.correctness = gr.Radio(
                 choices=[
-                    ("The answer is correct", "correct"),
-                    ("The answer is incorrect", "incorrect"),
+                    ("Die Antwort ist korrekt", "correct"),
+                    ("Die Antwort ist nicht korrekt", "incorrect"),
                 ],
-                label="Correctness:",
+                label="Korrektheit:",
             )
             self.issues = gr.CheckboxGroup(
                 choices=[
-                    ("The answer is offensive", "offensive"),
-                    ("The evidence is incorrect", "wrong-evidence"),
+                    ("Die Antwort ist beleidigend", "offensive"),
+                    ("Die Belege sind falsch", "wrong-evidence"),
                 ],
-                label="Other issue:",
+                label="Weiteres Problem:",
             )
             self.more_detail = gr.Textbox(
                 placeholder=(
-                    "More detail (e.g. how wrong is it, what is the "
-                    "correct answer, etc...)"
+                    "Mehr Details (z. B. was falsch ist, was die "
+                    "korrekte Antwort wäre usw.)"
                 ),
                 container=False,
                 lines=3,
             )
             gr.Markdown(
-                "This will send the current chat and the user settings to "
-                "help with investigation"
+                "Dadurch werden der aktuelle Chat und die Benutzereinstellungen "
+                "zur Untersuchung übermittelt"
             )
-            self.report_btn = gr.Button("Report")
+            self.report_btn = gr.Button("Melden")
 
     def report(
         self,
@@ -83,4 +83,4 @@ class ReportIssue(BasePage):
             )
             session.add(issue)
             session.commit()
-        gr.Info("Thank you for your feedback")
+        gr.Info("Danke für dein Feedback")

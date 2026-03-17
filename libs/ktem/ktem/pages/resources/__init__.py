@@ -17,7 +17,7 @@ class ResourcesTab(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Tab("Index Collections") as self.index_management_tab:
+        with gr.Tab("Index-Sammlungen") as self.index_management_tab:
             self.index_management = IndexManagement(self._app)
 
         with gr.Tab("LLMs") as self.llm_management_tab:
@@ -29,11 +29,11 @@ class ResourcesTab(BasePage):
         with gr.Tab("Rerankings") as self.rerank_management_tab:
             self.rerank_management = RerankingManagement(self._app)
 
-        with gr.Tab("MCP Servers") as self.mcp_management_tab:
+        with gr.Tab("MCP-Server") as self.mcp_management_tab:
             self.mcp_management = MCPManagement(self._app)
 
         if self._app.f_user_management:
-            with gr.Tab("Users", visible=False) as self.user_management_tab:
+            with gr.Tab("Benutzer", visible=False) as self.user_management_tab:
                 self.user_management = UserManagement(self._app)
 
     def on_subscribe_public_events(self):

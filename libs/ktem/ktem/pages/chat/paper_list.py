@@ -13,7 +13,7 @@ class PaperListPage(BasePage):
     def on_building_ui(self):
         self.papers_state = gr.State(None)
         with gr.Accordion(
-            label="Browse popular daily papers",
+            label="Beliebte Papers des Tages durchsuchen",
             open=True,
         ) as self.accordion:
             self.examples = gr.DataFrame(

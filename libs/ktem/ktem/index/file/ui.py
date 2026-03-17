@@ -25,7 +25,7 @@ from .utils import download_arxiv_pdf, is_arxiv_url
 
 KH_DEMO_MODE = getattr(flowsettings, "KH_DEMO_MODE", False)
 KH_SSO_ENABLED = getattr(flowsettings, "KH_SSO_ENABLED", False)
-DOWNLOAD_MESSAGE = "Start download"
+DOWNLOAD_MESSAGE = "Download starten"
 MAX_FILENAME_LENGTH = 20
 MAX_FILE_COUNT = 200
 
@@ -114,18 +114,18 @@ class DirectoryUpload(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Accordion(label="Directory upload", open=False):
-            gr.Markdown(f"Supported file types: {self._supported_file_types_str}")
+        with gr.Accordion(label="Ordner-Upload", open=False):
+            gr.Markdown(f"Unterstützte Dateitypen: {self._supported_file_types_str}")
             self.path = gr.Textbox(
-                placeholder="Directory path...", lines=1, max_lines=1, container=False
+                placeholder="Ordnerpfad...", lines=1, max_lines=1, container=False
             )
-            with gr.Accordion("Advanced indexing options", open=False):
+            with gr.Accordion("Erweiterte Indexierungsoptionen", open=False):
                 with gr.Row():
                     self.reindex = gr.Checkbox(
-                        value=False, label="Force reindex file", container=False
+                        value=False, label="Datei neu indexieren erzwingen", container=False
                     )
 
-            self.upload_button = gr.Button("Upload and Index")
+            self.upload_button = gr.Button("Hochladen und indexieren")
 
 
 class FileIndexPage(BasePage):
@@ -138,8 +138,8 @@ class FileIndexPage(BasePage):
         self._supported_file_types = [
             each.strip() for each in self._supported_file_types_str.split(",")
         ]
-        self.selected_panel_false = "Selected file: (please select above)"
-        self.selected_panel_true = "Selected file: {name}"
+        self.selected_panel_false = "Ausgewählte Datei: (bitte oben auswählen)"
+        self.selected_panel_true = "Ausgewählte Datei: {name}"
         # TODO: on_building_ui is not correctly named if it's always called in
         # the constructor
         self.public_events = [f"onFileIndex{index.id}Changed"]
@@ -166,10 +166,10 @@ class FileIndexPage(BasePage):
     def render_file_list(self):
         self.filter = gr.Textbox(
             value="",
-            label="Filter by name:",
+            label="Nach Namen filtern:",
             info=(
-                "(1) Case-insensitive. "
-                "(2) Search with empty string to show all files."
+                "(1) Groß-/Kleinschreibung wird ignoriert. "
+                "(2) Mit leerer Suche werden alle Dateien angezeigt."
             ),
         )
         self.file_list_state = gr.State(value=None)
@@ -191,21 +191,21 @@ class FileIndexPage(BasePage):
         with gr.Row():
 
             self.chat_button = gr.Button(
-                "Go to Chat",
+                "Zum Chat",
                 visible=False,
             )
             self.is_zipped_state = gr.State(value=False)
             self.download_single_button = gr.DownloadButton(
-                "Download",
+                "Herunterladen",
                 visible=False,
             )
             self.delete_button = gr.Button(
-                "Delete",
+                "Löschen",
                 variant="stop",
                 visible=False,
             )
             self.deselect_button = gr.Button(
-                "Close",
+                "Schließen",
                 visible=False,
             )
 
@@ -216,21 +216,21 @@ class FileIndexPage(BasePage):
 
         self.chunks = gr.HTML(visible=False)
 
-        with gr.Accordion("Advance options", open=False):
+        with gr.Accordion("Erweiterte Optionen", open=False):
             with gr.Row():
                 if not KH_SSO_ENABLED:
                     self.download_all_button = gr.DownloadButton(
-                        "Download all files",
+                        "Alle Dateien herunterladen",
                     )
                 self.delete_all_button = gr.Button(
-                    "Delete all files",
+                    "Alle Dateien löschen",
                     variant="stop",
                     visible=True,
                 )
                 self.delete_all_button_confirm = gr.Button(
-                    "Confirm delete", variant="stop", visible=False
+                    "Löschen bestätigen", variant="stop", visible=False
                 )
-                self.delete_all_button_cancel = gr.Button("Cancel", visible=False)
+                self.delete_all_button_cancel = gr.Button("Abbrechen", visible=False)
 
     def render_group_list(self):
         self.group_list_state = gr.State(value=None)
@@ -248,20 +248,20 @@ class FileIndexPage(BasePage):
 
         with gr.Row():
             self.group_add_button = gr.Button(
-                "Add",
+                "Hinzufügen",
                 variant="primary",
             )
             self.group_chat_button = gr.Button(
-                "Go to Chat",
+                "Zum Chat",
                 visible=False,
             )
             self.group_delete_button = gr.Button(
-                "Delete",
+                "Löschen",
                 variant="stop",
                 visible=False,
             )
             self.group_close_button = gr.Button(
-                "Close",
+                "Schließen",
                 visible=False,
             )
 
@@ -269,17 +269,17 @@ class FileIndexPage(BasePage):
             self.selected_group_id = gr.State(value=None)
             self.group_label = gr.Markdown()
             self.group_name = gr.Textbox(
-                label="Group name",
-                placeholder="Group name",
+                label="Gruppenname",
+                placeholder="Gruppenname",
                 lines=1,
                 max_lines=1,
             )
             self.group_files = gr.Dropdown(
-                label="Attached files",
+                label="Zugeordnete Dateien",
                 multiselect=True,
             )
             self.group_save_button = gr.Button(
-                "Save",
+                "Speichern",
                 variant="primary",
             )
 
@@ -288,7 +288,7 @@ class FileIndexPage(BasePage):
         with gr.Row():
             with gr.Column(scale=1):
                 with gr.Column() as self.upload:
-                    with gr.Tab("Upload Files"):
+                    with gr.Tab("Dateien hochladen"):
                         self.files = File(
                             file_types=self._supported_file_types,
                             file_count="multiple",
@@ -300,43 +300,43 @@ class FileIndexPage(BasePage):
                         if msg:
                             gr.Markdown(msg)
 
-                    with gr.Tab("Use Web Links"):
+                    with gr.Tab("Web-Links verwenden"):
                         self.urls = gr.Textbox(
-                            label="Input web URLs",
+                            label="Web-URLs eingeben",
                             lines=8,
                         )
-                        gr.Markdown("(separated by new line)")
+                        gr.Markdown("(durch Zeilenumbruch getrennt)")
 
-                    with gr.Accordion("Advanced indexing options", open=False):
+                    with gr.Accordion("Erweiterte Indexierungsoptionen", open=False):
                         with gr.Row():
                             self.reindex = gr.Checkbox(
-                                value=False, label="Force reindex file", container=False
+                                value=False, label="Datei neu indexieren erzwingen", container=False
                             )
 
                     self.upload_button = gr.Button(
-                        "Upload and Index", variant="primary"
+                        "Hochladen und indexieren", variant="primary"
                     )
 
             with gr.Column(scale=4):
                 with gr.Column(visible=False) as self.upload_progress_panel:
-                    gr.Markdown("## Upload Progress")
+                    gr.Markdown("## Upload-Fortschritt")
                     with gr.Row():
                         self.upload_result = gr.Textbox(
-                            lines=1, max_lines=20, label="Upload result"
+                            lines=1, max_lines=20, label="Upload-Ergebnis"
                         )
                         self.upload_info = gr.Textbox(
-                            lines=1, max_lines=20, label="Upload info"
+                            lines=1, max_lines=20, label="Upload-Info"
                         )
                     self.btn_close_upload_progress_panel = gr.Button(
-                        "Clear Upload Info and Close",
+                        "Upload-Info leeren und schließen",
                         variant="secondary",
                         elem_classes=["right-button"],
                     )
 
-                with gr.Tab("Files"):
+                with gr.Tab("Dateien"):
                     self.render_file_list()
 
-                with gr.Tab("Groups"):
+                with gr.Tab("Gruppen"):
                     self.render_group_list()
 
     def on_subscribe_public_events(self):
@@ -1631,13 +1631,13 @@ class FileSelector(BasePage):
         self.mode = gr.Radio(
             value=default_mode,
             choices=[
-                ("Search All", "all"),
-                ("Search In File(s)", "select"),
+                ("Alle durchsuchen", "all"),
+                ("In Datei(en) suchen", "select"),
             ],
             container=False,
         )
         self.selector = gr.Dropdown(
-            label="Files",
+            label="Dateien",
             value=default_selector,
             choices=[],
             multiselect=True,

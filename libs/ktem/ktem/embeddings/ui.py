@@ -24,12 +24,12 @@ class EmbeddingManagement(BasePage):
     def __init__(self, app):
         self._app = app
         self.spec_desc_default = (
-            "# Spec description\n\nSelect a model to view the spec description."
+            "# Spezifikationsbeschreibung\n\nWähle ein Modell aus, um seine Spezifikation anzuzeigen."
         )
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Tab(label="View"):
+        with gr.Tab(label="Ansehen"):
             self.emb_list = gr.DataFrame(
                 headers=["name", "vendor", "default"],
                 interactive=False,
@@ -41,7 +41,7 @@ class EmbeddingManagement(BasePage):
                 with gr.Row():
                     with gr.Column():
                         self.edit_default = gr.Checkbox(
-                            label="Set default",
+                            label="Als Standard festlegen",
                             info=(
                                 "Set this Embedding model as default. This default "
                                 "Embedding will be used by other components by default "
@@ -50,52 +50,52 @@ class EmbeddingManagement(BasePage):
                         )
                         self.edit_name = gr.Textbox(
                             label="Name",
-                            info="Edit to rename this Embedding model.",
+                            info="Zum Umbenennen dieses Embedding-Modells bearbeiten.",
                         )
                         self.edit_spec = gr.Textbox(
-                            label="Specification",
-                            info="Specification of the Embedding model in YAML format",
+                            label="Spezifikation",
+                            info="Spezifikation des Embedding-Modells im YAML-Format",
                             lines=10,
                         )
 
                         with gr.Accordion(
-                            label="Test connection", visible=False, open=False
+                            label="Verbindung testen", visible=False, open=False
                         ) as self._check_connection_panel:
                             with gr.Row():
                                 with gr.Column(scale=4):
                                     self.connection_logs = gr.HTML(
-                                        "Logs",
+                                        "Protokoll",
                                     )
 
                                 with gr.Column(scale=1):
-                                    self.btn_test_connection = gr.Button("Test")
+                                    self.btn_test_connection = gr.Button("Testen")
 
                         with gr.Row(visible=False) as self._selected_panel_btn:
                             with gr.Column():
                                 self.btn_edit_save = gr.Button(
-                                    "Save", min_width=10, variant="primary"
+                                    "Speichern", min_width=10, variant="primary"
                                 )
                             with gr.Column():
                                 self.btn_delete = gr.Button(
-                                    "Delete", min_width=10, variant="stop"
+                                    "Löschen", min_width=10, variant="stop"
                                 )
                                 with gr.Row():
                                     self.btn_delete_yes = gr.Button(
-                                        "Confirm Delete",
+                                        "Löschen bestätigen",
                                         variant="stop",
                                         visible=False,
                                         min_width=10,
                                     )
                                     self.btn_delete_no = gr.Button(
-                                        "Cancel", visible=False, min_width=10
+                                        "Abbrechen", visible=False, min_width=10
                                     )
                             with gr.Column():
-                                self.btn_close = gr.Button("Close", min_width=10)
+                                self.btn_close = gr.Button("Schließen", min_width=10)
 
                     with gr.Column():
-                        self.edit_spec_desc = gr.Markdown("# Spec description")
+                        self.edit_spec_desc = gr.Markdown("# Spezifikationsbeschreibung")
 
-        with gr.Tab(label="Add"):
+        with gr.Tab(label="Hinzufügen"):
             with gr.Row():
                 with gr.Column(scale=2):
                     self.name = gr.Textbox(
@@ -106,25 +106,25 @@ class EmbeddingManagement(BasePage):
                         ),
                     )
                     self.emb_choices = gr.Dropdown(
-                        label="Vendors",
+                        label="Anbieter",
                         info=(
                             "Choose the vendor of the Embedding model. Each vendor "
                             "has different specification."
                         ),
                     )
                     self.spec = gr.Textbox(
-                        label="Specification",
-                        info="Specification of the Embedding model in YAML format.",
+                        label="Spezifikation",
+                        info="Spezifikation des Embedding-Modells im YAML-Format.",
                     )
                     self.default = gr.Checkbox(
-                        label="Set default",
+                        label="Als Standard festlegen",
                         info=(
                             "Set this Embedding model as default. This default "
                             "Embedding will be used by other components by default "
                             "if no Embedding is specified for such components."
                         ),
                     )
-                    self.btn_new = gr.Button("Add", variant="primary")
+                    self.btn_new = gr.Button("Hinzufügen", variant="primary")
 
                 with gr.Column(scale=3):
                     self.spec_desc = gr.Markdown(self.spec_desc_default)

@@ -8,9 +8,9 @@ class ChatSuggestion(BasePage):
         flowsettings,
         "KH_FEATURE_CHAT_SUGGESTION_SAMPLES",
         [
-            "Summary this document",
-            "Generate a FAQ for this document",
-            "Identify the main highlights in bullet points",
+            "Fasse dieses Dokument zusammen",
+            "Erstelle eine FAQ für dieses Dokument",
+            "Nenne die wichtigsten Punkte als Stichpunkte",
         ],
     )
 
@@ -21,7 +21,7 @@ class ChatSuggestion(BasePage):
     def on_building_ui(self):
         self.chat_samples = [[each] for each in self.CHAT_SAMPLES]
         with gr.Accordion(
-            label="Chat Suggestion",
+            label="Chat-Vorschläge",
             visible=getattr(flowsettings, "KH_FEATURE_CHAT_SUGGESTION", False),
         ) as self.accordion:
             self.default_example = gr.State(
@@ -29,7 +29,7 @@ class ChatSuggestion(BasePage):
             )
             self.examples = gr.DataFrame(
                 value=self.chat_samples,
-                headers=["Next Question"],
+                headers=["Nächste Frage"],
                 interactive=False,
                 elem_id="chat-suggestion",
                 wrap=True,
