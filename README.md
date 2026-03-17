@@ -96,49 +96,29 @@ documents and developers who want to build their own RAG pipeline.
 
 ### With Docker (recommended)
 
-1. We support both `lite` & `full` version of Docker images. With `full` version, the extra packages of `unstructured` will be installed, which can support additional file types (`.doc`, `.docx`, ...) but the cost is larger docker image size. For most users, the `lite` image should work well in most cases.
+1.
+git clone https://github.com/blizzark89/kaidoku.git
+cd kaidoku
 
-   - To use the `full` version.
+nano docker-compose.yaml
 
-     ```bash
-     docker run \
-     -e GRADIO_SERVER_NAME=0.0.0.0 \
-     -e GRADIO_SERVER_PORT=7860 \
-     -v ./ktem_app_data:/app/ktem_app_data \
-     -p 7860:7860 -it --rm \
-     ghcr.io/cinnamon/kotaemon:main-full
-     ```
+services:
+  kaidoku:
+    build:
+      context: .
+      # Falls es im Repo ein spezielles Dockerfile für "Full" gibt, hier den Pfad angeben:
+      dockerfile: Dockerfile 
+    container_name: kaidoku
+    restart: unless-stopped
+    environment:
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+    volumes:
+      - ./kaidoku_app_data:/app/ktem_app_data
+    ports:
+      - "7860:7860"
 
-   - To use the `full` version with bundled **Ollama** for _local / private RAG_.
-
-     ```bash
-     # change image name to
-     docker run <...> ghcr.io/cinnamon/kotaemon:main-ollama
-     ```
-
-   - To use the `lite` version.
-
-   ```bash
-    # change image name to
-    docker run <...> ghcr.io/cinnamon/kotaemon:main-lite
-   ```
-
-2. We currently support and test two platforms: `linux/amd64` and `linux/arm64` (for newer Mac). You can specify the platform by passing `--platform` in the `docker run` command. For example:
-
-   ```bash
-   # To run docker with platform linux/arm64
-   docker run \
-   -e GRADIO_SERVER_NAME=0.0.0.0 \
-   -e GRADIO_SERVER_PORT=7860 \
-   -v ./ktem_app_data:/app/ktem_app_data \
-   -p 7860:7860 -it --rm \
-   --platform linux/arm64 \
-   ghcr.io/cinnamon/kotaemon:main-lite
-   ```
-
-3. Once everything is set up correctly, you can go to `http://localhost:7860/` to access the WebUI.
-
-4. We use [GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry) to store docker images, all images can be found [here.](https://github.com/Cinnamon/kotaemon/pkgs/container/kotaemon)
+docker compose up -d --build
 
 ### Without Docker
 
