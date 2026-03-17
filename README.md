@@ -96,10 +96,12 @@ documents and developers who want to build their own RAG pipeline.
 
 ### With Docker (recommended)
 
-1.
+```shell
 git clone https://github.com/blizzark89/kaidoku.git
 cd kaidoku
+```
 
+```shell
 nano docker-compose.yaml
 
 services:
@@ -113,13 +115,16 @@ services:
     environment:
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860
+      - KH_USER_CAN_CREATE_USER=true
     volumes:
       - ./kaidoku_app_data:/app/ktem_app_data
     ports:
       - "7860:7860"
+```
 
+```shell
 docker compose up -d --build
-
+```
 ### Without Docker
 
 #### Option 1: Using uv (Recommended for faster installation)
