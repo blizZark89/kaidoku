@@ -49,7 +49,8 @@ docker ps
 cd ~/kaidoku
 git pull origin main
 docker compose down
-docker compose up -d --build
+docker compose build --no-cache
+docker compose up -d
 docker system prune -f
 docker ps
 ```
