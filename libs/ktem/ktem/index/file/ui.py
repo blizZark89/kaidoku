@@ -512,7 +512,7 @@ class FileIndexPage(BasePage):
                 zipMe.write(file, arcname=os.path.basename(file))
 
         if is_zipped_state:
-            new_button = gr.DownloadButton(label="Download", value=None)
+            new_button = gr.DownloadButton(label="Herunterladen", value=None)
         else:
             new_button = gr.DownloadButton(
                 label=DOWNLOAD_MESSAGE, value=f"{zip_file_path}.zip"
@@ -538,7 +538,7 @@ class FileIndexPage(BasePage):
             f.write(file_html)
 
         if is_zipped_state:
-            new_button = gr.DownloadButton(label="Download", value=None)
+            new_button = gr.DownloadButton(label="Herunterladen", value=None)
         else:
             # export the file path
             new_button = gr.DownloadButton(
