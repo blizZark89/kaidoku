@@ -1,4 +1,5 @@
 import hashlib
+import json
 import uuid
 
 import gradio as gr
@@ -25,6 +26,24 @@ PASSWORD_RULE = """**Passwort-Regeln:**
 - Mindestens eine Ziffer
 - Mindestens ein Sonderzeichen aus dieser Liste:
     ^ $ * . [ ] { } ( ) ? - " ! @ # % & / \\ , > < ' : ; | _ ~  + =
+"""
+
+
+fetch_team_state_js = """
+function(userId, currentValue) {
+    const key = `kaidoku_team_state_${userId || 'anonymous'}`;
+    return [userId, getStorage(key, currentValue || '')];
+}
+"""
+
+
+save_team_state_js = """
+function(userId, teamState) {
+    const key = `kaidoku_team_state_${userId || 'anonymous'}`;
+    const serialized = JSON.stringify(teamState || {teams: [], user_teams: {}});
+    setStorage(key, serialized);
+    return serialized;
+}
 """
 
 
@@ -198,6 +217,7 @@ class UserManagement(BasePage):
 
     def on_building_ui(self):
         self.team_state = gr.State(value=default_team_state())
+        self.team_state_storage = gr.Textbox(visible=False, value="")
 
         with gr.Tab(label="Benutzerliste"):
             self.state_user_list = gr.State(value=None)
@@ -309,6 +329,11 @@ class UserManagement(BasePage):
                 self.user_teams_edit,
                 self.user_teams_badges,
             ],
+        ).then(
+            fn=None,
+            inputs=[self._app.user_id, self.team_state],
+            outputs=[self.team_state_storage],
+            js=save_team_state_js,
         )
         self.user_list.select(
             self.select_user,
@@ -372,6 +397,11 @@ class UserManagement(BasePage):
                 self.user_teams_edit,
                 self.user_teams_badges,
             ],
+        ).then(
+            fn=None,
+            inputs=[self._app.user_id, self.team_state],
+            outputs=[self.team_state_storage],
+            js=save_team_state_js,
         )
         self.btn_delete_no.click(
             lambda: (
@@ -409,6 +439,11 @@ class UserManagement(BasePage):
                 self.user_teams_edit,
                 self.user_teams_badges,
             ],
+        ).then(
+            fn=None,
+            inputs=[self._app.user_id, self.team_state],
+            outputs=[self.team_state_storage],
+            js=save_team_state_js,
         )
         self.btn_close.click(
             lambda: -1,
@@ -448,6 +483,11 @@ class UserManagement(BasePage):
                 self.user_teams_edit,
                 self.user_teams_badges,
             ],
+        ).then(
+            fn=None,
+            inputs=[self._app.user_id, self.team_state],
+            outputs=[self.team_state_storage],
+            js=save_team_state_js,
         )
         self.btn_team_save.click(
             self.rename_team,
@@ -467,6 +507,11 @@ class UserManagement(BasePage):
                 self.user_teams_edit,
                 self.user_teams_badges,
             ],
+        ).then(
+            fn=None,
+            inputs=[self._app.user_id, self.team_state],
+            outputs=[self.team_state_storage],
+            js=save_team_state_js,
         )
         self.btn_team_delete.click(
             self.delete_team,
@@ -486,6 +531,11 @@ class UserManagement(BasePage):
                 self.user_teams_edit,
                 self.user_teams_badges,
             ],
+        ).then(
+            fn=None,
+            inputs=[self._app.user_id, self.team_state],
+            outputs=[self.team_state_storage],
+            js=save_team_state_js,
         )
         self.btn_team_close.click(lambda: "", outputs=[self.selected_team_id])
 
@@ -493,8 +543,8 @@ class UserManagement(BasePage):
         self._app.subscribe_event(
             name="onSignIn",
             definition={
-                "fn": self.refresh_management_views,
-                "inputs": [self._app.user_id, self.team_state],
+                "fn": self.load_team_state_and_refresh,
+                "inputs": [self._app.user_id, self.team_state_storage],
                 "outputs": [
                     self.team_state,
                     self.state_user_list,
@@ -505,6 +555,7 @@ class UserManagement(BasePage):
                     self.user_teams_edit,
                     self.user_teams_badges,
                 ],
+                "js": fetch_team_state_js,
             },
         )
         self._app.subscribe_event(
@@ -655,6 +706,15 @@ class UserManagement(BasePage):
             empty_choices,
             render_team_badges([]),
         )
+
+    def load_team_state_and_refresh(self, user_id, team_state_storage):
+        team_state = default_team_state()
+        if team_state_storage:
+            try:
+                team_state = normalize_team_state(json.loads(team_state_storage))
+            except Exception:
+                team_state = default_team_state()
+        return self.refresh_management_views(user_id, team_state)
 
     def select_user(self, user_list, ev: gr.SelectData):
         if ev.value == "-" and ev.index[0] == 0:
@@ -889,3 +949,21 @@ class UserManagement(BasePage):
 
         gr.Info(f'Team "{team["name"]}" erfolgreich gelöscht')
         return "", team_state
+
+    def _on_app_created(self):
+        self._app.app.load(
+            self.load_team_state_and_refresh,
+            inputs=[self._app.user_id, self.team_state_storage],
+            outputs=[
+                self.team_state,
+                self.state_user_list,
+                self.user_list,
+                self.state_team_list,
+                self.team_list,
+                self.user_teams_new,
+                self.user_teams_edit,
+                self.user_teams_badges,
+            ],
+            show_progress="hidden",
+            js=fetch_team_state_js,
+        )
