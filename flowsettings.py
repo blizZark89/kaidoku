@@ -335,13 +335,13 @@ SETTINGS_APP: dict[str, dict] = {}
 
 SETTINGS_REASONING = {
     "use": {
-        "name": "Reasoning options",
+        "name": "Reasoning-Optionen",
         "value": None,
         "choices": [],
         "component": "radio",
     },
     "lang": {
-        "name": "Language",
+        "name": "Sprache",
         "value": "en",
         "choices": [(lang, code) for code, lang in SUPPORTED_LANGUAGE_MAP.items()],
         "component": "dropdown",
@@ -375,7 +375,7 @@ KH_INDEX_TYPES = [
 GRAPHRAG_INDICES = [
     {
         "name": graph_type.split(".")[-1].replace("Index", "")
-        + " Collection",  # get last name
+        + " Sammlung",  # get last name
         "config": {
             "supported_file_types": (
                 ".png, .jpeg, .jpg, .tiff, .tif, .pdf, .xls, .xlsx, .doc, .docx, "
@@ -390,7 +390,7 @@ GRAPHRAG_INDICES = [
 
 KH_INDICES = [
     {
-        "name": "File Collection",
+        "name": "Dateisammlung",
         "config": {
             "supported_file_types": (
                 ".png, .jpeg, .jpg, .tiff, .tif, .pdf, .xls, .xlsx, .doc, .docx, "

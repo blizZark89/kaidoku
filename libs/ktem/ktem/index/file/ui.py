@@ -607,8 +607,8 @@ class FileIndexPage(BasePage):
                     quickUploadedEvent = (
                         self._app.chat_page.quick_file_upload.upload(
                             fn=lambda: gr.update(
-                                value="Please wait for the indexing process "
-                                "to complete before adding your question."
+                                value="Bitte warte, bis die Indexierung "
+                                "abgeschlossen ist, bevor du deine Frage hinzufügst."
                             ),
                             outputs=self._app.chat_page.quick_file_upload_status,
                         )
@@ -646,7 +646,7 @@ class FileIndexPage(BasePage):
                             outputs=self._app.chat_page._indices_input[1],
                         )
                         .then(
-                            fn=lambda: gr.update(value="Indexing completed."),
+                            fn=lambda: gr.update(value="Indexierung abgeschlossen."),
                             outputs=self._app.chat_page.quick_file_upload_status,
                         )
                         .then(
@@ -666,8 +666,8 @@ class FileIndexPage(BasePage):
                 quickURLUploadedEvent = (
                     self._app.chat_page.quick_urls.submit(
                         fn=lambda: gr.update(
-                            value="Please wait for the indexing process "
-                            "to complete before adding your question."
+                            value="Bitte warte, bis die Indexierung "
+                            "abgeschlossen ist, bevor du deine Frage hinzufügst."
                         ),
                         outputs=self._app.chat_page.quick_file_upload_status,
                     )
@@ -701,7 +701,7 @@ class FileIndexPage(BasePage):
                     inputs=self.quick_upload_state,
                     outputs=self._app.chat_page._indices_input[1],
                 ).then(
-                    fn=lambda: gr.update(value="Indexing completed."),
+                    fn=lambda: gr.update(value="Indexierung abgeschlossen."),
                     outputs=self._app.chat_page.quick_file_upload_status,
                 )
 

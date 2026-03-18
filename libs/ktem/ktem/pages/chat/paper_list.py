@@ -18,7 +18,7 @@ class PaperListPage(BasePage):
         ) as self.accordion:
             self.examples = gr.DataFrame(
                 value=[],
-                headers=["title", "url", "upvotes"],
+                headers=["Titel", "URL", "Upvotes"],
                 column_widths=[60, 30, 10],
                 interactive=False,
                 elem_id="paper-suggestion",

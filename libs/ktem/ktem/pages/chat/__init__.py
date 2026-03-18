@@ -237,7 +237,7 @@ class ChatPage(BasePage):
                     index_name = index.name
 
                     if KH_DEMO_MODE and is_first_index:
-                        index_name = "Select from Paper Collection"
+                        index_name = "Aus Papersammlung auswählen"
 
                     with gr.Accordion(
                         label=index_name,
@@ -815,7 +815,7 @@ class ChatPage(BasePage):
             outputs=[self._reasoning_type],
         )
         self.use_mindmap_check.change(
-            lambda x: (x, gr.update(label="Mindmap " + ("(on)" if x else "(off)"))),
+            lambda x: (x, gr.update(label="Mindmap " + ("(an)" if x else "(aus)"))),
             inputs=[self.use_mindmap_check],
             outputs=[self.use_mindmap, self.use_mindmap_check],
             show_progress="hidden",
