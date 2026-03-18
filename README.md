@@ -30,6 +30,7 @@ services:
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860
       - GRADIO_ALLOW_CORS=true
+      - GRADIO_SAMESITE="none"
       - KH_LOCALE=de
       - KH_FEATURE_USER_MANAGEMENT=True
     volumes:
