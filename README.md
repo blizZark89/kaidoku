@@ -40,6 +40,7 @@ services:
 
 ```shell
 docker compose up -d --build
+docker ps
 ```
 
 
@@ -49,5 +50,6 @@ cd ~/kaidoku
 git pull origin main
 docker compose up -d --build
 docker system prune -f
+docker ps
 ```
 
