@@ -32,8 +32,6 @@ services:
       - GRADIO_ALLOW_CORS=true
       - KH_LOCALE=de
       - KH_FEATURE_USER_MANAGEMENT=True
-      - KH_FEATURE_USER_MANAGEMENT_ADMIN=admin
-      - KH_FEATURE_USER_MANAGEMENT_PASSWORD=admin
     volumes:
       - ./kaidoku_app_data:/app/ktem_app_data
     ports:
