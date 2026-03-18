@@ -378,12 +378,12 @@ class ChatPage(BasePage):
                         )
 
                         if not config("USE_LOW_LLM_REQUESTS", default=False, cast=bool):
-                            self.use_mindmap = gr.State(value=True)
+                            self.use_mindmap = gr.State(value=False)
                             self.use_mindmap_check = gr.Checkbox(
-                                label="Mindmap (an)",
+                                label="Mindmap (aus)",
                                 container=False,
                                 elem_id="use-mindmap-checkbox",
-                                value=True,
+                                value=False,
                             )
                         else:
                             self.use_mindmap = gr.State(value=False)
