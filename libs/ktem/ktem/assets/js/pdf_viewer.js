@@ -82,10 +82,22 @@ function onBlockLoad() {
     return result.length / Math.min(n, m);
   }
 
+  function getPdfIframe() {
+    var pdfViewer = document.querySelector("#pdf-viewer");
+    if (!pdfViewer) {
+      return null;
+    }
+
+    return (
+      pdfViewer.iframe ||
+      pdfViewer.querySelector("iframe") ||
+      (pdfViewer.shadowRoot ? pdfViewer.shadowRoot.querySelector("iframe") : null)
+    );
+  }
+
   async function waitForPdfIframe(retries = 20) {
     for (var attempt = 0; attempt < retries; attempt++) {
-      var pdfViewer = document.querySelector("#pdf-viewer");
-      var iframe = pdfViewer ? pdfViewer.iframe : null;
+      var iframe = getPdfIframe();
       if (iframe) {
         return iframe;
       }
@@ -94,13 +106,31 @@ function onBlockLoad() {
     return null;
   }
 
-  globalThis.compareText = async (search_phrases, page_label) => {
-    var iframe = await waitForPdfIframe();
-    if (!iframe) return;
+  async function waitForPdfDocument(retries = 40) {
+    for (var attempt = 0; attempt < retries; attempt++) {
+      var iframe = await waitForPdfIframe(1);
+      if (!iframe) {
+        await sleep(100);
+        continue;
+      }
 
-    var innerDoc = iframe.contentDocument
-      ? iframe.contentDocument
-      : iframe.contentWindow.document;
+      var innerDoc = iframe.contentDocument
+        ? iframe.contentDocument
+        : iframe.contentWindow
+          ? iframe.contentWindow.document
+          : null;
+      if (innerDoc) {
+        return innerDoc;
+      }
+
+      await sleep(100);
+    }
+    return null;
+  }
+
+  globalThis.compareText = async (search_phrases, page_label) => {
+    var innerDoc = await waitForPdfDocument();
+    if (!innerDoc) return;
 
     var renderedPages = innerDoc.querySelectorAll("div#viewer div.page");
     if (renderedPages.length == 0) {
@@ -141,6 +171,10 @@ function onBlockLoad() {
   // Function to open modal and display PDF
   globalThis.openModal = async (event) => {
     event.preventDefault();
+    if (window.customElements && customElements.whenDefined) {
+      await customElements.whenDefined("pdfjs-viewer-element");
+    }
+
     var target = event.currentTarget;
     var src = target.getAttribute("data-src");
     var page = target.getAttribute("data-page");
