@@ -29,6 +29,7 @@ services:
     environment:
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860
+      - GRADIO_ALLOW_CORS=true
       - KH_LOCALE=de
       - KH_FEATURE_USER_MANAGEMENT=True
       - KH_FEATURE_USER_MANAGEMENT_ADMIN=admin
