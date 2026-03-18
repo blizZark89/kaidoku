@@ -191,6 +191,10 @@ class SettingsPage(BasePage):
                 inputs=[self._user_id] + self.components(),
                 outputs=self._settings_state,
             ).then(
+                self._app.update_graph_collection_tabs,
+                inputs=[self._user_id, self._settings_state],
+                outputs=self._app.graph_index_tabs(),
+            ).then(
                 lambda: gr.Tabs(selected="chat-tab"),
                 outputs=self._app.tabs,
             )
