@@ -100,6 +100,18 @@ button.selected {
   transition: all 0.4s;
 }
 
+#chat-info-panel figure {
+  margin: 0;
+}
+
+#chat-info-panel figure > img,
+#chat-info-panel img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 body.dark #chat-info-panel figure>img{
   filter: invert(100%);
 }
