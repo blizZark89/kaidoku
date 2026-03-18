@@ -171,10 +171,6 @@ function onBlockLoad() {
   // Function to open modal and display PDF
   globalThis.openModal = async (event) => {
     event.preventDefault();
-    if (window.customElements && customElements.whenDefined) {
-      await customElements.whenDefined("pdfjs-viewer-element");
-    }
-
     var target = event.currentTarget;
     var src = target.getAttribute("data-src");
     var page = target.getAttribute("data-page");
@@ -214,6 +210,12 @@ function onBlockLoad() {
       info_panel.style.display = "none";
     }
     scrollableDiv.scrollTop = 0;
+
+    if (window.customElements && customElements.whenDefined) {
+      customElements
+        .whenDefined("pdfjs-viewer-element")
+        .catch(() => null);
+    }
 
     /* search for text inside PDF page */
     await sleep(100);
