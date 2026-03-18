@@ -1,4 +1,4 @@
-# About Kotaemon
+# About kaidoku
 
 An open-source tool for you to chat with your documents.
 

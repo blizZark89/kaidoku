@@ -12,7 +12,7 @@ if not KH_DEMO_MODE:
     )
 else:
     PLACEHOLDER_TEXT = (
-        "Willkommen zur Kotaemon-Demo. "
+        "Willkommen zur kaidoku-Demo. "
         "Starte mit den vorgeladenen Unterhaltungen, um dich einzuarbeiten.\n"
         "Im Hinweis-Bereich findest du weitere Tipps."
     )

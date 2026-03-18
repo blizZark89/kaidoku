@@ -28,6 +28,7 @@ if not KH_APP_VERSION:
 KH_GRADIO_SHARE = config("KH_GRADIO_SHARE", default=False, cast=bool)
 KH_ENABLE_FIRST_SETUP = config("KH_ENABLE_FIRST_SETUP", default=True, cast=bool)
 KH_DEMO_MODE = config("KH_DEMO_MODE", default=False, cast=bool)
+KH_APP_NAME = config("KH_APP_NAME", default="kaidoku")
 KH_OLLAMA_URL = config("KH_OLLAMA_URL", default="http://localhost:11434/v1/")
 
 # App can be ran from anywhere and it's not trivial to decide where to store app data.

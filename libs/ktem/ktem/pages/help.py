@@ -67,7 +67,7 @@ class HelpPage:
             with gr.Accordion("Eigenen Space erstellen"):
                 gr.Markdown(
                     "Dies ist eine Demo mit eingeschränktem Funktionsumfang. "
-                    "Nutze die Schaltfläche **Space erstellen**, um Kotaemon "
+                    "Nutze die Schaltfläche **Space erstellen**, um kaidoku "
                     "mit allen Funktionen in deinem eigenen Space zu installieren "
                     "(einschließlich sicherem Hochladen und Verwalten privater "
                     "Dokumente)."
