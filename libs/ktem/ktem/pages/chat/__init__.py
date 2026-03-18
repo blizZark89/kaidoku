@@ -239,10 +239,16 @@ class ChatPage(BasePage):
                     if KH_DEMO_MODE and is_first_index:
                         index_name = "Aus Papersammlung auswählen"
 
+                    hide_index_selector = index_name.lower() in {
+                        "graphrag sammlung",
+                        "lightrag sammlung",
+                    }
+
                     with gr.Accordion(
                         label=index_name,
                         open=is_first_index,
                         elem_id=f"index-{index_id}",
+                        visible=not hide_index_selector,
                     ):
                         index_ui.render()
                         gr_index = index_ui.as_gradio_component()
@@ -277,7 +283,7 @@ class ChatPage(BasePage):
                         else "Oder neue Paper-URL eingeben"
                     )
 
-                    with gr.Accordion(label=quick_upload_label) as _:
+                    with gr.Accordion(label=quick_upload_label, visible=False) as _:
                         self.quick_file_upload_status = gr.Markdown()
                         if not KH_DEMO_MODE:
                             self.quick_file_upload = File(
