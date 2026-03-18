@@ -16,14 +16,7 @@ this_dir = Path(this_file).parent
 # change this if your app use a different name
 KH_PACKAGE_NAME = "kotaemon_app"
 
-KH_APP_VERSION = config("KH_APP_VERSION", None)
-if not KH_APP_VERSION:
-    try:
-        # Caution: This might produce the wrong version
-        # https://stackoverflow.com/a/59533071
-        KH_APP_VERSION = version(KH_PACKAGE_NAME)
-    except Exception:
-        KH_APP_VERSION = "local"
+KH_APP_VERSION = "0.1"
 
 KH_GRADIO_SHARE = config("KH_GRADIO_SHARE", default=False, cast=bool)
 KH_ENABLE_FIRST_SETUP = config("KH_ENABLE_FIRST_SETUP", default=True, cast=bool)
