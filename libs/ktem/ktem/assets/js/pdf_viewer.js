@@ -82,8 +82,22 @@ function onBlockLoad() {
     return result.length / Math.min(n, m);
   }
 
-  globalThis.compareText = (search_phrases, page_label) => {
-    var iframe = document.querySelector("#pdf-viewer").iframe;
+  async function waitForPdfIframe(retries = 20) {
+    for (var attempt = 0; attempt < retries; attempt++) {
+      var pdfViewer = document.querySelector("#pdf-viewer");
+      var iframe = pdfViewer ? pdfViewer.iframe : null;
+      if (iframe) {
+        return iframe;
+      }
+      await sleep(100);
+    }
+    return null;
+  }
+
+  globalThis.compareText = async (search_phrases, page_label) => {
+    var iframe = await waitForPdfIframe();
+    if (!iframe) return;
+
     var innerDoc = iframe.contentDocument
       ? iframe.contentDocument
       : iframe.contentWindow.document;
@@ -91,7 +105,7 @@ function onBlockLoad() {
     var renderedPages = innerDoc.querySelectorAll("div#viewer div.page");
     if (renderedPages.length == 0) {
       // if pages are not rendered yet, wait and try again
-      setTimeout(() => compareText(search_phrases, page_label), 2000);
+      setTimeout(() => compareText(search_phrases, page_label), 100);
       return;
     }
 
@@ -146,6 +160,7 @@ function onBlockLoad() {
     // var phrase = target.getAttribute("data-phrase");
 
     var pdfViewer = document.getElementById("pdf-viewer");
+    if (!pdfViewer) return;
 
     current_src = pdfViewer.getAttribute("src");
     if (current_src != src) {
@@ -167,8 +182,8 @@ function onBlockLoad() {
     scrollableDiv.scrollTop = 0;
 
     /* search for text inside PDF page */
-    await sleep(500);
-    compareText(search_phrases, page);
+    await sleep(100);
+    await compareText(search_phrases, page);
   };
 
   globalThis.assignPdfOnclickEvent = () => {
