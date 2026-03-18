@@ -136,7 +136,7 @@ class UserManagement(BasePage):
         with gr.Tab(label="Benutzerliste"):
             self.state_user_list = gr.State(value=None)
             self.user_list = gr.DataFrame(
-                headers=["id", "name", "admin"],
+                headers=["id", "username", "admin"],
                 column_widths=[0, 50, 50],
                 interactive=False,
             )
@@ -300,15 +300,20 @@ class UserManagement(BasePage):
             result = session.exec(statement).all()
             if result:
                 gr.Warning(f'Benutzername "{usn}" existiert bereits')
-                return
+                return usn, pwd, pwd_cnf
 
-            hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
-            user = User(
-                username=usn, username_lower=usn.lower(), password=hashed_password
-            )
-            session.add(user)
-            session.commit()
-            gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
+            try:
+                hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
+                user = User(
+                    username=usn, username_lower=usn.lower(), password=hashed_password
+                )
+                session.add(user)
+                session.commit()
+                gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
+            except Exception as e:
+                session.rollback()
+                gr.Warning(f'Benutzer "{usn}" konnte nicht erstellt werden: {e}')
+                return usn, pwd, pwd_cnf
 
         return "", "", ""
 
