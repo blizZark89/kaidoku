@@ -50,7 +50,7 @@ if KH_WEB_SEARCH_BACKEND:
 
 REASONING_LIMITS = 2 if KH_DEMO_MODE else 10
 DEFAULT_SETTING = "(default)"
-INFO_PANEL_SCALES = {True: 8, False: 4}
+INFO_PANEL_SCALES = {True: 8, False: 6}
 DEFAULT_QUESTION = (
     "Was ist die Zusammenfassung dieses Dokuments?"
     if not KH_DEMO_MODE
@@ -315,7 +315,7 @@ class ChatPage(BasePage):
 
                     self.hint_page = HintPage(self._app)
 
-            with gr.Column(scale=6, elem_id="chat-area"):
+            with gr.Column(scale=4, elem_id="chat-area"):
                 if KH_DEMO_MODE:
                     self.paper_list = PaperListPage(self._app)
 
