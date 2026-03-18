@@ -66,6 +66,7 @@ os.environ["HF_HUB_CACHE"] = str(KH_APP_DATA_DIR / "huggingface")
 KH_DOC_DIR = this_dir / "docs"
 
 KH_MODE = "dev"
+KH_LOCALE = "de"  # <--- Diese Zeile erzwingt die deutsche Oberfläche
 KH_SSO_ENABLED = config("KH_SSO_ENABLED", default=False, cast=bool)
 
 KH_FEATURE_CHAT_SUGGESTION = config(
