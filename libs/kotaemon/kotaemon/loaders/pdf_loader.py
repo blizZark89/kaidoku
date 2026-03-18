@@ -10,7 +10,7 @@ from PIL import Image
 
 from kotaemon.base import Document
 
-PDF_LOADER_DPI = config("PDF_LOADER_DPI", default=40, cast=int)
+PDF_LOADER_DPI = config("PDF_LOADER_DPI", default=96, cast=int)
 
 
 def get_page_thumbnails(
