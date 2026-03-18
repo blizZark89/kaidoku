@@ -115,7 +115,7 @@ class App(BaseApp):
                 "Hilfe",
                 elem_id="help-tab",
                 id="help-tab",
-                visible=not self.f_user_management,
+                visible=False,
                 elem_classes=["fill-main-area-height", "scrollable"],
             ) as self._tabs["help-tab"]:
                 self.help_page = HelpPage(self)
