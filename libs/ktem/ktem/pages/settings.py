@@ -184,6 +184,16 @@ class SettingsPage(BasePage):
                 },
             )
 
+    def _get_current_username_label(self, user_id):
+        name = "Aktueller Benutzer: "
+        if user_id:
+            with Session(engine) as session:
+                statement = select(User).where(User.id == user_id)
+                result = session.exec(statement).all()
+                if result:
+                    return name + result[0].username
+        return name + "___"
+
     def on_register_events(self):
         if not KH_SSO_ENABLED:
             self.setting_save_btn.click(
@@ -253,6 +263,15 @@ class SettingsPage(BasePage):
                 label="Passwort bestätigen", interactive=True, type="password"
             )
             self.password_change_btn = gr.Button("Passwort ändern", interactive=True)
+
+    def _on_app_created(self):
+        if self._app.f_user_management:
+            self._app.app.load(
+                self._get_current_username_label,
+                inputs=[self._user_id],
+                outputs=[self.current_name],
+                show_progress="hidden",
+            )
 
     def change_password(self, user_id, password, password_confirm):
         from ktem.pages.resources.user import validate_password
