@@ -229,6 +229,14 @@ def get_document_origin_label(is_owner, team_ids):
     return "Privates Dokument"
 
 
+def get_user_team_badges_html(user_id, team_state):
+    team_lookup = get_team_name_lookup(team_state)
+    user_team_ids = get_current_user_team_ids(user_id, team_state)
+    if not user_team_ids:
+        return "<div>Keine Teams zugeordnet</div>"
+    return get_visibility_badges_html(user_team_ids, team_lookup)
+
+
 class File(gr.File):
     """Subclass from gr.File to maintain the original filename
 
@@ -372,6 +380,7 @@ class FileIndexPage(BasePage):
         with gr.Row() as self.selection_info:
             self.selected_file_id = gr.State(value=None)
             with gr.Column(scale=2):
+                self.current_user_teams = gr.HTML("Keine Teams zugeordnet")
                 self.selected_panel = gr.Markdown(self.selected_panel_false)
                 self.selected_file_origin = gr.Markdown(visible=False)
                 self.selected_file_visibility = gr.HTML(visible=False)
@@ -1004,6 +1013,7 @@ class FileIndexPage(BasePage):
                     self.delete_button,
                     self.download_single_button,
                     self.chat_button,
+                    self.current_user_teams,
                     self.selected_file_origin,
                     self.selected_file_visibility,
                     self.selected_file_owner,
@@ -1051,6 +1061,7 @@ class FileIndexPage(BasePage):
                     self.delete_button,
                     self.download_single_button,
                     self.chat_button,
+                    self.current_user_teams,
                     self.selected_file_origin,
                     self.selected_file_visibility,
                     self.selected_file_owner,
@@ -1084,6 +1095,7 @@ class FileIndexPage(BasePage):
                 self.delete_button,
                 self.download_single_button,
                 self.chat_button,
+                self.current_user_teams,
                 self.selected_file_origin,
                 self.selected_file_visibility,
                 self.selected_file_owner,
@@ -1245,6 +1257,7 @@ class FileIndexPage(BasePage):
                 self.delete_button,
                 self.download_single_button,
                 self.chat_button,
+                self.current_user_teams,
                 self.selected_file_origin,
                 self.selected_file_visibility,
                 self.selected_file_owner,
@@ -1335,6 +1348,7 @@ class FileIndexPage(BasePage):
                 self.delete_button,
                 self.download_single_button,
                 self.chat_button,
+                self.current_user_teams,
                 self.selected_file_origin,
                 self.selected_file_visibility,
                 self.selected_file_owner,
@@ -1873,13 +1887,20 @@ class FileIndexPage(BasePage):
         document_visibility_state,
     ):
         team_lookup = get_team_name_lookup(team_state)
+        user_team_ids = get_current_user_team_ids(user_id, team_state)
+        user_team_choices = [
+            (team_name, team_id)
+            for team_name, team_id in get_team_choices(normalize_team_state(team_state))
+            if team_id in set(user_team_ids)
+        ]
         if file_id is None:
             hidden_dropdown = gr.update(
                 visible=False,
-                choices=get_team_choices(normalize_team_state(team_state)),
+                choices=user_team_choices,
                 value=[],
             )
             return (
+                gr.update(value=f"<div><strong>Meine Teams:</strong> {get_user_team_badges_html(user_id, team_state)}</div>"),
                 gr.update(visible=False, value=""),
                 gr.update(visible=False, value=""),
                 gr.update(visible=False, value=""),
@@ -1907,6 +1928,7 @@ class FileIndexPage(BasePage):
         selected_team_ids = visibility["teamIds"]
 
         return (
+            gr.update(value=f"<div><strong>Meine Teams:</strong> {get_user_team_badges_html(user_id, team_state)}</div>"),
             gr.update(
                 visible=True,
                 value=f"**Status:** {get_document_origin_label(editable, selected_team_ids)}",
@@ -1920,8 +1942,8 @@ class FileIndexPage(BasePage):
             owner_value,
             gr.update(
                 visible=editable,
-                choices=get_team_choices(normalize_team_state(team_state)),
-                value=selected_team_ids,
+                choices=user_team_choices,
+                value=[team_id for team_id in selected_team_ids if team_id in set(user_team_ids)],
             ),
             gr.update(visible=editable),
         )
@@ -1957,7 +1979,7 @@ class FileIndexPage(BasePage):
             gr.Warning("Nur der Besitzer kann die Team-Freigabe ändern")
             return document_visibility_state
 
-        valid_team_ids = {team_id for _, team_id in get_team_choices(team_state)}
+        valid_team_ids = set(get_current_user_team_ids(user_id, team_state))
         filtered_team_ids = [
             team_id for team_id in (selected_team_ids or []) if team_id in valid_team_ids
         ]
