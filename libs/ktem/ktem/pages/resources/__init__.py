@@ -66,3 +66,12 @@ class ResourcesTab(BasePage):
                 return gr.update(visible=True)
 
             return gr.update(visible=False)
+
+    def _on_app_created(self):
+        if self._app.f_user_management:
+            self._app.app.load(
+                self.toggle_user_management,
+                inputs=[self._app.user_id],
+                outputs=[self.user_management_tab],
+                show_progress="hidden",
+            )
