@@ -1,11 +1,10 @@
 import hashlib
 import json
-import uuid
 
 import gradio as gr
 import pandas as pd
 from ktem.app import BasePage
-from ktem.db.models import User, engine
+from ktem.db.models import Team, User, UserTeamMembership, engine
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -88,6 +87,77 @@ def get_team_names_for_user(username_lower, team_state):
     team_lookup = {team["id"]: team["name"] for team in state["teams"]}
     team_ids = state["user_teams"].get(username_lower.lower(), [])
     return [team_lookup[team_id] for team_id in team_ids if team_id in team_lookup]
+
+
+def build_team_state(session: Session):
+    teams = session.exec(select(Team)).all()
+    users = session.exec(select(User)).all()
+    memberships = session.exec(select(UserTeamMembership)).all()
+
+    user_lookup = {user.id: user.username_lower for user in users}
+    state = {
+        "teams": [{"id": team.id, "name": team.name} for team in teams],
+        "user_teams": {},
+    }
+    valid_team_ids = {team.id for team in teams}
+    for membership in memberships:
+        username_lower = user_lookup.get(membership.user_id)
+        if not username_lower or membership.team_id not in valid_team_ids:
+            continue
+        state["user_teams"].setdefault(username_lower, []).append(membership.team_id)
+
+    return normalize_team_state(state)
+
+
+def replace_user_team_memberships(session: Session, user_id: str, team_ids: list[str]):
+    memberships = session.exec(
+        select(UserTeamMembership).where(UserTeamMembership.user_id == user_id)
+    ).all()
+    for membership in memberships:
+        session.delete(membership)
+
+    for team_id in dict.fromkeys(team_ids):
+        session.add(UserTeamMembership(user_id=user_id, team_id=team_id))
+
+
+def import_legacy_team_state(session: Session, team_state_storage: str):
+    if not team_state_storage:
+        return
+
+    has_teams = session.exec(select(Team)).first()
+    has_memberships = session.exec(select(UserTeamMembership)).first()
+    if has_teams or has_memberships:
+        return
+
+    try:
+        legacy_state = normalize_team_state(json.loads(team_state_storage))
+    except Exception:
+        return
+
+    user_lookup = {
+        user.username_lower: user.id for user in session.exec(select(User)).all()
+    }
+    for team in legacy_state["teams"]:
+        session.add(
+            Team(
+                id=team["id"],
+                name=team["name"],
+                name_lower=team["name"].lower(),
+            )
+        )
+
+    session.commit()
+
+    valid_team_ids = {team["id"] for team in legacy_state["teams"]}
+    for username_lower, team_ids in legacy_state["user_teams"].items():
+        user_id = user_lookup.get(username_lower)
+        if not user_id:
+            continue
+        for team_id in team_ids:
+            if team_id in valid_team_ids:
+                session.add(UserTeamMembership(user_id=user_id, team_id=team_id))
+
+    session.commit()
 
 
 def format_team_names(team_names):
@@ -593,6 +663,8 @@ class UserManagement(BasePage):
 
     def create_user(self, usn, pwd, pwd_cnf, team_ids, team_state):
         team_state = normalize_team_state(team_state)
+        valid_team_ids = {team_id for _, team_id in get_team_choices(team_state)}
+        team_ids = [team_id for team_id in (team_ids or []) if team_id in valid_team_ids]
         errors = validate_username(usn)
         if errors:
             gr.Warning(errors)
@@ -618,7 +690,10 @@ class UserManagement(BasePage):
                 )
                 session.add(user)
                 session.commit()
-                team_state["user_teams"][usn.lower()] = list(team_ids or [])
+                session.refresh(user)
+                replace_user_team_memberships(session, user.id, list(team_ids or []))
+                session.commit()
+                team_state = build_team_state(session)
                 gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
             except Exception as e:
                 session.rollback()
@@ -628,13 +703,13 @@ class UserManagement(BasePage):
         return "", "", "", [], team_state
 
     def list_users(self, user_id, team_state):
-        team_state = normalize_team_state(team_state)
         if user_id is None:
             return [], pd.DataFrame.from_records(
                 [{"id": "-", "username": "-", "admin": "-", "teams": "-"}]
             )
 
         with Session(engine) as session:
+            team_state = build_team_state(session)
             statement = select(User).where(User.id == user_id)
             user = session.exec(statement).one()
             if not user.admin:
@@ -664,8 +739,8 @@ class UserManagement(BasePage):
         return results, user_list
 
     def list_teams(self, team_state):
-        team_state = normalize_team_state(team_state)
         with Session(engine) as session:
+            team_state = build_team_state(session)
             users = session.exec(select(User)).all()
 
         rows = []
@@ -691,7 +766,8 @@ class UserManagement(BasePage):
         return rows, pd.DataFrame.from_records(rows)
 
     def refresh_management_views(self, user_id, team_state):
-        team_state = normalize_team_state(team_state)
+        with Session(engine) as session:
+            team_state = build_team_state(session)
         user_rows, user_df = self.list_users(user_id, team_state)
         team_rows, team_df = self.list_teams(team_state)
         empty_choices = gr.update(choices=get_team_choices(team_state), value=[])
@@ -708,12 +784,9 @@ class UserManagement(BasePage):
         )
 
     def load_team_state_and_refresh(self, user_id, team_state_storage):
-        team_state = default_team_state()
-        if team_state_storage:
-            try:
-                team_state = normalize_team_state(json.loads(team_state_storage))
-            except Exception:
-                team_state = default_team_state()
+        with Session(engine) as session:
+            import_legacy_team_state(session, team_state_storage)
+            team_state = build_team_state(session)
         return self.refresh_management_views(user_id, team_state)
 
     def select_user(self, user_list, ev: gr.SelectData):
@@ -750,6 +823,7 @@ class UserManagement(BasePage):
             with Session(engine) as session:
                 statement = select(User).where(User.id == selected_user_id)
                 user = session.exec(statement).one()
+                team_state = build_team_state(session)
 
             usn_edit = gr.update(value=user.username)
             pwd_edit = gr.update(value="")
@@ -793,6 +867,8 @@ class UserManagement(BasePage):
 
     def save_user(self, selected_user_id, usn, pwd, pwd_cnf, admin, team_ids, team_state):
         team_state = normalize_team_state(team_state)
+        valid_team_ids = {team_id for _, team_id in get_team_choices(team_state)}
+        team_ids = [team_id for team_id in (team_ids or []) if team_id in valid_team_ids]
         errors = validate_username(usn)
         if errors:
             gr.Warning(errors)
@@ -825,18 +901,14 @@ class UserManagement(BasePage):
             user.admin = admin
             if pwd:
                 user.password = hashlib.sha256(pwd.encode()).hexdigest()
+            replace_user_team_memberships(session, user.id, list(team_ids or []))
             session.commit()
-            if old_username_lower != user.username_lower:
-                team_state["user_teams"][user.username_lower] = team_state["user_teams"].pop(
-                    old_username_lower, []
-                )
-            team_state["user_teams"][user.username_lower] = list(team_ids or [])
+            team_state = build_team_state(session)
             gr.Info(f'Benutzer "{usn}" erfolgreich aktualisiert')
 
         return "", "", team_state
 
     def delete_user(self, current_user, selected_user_id, team_state):
-        team_state = normalize_team_state(team_state)
         if current_user == selected_user_id:
             gr.Warning("Du kannst dich nicht selbst löschen")
             return selected_user_id, team_state
@@ -844,9 +916,16 @@ class UserManagement(BasePage):
         with Session(engine) as session:
             statement = select(User).where(User.id == selected_user_id)
             user = session.exec(statement).one()
-            team_state["user_teams"].pop(user.username_lower, None)
+            memberships = session.exec(
+                select(UserTeamMembership).where(
+                    UserTeamMembership.user_id == selected_user_id
+                )
+            ).all()
+            for membership in memberships:
+                session.delete(membership)
             session.delete(user)
             session.commit()
+            team_state = build_team_state(session)
             gr.Info(f'Benutzer "{user.username}" erfolgreich gelöscht')
         return -1, team_state
 
@@ -861,7 +940,8 @@ class UserManagement(BasePage):
         return team_list["id"][ev.index[0]]
 
     def on_selected_team_change(self, selected_team_id, team_state):
-        team_state = normalize_team_state(team_state)
+        with Session(engine) as session:
+            team_state = build_team_state(session)
         if not selected_team_id:
             return (
                 gr.update(visible=False),
@@ -887,68 +967,78 @@ class UserManagement(BasePage):
         )
 
     def create_team(self, team_name, team_state):
-        team_state = normalize_team_state(team_state)
         team_name = team_name.strip()
         if not team_name:
             gr.Warning("Der Teamname darf nicht leer sein")
-            return team_name, team_state
+            return team_name, normalize_team_state(team_state)
 
-        if any(team["name"].lower() == team_name.lower() for team in team_state["teams"]):
-            gr.Warning(f'Team "{team_name}" existiert bereits')
-            return team_name, team_state
+        with Session(engine) as session:
+            existing = session.exec(
+                select(Team).where(Team.name_lower == team_name.lower())
+            ).first()
+            if existing:
+                gr.Warning(f'Team "{team_name}" existiert bereits')
+                return team_name, build_team_state(session)
 
-        team_state["teams"].append({"id": uuid.uuid4().hex, "name": team_name})
-        gr.Info(f'Team "{team_name}" erfolgreich erstellt')
-        return "", team_state
+            session.add(Team(name=team_name, name_lower=team_name.lower()))
+            session.commit()
+            gr.Info(f'Team "{team_name}" erfolgreich erstellt')
+            return "", build_team_state(session)
 
     def rename_team(self, selected_team_id, team_name, team_state):
-        team_state = normalize_team_state(team_state)
         team_name = team_name.strip()
         if not selected_team_id:
             gr.Warning("Kein Team ausgewählt")
-            return team_name, team_state
+            return team_name, normalize_team_state(team_state)
         if not team_name:
             gr.Warning("Der Teamname darf nicht leer sein")
-            return team_name, team_state
+            return team_name, normalize_team_state(team_state)
 
-        for team in team_state["teams"]:
-            if team["id"] != selected_team_id and team["name"].lower() == team_name.lower():
+        with Session(engine) as session:
+            existing = session.exec(
+                select(Team).where(
+                    Team.name_lower == team_name.lower(),
+                    Team.id != selected_team_id,
+                )
+            ).first()
+            if existing:
                 gr.Warning(f'Team "{team_name}" existiert bereits')
-                return team_name, team_state
+                return team_name, build_team_state(session)
 
-        for team in team_state["teams"]:
-            if team["id"] == selected_team_id:
-                team["name"] = team_name
-                gr.Info(f'Team "{team_name}" erfolgreich umbenannt')
-                return team_name, team_state
+            team = session.exec(select(Team).where(Team.id == selected_team_id)).first()
+            if not team:
+                gr.Warning("Team nicht gefunden")
+                return team_name, build_team_state(session)
 
-        gr.Warning("Team nicht gefunden")
-        return team_name, team_state
+            team.name = team_name
+            team.name_lower = team_name.lower()
+            session.commit()
+            gr.Info(f'Team "{team_name}" erfolgreich umbenannt')
+            return team_name, build_team_state(session)
 
     def delete_team(self, selected_team_id, team_state):
-        team_state = normalize_team_state(team_state)
         if not selected_team_id:
             gr.Warning("Kein Team ausgewählt")
-            return selected_team_id, team_state
+            return selected_team_id, normalize_team_state(team_state)
 
-        team = next(
-            (team for team in team_state["teams"] if team["id"] == selected_team_id),
-            None,
-        )
-        if team is None:
-            gr.Warning("Team nicht gefunden")
-            return "", team_state
+        with Session(engine) as session:
+            team = session.exec(select(Team).where(Team.id == selected_team_id)).first()
+            if team is None:
+                gr.Warning("Team nicht gefunden")
+                return "", build_team_state(session)
 
-        team_state["teams"] = [
-            team for team in team_state["teams"] if team["id"] != selected_team_id
-        ]
-        for username, team_ids in team_state["user_teams"].items():
-            team_state["user_teams"][username] = [
-                team_id for team_id in team_ids if team_id != selected_team_id
-            ]
+            memberships = session.exec(
+                select(UserTeamMembership).where(
+                    UserTeamMembership.team_id == selected_team_id
+                )
+            ).all()
+            for membership in memberships:
+                session.delete(membership)
+            session.delete(team)
+            session.commit()
 
-        gr.Info(f'Team "{team["name"]}" erfolgreich gelöscht')
-        return "", team_state
+            gr.Info(f'Team "{team.name}" erfolgreich gelöscht')
+            return "", build_team_state(session)
 
     def _on_app_created(self):
         self._app.app.load(

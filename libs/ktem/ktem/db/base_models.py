@@ -100,3 +100,27 @@ class BaseIssueReport(SQLModel):
     chat: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     settings: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     user: Optional[str] = Field(default=None)
+
+
+class BaseTeam(SQLModel):
+    """Store teams in the database."""
+
+    __table_args__ = {"extend_existing": True}
+
+    id: str = Field(
+        default_factory=lambda: uuid.uuid4().hex, primary_key=True, index=True
+    )
+    name: str = Field(unique=True)
+    name_lower: str = Field(unique=True, index=True)
+
+
+class BaseUserTeamMembership(SQLModel):
+    """Store user-to-team memberships in the database."""
+
+    __table_args__ = {"extend_existing": True}
+
+    id: str = Field(
+        default_factory=lambda: uuid.uuid4().hex, primary_key=True, index=True
+    )
+    user_id: str = Field(index=True)
+    team_id: str = Field(index=True)

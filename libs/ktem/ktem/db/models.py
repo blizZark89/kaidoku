@@ -28,6 +28,18 @@ _base_issue_report = (
     else base_models.BaseIssueReport
 )
 
+_base_team = (
+    import_dotted_string(settings.KH_TABLE_TEAM, safe=False)
+    if hasattr(settings, "KH_TABLE_TEAM")
+    else base_models.BaseTeam
+)
+
+_base_user_team_membership = (
+    import_dotted_string(settings.KH_TABLE_USER_TEAM_MEMBERSHIP, safe=False)
+    if hasattr(settings, "KH_TABLE_USER_TEAM_MEMBERSHIP")
+    else base_models.BaseUserTeamMembership
+)
+
 
 class Conversation(_base_conv, table=True):  # type: ignore
     """Conversation record"""
@@ -43,6 +55,14 @@ class Settings(_base_settings, table=True):  # type: ignore
 
 class IssueReport(_base_issue_report, table=True):  # type: ignore
     """Record of issues"""
+
+
+class Team(_base_team, table=True):  # type: ignore
+    """Team table"""
+
+
+class UserTeamMembership(_base_user_team_membership, table=True):  # type: ignore
+    """User-team membership table"""
 
 
 if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
