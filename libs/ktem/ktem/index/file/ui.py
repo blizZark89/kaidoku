@@ -199,7 +199,11 @@ def get_document_visibility_meta(source, user_id, team_state, document_visibilit
 def get_visibility_label(team_ids, team_lookup):
     if not team_ids:
         return "Privat"
-    names = [team_lookup[team_id] for team_id in team_ids if team_id in team_lookup]
+    names = [
+        team_lookup[team_id]
+        for team_id in dict.fromkeys(team_ids)
+        if team_id in team_lookup
+    ]
     return ", ".join(names) if names else "Privat"
 
 
@@ -217,7 +221,7 @@ def get_visibility_badges_html(team_ids, team_lookup):
             "border:1px solid var(--border-color-primary);font-size:12px;'>"
             f"{html.escape(team_lookup[team_id])}</span>"
         )
-        for team_id in team_ids
+        for team_id in dict.fromkeys(team_ids)
         if team_id in team_lookup
     )
 
@@ -1958,7 +1962,7 @@ class FileIndexPage(BasePage):
         document_visibility_state,
     ):
         document_visibility_state = normalize_document_visibility_state(
-            document_visibility_state
+            deepcopy(document_visibility_state)
         )
         if not file_id:
             gr.Warning("Keine Datei ausgewählt")
@@ -1982,12 +1986,17 @@ class FileIndexPage(BasePage):
 
         valid_team_ids = set(get_current_user_team_ids(user_id, team_state))
         filtered_team_ids = [
-            team_id for team_id in (selected_team_ids or []) if team_id in valid_team_ids
+            team_id
+            for team_id in dict.fromkeys(selected_team_ids or [])
+            if team_id in valid_team_ids
         ]
-        document_visibility_state["documents"][file_id] = {
-            "ownerId": visibility["ownerId"],
-            "teamIds": filtered_team_ids,
-        }
+        if filtered_team_ids:
+            document_visibility_state["documents"][file_id] = {
+                "ownerId": visibility["ownerId"],
+                "teamIds": filtered_team_ids,
+            }
+        else:
+            document_visibility_state["documents"].pop(file_id, None)
         gr.Info("Team-Freigabe gespeichert")
         return document_visibility_state
 
