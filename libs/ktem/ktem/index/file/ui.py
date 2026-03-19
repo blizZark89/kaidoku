@@ -973,6 +973,48 @@ class FileIndexPage(BasePage):
         if KH_DEMO_MODE:
             return
 
+        if self._app.f_user_management:
+            source_team_state = self._app.resources_page.user_management.team_state
+            source_team_state.change(
+                fn=lambda team_state: team_state,
+                inputs=[source_team_state],
+                outputs=[self.file_team_state],
+                show_progress="hidden",
+            ).then(
+                fn=self.list_file,
+                inputs=[
+                    self._app.user_id,
+                    self.filter,
+                    self.file_team_state,
+                    self.document_visibility_state,
+                ],
+                outputs=[self.file_list_state, self.file_list],
+                show_progress="hidden",
+            ).then(
+                fn=self.file_selected,
+                inputs=[
+                    self.selected_file_id,
+                    self._app.user_id,
+                    self.file_team_state,
+                    self.document_visibility_state,
+                ],
+                outputs=[
+                    self.chunks,
+                    self.deselect_button,
+                    self.delete_button,
+                    self.download_single_button,
+                    self.chat_button,
+                    self.selected_file_origin,
+                    self.selected_file_visibility,
+                    self.selected_file_owner,
+                    self.selected_file_team_ids,
+                    self.selected_file_owner_id,
+                    self.selected_file_team_select,
+                    self.selected_file_save_teams,
+                ],
+                show_progress="hidden",
+            )
+
         onDeleted = (
             self.delete_button.click(
                 fn=self.delete_event,
@@ -2223,6 +2265,25 @@ class FileSelector(BasePage):
                 fn=None,
                 inputs=[self.selector_choices],
                 js=update_file_list_js,
+                show_progress="hidden",
+            )
+        if self._app.f_user_management:
+            source_team_state = self._app.resources_page.user_management.team_state
+            source_team_state.change(
+                fn=lambda team_state: team_state,
+                inputs=[source_team_state],
+                outputs=[self.selector_team_state],
+                show_progress="hidden",
+            ).then(
+                fn=self.load_files,
+                inputs=[
+                    self.selector,
+                    self._app.user_id,
+                    self.selector_team_state,
+                    self.selector_document_state,
+                    self.team_selector,
+                ],
+                outputs=[self.selector, self.selector_choices, self.team_selector],
                 show_progress="hidden",
             )
 
