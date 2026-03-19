@@ -16,6 +16,7 @@ from ktem.app import BasePage
 from ktem.db.engine import engine
 from ktem.db.models import User
 from ktem.pages.resources.user import (
+    build_team_state,
     default_team_state,
     get_team_choices,
     normalize_team_state,
@@ -2002,13 +2003,8 @@ class FileIndexPage(BasePage):
         return state
 
     def load_file_team_state(self, user_id, file_team_state_storage):
-        team_state = default_team_state()
-        if file_team_state_storage:
-            try:
-                team_state = normalize_team_state(json.loads(file_team_state_storage))
-            except Exception:
-                team_state = default_team_state()
-        return team_state
+        with Session(engine) as session:
+            return build_team_state(session)
 
     def list_file_names(self, file_list_state):
         if file_list_state:
@@ -2410,12 +2406,8 @@ class FileSelector(BasePage):
     def load_selector_access_state(
         self, user_id, selector_team_state_storage, selector_document_state_storage
     ):
-        team_state = default_team_state()
-        if selector_team_state_storage:
-            try:
-                team_state = normalize_team_state(json.loads(selector_team_state_storage))
-            except Exception:
-                team_state = default_team_state()
+        with Session(engine) as session:
+            team_state = build_team_state(session)
 
         document_state = default_document_visibility_state()
         if selector_document_state_storage:
