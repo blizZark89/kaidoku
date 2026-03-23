@@ -155,12 +155,28 @@ def get_current_username_lower(user_id):
     return user[0].username_lower
 
 
+def is_current_user_admin(user_id):
+    if user_id is None:
+        return False
+
+    with Session(engine) as session:
+        user = session.execute(select(User).where(User.id == user_id)).first()
+
+    if not user:
+        return False
+
+    return bool(user[0].admin)
+
+
 def get_current_user_team_ids(user_id, team_state):
+    state = normalize_team_state(team_state)
+    if is_current_user_admin(user_id):
+        return [team_id for _, team_id in get_team_choices(state)]
+
     username_lower = get_current_username_lower(user_id)
     if not username_lower:
         return []
 
-    state = normalize_team_state(team_state)
     return state["user_teams"].get(username_lower, [])
 
 
