@@ -2365,7 +2365,12 @@ class FileSelector(BasePage):
         available_ids = []
         team_state = normalize_team_state(team_state)
         user_team_ids = get_current_user_team_ids(user_id, team_state)
-        team_choices = get_team_choices(team_state)
+        allowed_team_ids = set(user_team_ids)
+        team_choices = [
+            (team_name, team_id)
+            for team_name, team_id in get_team_choices(team_state)
+            if team_id in allowed_team_ids
+        ]
         selected_team_filters = [
             team_id for team_id in (selected_team_filters or []) if team_id in {id_ for _, id_ in team_choices}
         ]
