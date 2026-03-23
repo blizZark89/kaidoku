@@ -568,6 +568,22 @@ class ChatPage(BasePage):
 
         if KH_DEMO_MODE:
             self.chat_control.btn_demo_logout.click(
+                fn=lambda: self.chat_control.select_conv("", None),
+                outputs=[
+                    self.chat_control.conversation_id,
+                    self.chat_control.conversation,
+                    self.chat_control.conversation_rn,
+                    self.chat_panel.chatbot,
+                    self.followup_questions,
+                    self.info_panel,
+                    self.state_plot_panel,
+                    self.state_retrieval_history,
+                    self.state_plot_history,
+                    self.chat_control.cb_is_public,
+                    self.state_chat,
+                ]
+                + self._indices_input,
+            ).then(
                 fn=None,
                 js=self.chat_control.logout_js,
             )
