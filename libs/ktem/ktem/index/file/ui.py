@@ -6,21 +6,20 @@ import tempfile
 import zipfile
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Generator
+from typing import Generator
 
 import gradio as gr
 import pandas as pd
 from gradio.data_classes import FileData
 from gradio.utils import NamedString
+from ktem.authz import (
+    allowed_user_ids_for_scope,
+    get_access_context,
+    has_read_access,
+    has_upload_access,
+)
 from ktem.app import BasePage
 from ktem.db.engine import engine
-from ktem.db.models import User
-from ktem.pages.resources.user import (
-    build_team_state,
-    default_team_state,
-    get_team_choices,
-    normalize_team_state,
-)
 from ktem.utils.render import Render
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -80,182 +79,6 @@ function(file_list) {
 """.replace(
     "web_search", WEB_SEARCH_COMMAND
 )
-
-fetch_document_visibility_state_js = """
-function(userId, currentValue) {
-    return [userId, getStorage('kaidoku_document_visibility_state', currentValue || '')];
-}
-"""
-
-save_document_visibility_state_js = """
-function(documentState) {
-    const serialized = JSON.stringify(documentState || {documents: {}});
-    setStorage('kaidoku_document_visibility_state', serialized);
-    return serialized;
-}
-"""
-
-fetch_selector_access_state_js = """
-function(userId, currentTeamValue, currentDocumentValue) {
-    const teamKey = `kaidoku_team_state_${userId || 'anonymous'}`;
-    return [
-        userId,
-        getStorage(teamKey, currentTeamValue || ''),
-        getStorage('kaidoku_document_visibility_state', currentDocumentValue || ''),
-    ];
-}
-"""
-
-fetch_file_team_state_js = """
-function(userId, currentValue) {
-    const key = `kaidoku_team_state_${userId || 'anonymous'}`;
-    return [userId, getStorage(key, currentValue || '')];
-}
-"""
-
-
-def default_document_visibility_state():
-    return {"documents": {}}
-
-
-def normalize_document_visibility_state(document_state):
-    state = default_document_visibility_state()
-    if not isinstance(document_state, dict):
-        return state
-
-    documents = {}
-    for document_id, entry in document_state.get("documents", {}).items():
-        if not isinstance(entry, dict):
-            continue
-        doc_id = str(document_id).strip()
-        owner_id = str(entry.get("ownerId", "")).strip()
-        team_ids = entry.get("teamIds", [])
-        if not isinstance(team_ids, list):
-            team_ids = []
-        if doc_id:
-            documents[doc_id] = {
-                "ownerId": owner_id,
-                "teamIds": [str(team_id).strip() for team_id in team_ids if str(team_id).strip()],
-            }
-
-    state["documents"] = documents
-    return state
-
-
-def get_current_username_lower(user_id):
-    if user_id is None:
-        return ""
-
-    with Session(engine) as session:
-        user = session.execute(select(User).where(User.id == user_id)).first()
-
-    if not user:
-        return ""
-
-    return user[0].username_lower
-
-
-def is_current_user_admin(user_id):
-    if user_id is None:
-        return False
-
-    with Session(engine) as session:
-        user = session.execute(select(User).where(User.id == user_id)).first()
-
-    if not user:
-        return False
-
-    return bool(user[0].admin)
-
-
-def get_current_user_team_ids(user_id, team_state):
-    state = normalize_team_state(team_state)
-    if is_current_user_admin(user_id):
-        return [team_id for _, team_id in get_team_choices(state)]
-
-    username_lower = get_current_username_lower(user_id)
-    if not username_lower:
-        return []
-
-    return state["user_teams"].get(username_lower, [])
-
-
-def get_document_access(source, document_visibility_state):
-    state = normalize_document_visibility_state(document_visibility_state)
-    entry = state["documents"].get(source.id, {})
-    return {
-        "ownerId": str(entry.get("ownerId") or source.user or ""),
-        "teamIds": list(entry.get("teamIds", [])),
-    }
-
-
-def get_team_name_lookup(team_state):
-    state = normalize_team_state(team_state)
-    return {team_id: team_name for team_name, team_id in get_team_choices(state)}
-
-
-def get_document_visibility_meta(source, user_id, team_state, document_visibility_state):
-    access = get_document_access(source, document_visibility_state)
-    owner_id = access["ownerId"]
-    team_ids = access["teamIds"]
-    user_team_ids = get_current_user_team_ids(user_id, team_state)
-    is_owner = owner_id == str(user_id)
-    shared_team_ids = [team_id for team_id in team_ids if team_id in user_team_ids]
-    is_visible = is_owner or bool(shared_team_ids)
-    return {
-        "ownerId": owner_id,
-        "teamIds": team_ids,
-        "userTeamIds": user_team_ids,
-        "sharedTeamIds": shared_team_ids,
-        "isOwner": is_owner,
-        "isVisible": is_visible,
-    }
-
-
-def get_visibility_label(team_ids, team_lookup):
-    if not team_ids:
-        return "Privat"
-    names = [
-        team_lookup[team_id]
-        for team_id in dict.fromkeys(team_ids)
-        if team_id in team_lookup
-    ]
-    return ", ".join(names) if names else "Privat"
-
-
-def get_visibility_badges_html(team_ids, team_lookup):
-    if not team_ids:
-        return (
-            "<span style='display:inline-block;padding:4px 10px;border-radius:999px;"
-            "background:#f5d7d7;border:1px solid #d96c6c;font-size:12px;'>Privat</span>"
-        )
-
-    return "".join(
-        (
-            "<span style='display:inline-block;padding:4px 10px;margin:0 6px 6px 0;"
-            "border-radius:999px;background:var(--background-fill-secondary);"
-            "border:1px solid var(--border-color-primary);font-size:12px;'>"
-            f"{html.escape(team_lookup[team_id])}</span>"
-        )
-        for team_id in dict.fromkeys(team_ids)
-        if team_id in team_lookup
-    )
-
-
-def get_document_origin_label(is_owner, team_ids):
-    if is_owner:
-        return "Mein Dokument"
-    if team_ids:
-        return "Geteilt über Team"
-    return "Privates Dokument"
-
-
-def get_user_team_badges_html(user_id, team_state):
-    team_lookup = get_team_name_lookup(team_state)
-    user_team_ids = get_current_user_team_ids(user_id, team_state)
-    if not user_team_ids:
-        return "<div>Keine Teams zugeordnet</div>"
-    return get_visibility_badges_html(user_team_ids, team_lookup)
 
 
 class File(gr.File):
@@ -346,11 +169,28 @@ class FileIndexPage(BasePage):
 
         return ""
 
+    def _scope_user_ids(self, session: Session, user_id):
+        if not self._app.f_user_management:
+            return None
+        actor = get_access_context(session, user_id)
+        if not actor or not has_read_access(actor):
+            return []
+        return allowed_user_ids_for_scope(session, actor)
+
+    def _check_upload_permission(self, user_id) -> bool:
+        if not self._app.f_user_management:
+            return True
+        with Session(engine) as session:
+            actor = get_access_context(session, user_id)
+            if not actor:
+                gr.Warning("Nicht angemeldet")
+                return False
+            if not has_upload_access(actor):
+                gr.Warning("Keine Upload-Berechtigung")
+                return False
+            return True
+
     def render_file_list(self):
-        self.file_team_state = gr.State(value=default_team_state())
-        self.file_team_state_storage = gr.Textbox(visible=False, value="")
-        self.document_visibility_state = gr.State(value=default_document_visibility_state())
-        self.document_visibility_storage = gr.Textbox(visible=False, value="")
         self.filter = gr.Textbox(
             value="",
             label="Nach Namen filtern:",
@@ -361,21 +201,19 @@ class FileIndexPage(BasePage):
         )
         self.file_list_state = gr.State(value=None)
         self.file_list = gr.DataFrame(
-                headers=[
-                    "id",
-                    "name",
-                    "sichtbarkeit",
-                    "herkunft",
-                    "size",
-                    "tokens",
-                    "loader",
-                    "date_created",
-                ],
-                column_widths=[0, 28, 22, 15, 8, 7, 10, 18],
-                interactive=False,
-                wrap=False,
-                elem_id="file_list_view",
-            )
+            headers=[
+                "id",
+                "name",
+                "size",
+                "tokens",
+                "loader",
+                "date_created",
+            ],
+            column_widths=[0, 50, 8, 7, 15, 20],
+            interactive=False,
+            wrap=False,
+            elem_id="file_list_view",
+        )
 
         with gr.Row():
 
@@ -401,26 +239,7 @@ class FileIndexPage(BasePage):
         with gr.Row() as self.selection_info:
             self.selected_file_id = gr.State(value=None)
             with gr.Column(scale=2):
-                self.current_user_teams = gr.HTML("Keine Teams zugeordnet")
                 self.selected_panel = gr.Markdown(self.selected_panel_false)
-                self.selected_file_origin = gr.Markdown(visible=False)
-                self.selected_file_visibility = gr.HTML(visible=False)
-                self.selected_file_owner = gr.Markdown(visible=False)
-                self.selected_file_team_ids = gr.State(value=[])
-                self.selected_file_owner_id = gr.State(value="")
-                self.selected_file_team_select = gr.Dropdown(
-                    label="Für Teams freigeben",
-                    choices=[],
-                    value=[],
-                    multiselect=True,
-                    allow_custom_value=False,
-                    visible=False,
-                )
-                self.selected_file_save_teams = gr.Button(
-                    "Team-Freigabe speichern",
-                    variant="primary",
-                    visible=False,
-                )
 
         self.chunks = gr.HTML(visible=False)
 
@@ -552,9 +371,6 @@ class FileIndexPage(BasePage):
         if KH_DEMO_MODE:
             return
 
-        team_state_input = self.file_team_state
-        document_state_input = self.document_visibility_state
-
         self._app.subscribe_event(
             name=f"onFileIndex{self._index.id}Changed",
             definition={
@@ -566,6 +382,15 @@ class FileIndexPage(BasePage):
         )
 
         if self._app.f_user_management:
+            self._app.subscribe_event(
+                name="onSignIn",
+                definition={
+                    "fn": self.list_file,
+                    "inputs": [self._app.user_id],
+                    "outputs": [self.file_list_state, self.file_list],
+                    "show_progress": "hidden",
+                },
+            )
             self._app.subscribe_event(
                 name="onSignIn",
                 definition={
@@ -584,61 +409,17 @@ class FileIndexPage(BasePage):
                     "show_progress": "hidden",
                 },
             )
-            for event_name in ["onSignIn", "onSignOut"]:
-                self._app.subscribe_event(
-                    name=event_name,
-                    definition={
-                        "fn": self.load_file_team_state,
-                        "inputs": [self._app.user_id, self.file_team_state_storage],
-                        "outputs": [self.file_team_state],
-                        "show_progress": "hidden",
-                        "js": fetch_file_team_state_js,
-                    },
-                )
-                self._app.subscribe_event(
-                    name=event_name,
-                    definition={
-                        "fn": self.load_document_visibility_state,
-                        "inputs": [self._app.user_id, self.document_visibility_storage],
-                        "outputs": [self.document_visibility_state],
-                        "show_progress": "hidden",
-                        "js": fetch_document_visibility_state_js,
-                    },
-                )
-                self._app.subscribe_event(
-                    name=event_name,
-                    definition={
-                        "fn": self.list_file,
-                        "inputs": [
-                            self._app.user_id,
-                            self.filter,
-                            team_state_input,
-                            self.document_visibility_state,
-                        ],
-                        "outputs": [self.file_list_state, self.file_list],
-                        "show_progress": "hidden",
-                    },
-                )
-                self._app.subscribe_event(
-                    name=event_name,
-                    definition={
-                        "fn": self.list_group,
-                        "inputs": [self._app.user_id, self.file_list_state],
-                        "outputs": [self.group_list_state, self.group_list],
-                        "show_progress": "hidden",
-                    },
-                )
-                self._app.subscribe_event(
-                    name=event_name,
-                    definition={
-                        "fn": self.list_file_names,
-                        "inputs": [self.file_list_state],
-                        "outputs": [self.group_files],
-                        "show_progress": "hidden",
-                    },
-                )
+            self._app.subscribe_event(
+                name="onSignOut",
+                definition={
+                    "fn": self.list_file,
+                    "inputs": [self._app.user_id],
+                    "outputs": [self.file_list_state, self.file_list],
+                    "show_progress": "hidden",
+                },
+            )
 
-    def file_selected(self, file_id, user_id=None, team_state=None, document_visibility_state=None):
+    def file_selected(self, file_id):
         chunks = []
         if file_id is not None:
             # get the chunks
@@ -682,32 +463,15 @@ class FileIndexPage(BasePage):
                             content=content,
                         )
                     )
-        visibility = {"isOwner": False}
-        if file_id is not None:
-            Source = self._index._resources["Source"]
-            with Session(engine) as session:
-                source_row = session.execute(select(Source).where(Source.id == file_id)).first()
-            if source_row:
-                visibility = get_document_visibility_meta(
-                    source_row[0], user_id, team_state, document_visibility_state
-                )
-
-        selected_updates = self.get_selected_document_updates(
-            file_id,
-            user_id,
-            team_state,
-            document_visibility_state,
-        )
         return (
             gr.update(value="".join(chunks), visible=file_id is not None),
             gr.update(visible=file_id is not None),
-            gr.update(visible=file_id is not None and visibility["isOwner"]),
             gr.update(visible=file_id is not None),
             gr.update(visible=file_id is not None),
-            *selected_updates,
+            gr.update(visible=file_id is not None),
         )
 
-    def delete_event(self, file_id):
+    def delete_event(self, file_id, user_id):
         file_name = ""
         with Session(engine) as session:
             source = session.execute(
@@ -716,6 +480,10 @@ class FileIndexPage(BasePage):
                 )
             ).first()
             if source:
+                scope_ids = self._scope_user_ids(session, user_id)
+                if scope_ids is not None and source[0].user not in scope_ids:
+                    gr.Warning("Keine Berechtigung für diese Datei")
+                    return None, self.selected_panel_false
                 file_name = source[0].name
                 session.delete(source[0])
 
@@ -747,13 +515,20 @@ class FileIndexPage(BasePage):
             gr.update(visible=False),
         )
 
-    def download_single_file(self, is_zipped_state, file_id):
+    def download_single_file(self, is_zipped_state, file_id, user_id):
         with Session(engine) as session:
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
                 )
             ).first()
+            if source:
+                scope_ids = self._scope_user_ids(session, user_id)
+                if scope_ids is not None and source[0].user not in scope_ids:
+                    gr.Warning("Keine Berechtigung für diese Datei")
+                    return is_zipped_state, gr.DownloadButton(
+                        label="Download", value=None
+                    )
         if source:
             target_file_name = Path(source[0].name)
         zip_files = []
@@ -775,7 +550,7 @@ class FileIndexPage(BasePage):
                 zipMe.write(file, arcname=os.path.basename(file))
 
         if is_zipped_state:
-            new_button = gr.DownloadButton(label="Herunterladen", value=None)
+            new_button = gr.DownloadButton(label="Download", value=None)
         else:
             new_button = gr.DownloadButton(
                 label=DOWNLOAD_MESSAGE, value=f"{zip_file_path}.zip"
@@ -783,13 +558,20 @@ class FileIndexPage(BasePage):
 
         return not is_zipped_state, new_button
 
-    def download_single_file_simple(self, is_zipped_state, file_html, file_id):
+    def download_single_file_simple(self, is_zipped_state, file_html, file_id, user_id):
         with Session(engine) as session:
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
                 )
             ).first()
+            if source:
+                scope_ids = self._scope_user_ids(session, user_id)
+                if scope_ids is not None and source[0].user not in scope_ids:
+                    gr.Warning("Keine Berechtigung für diese Datei")
+                    return is_zipped_state, gr.DownloadButton(
+                        label="Download", value=None
+                    )
         if source:
             target_file_name = Path(source[0].name)
 
@@ -801,7 +583,7 @@ class FileIndexPage(BasePage):
             f.write(file_html)
 
         if is_zipped_state:
-            new_button = gr.DownloadButton(label="Herunterladen", value=None)
+            new_button = gr.DownloadButton(label="Download", value=None)
         else:
             # export the file path
             new_button = gr.DownloadButton(
@@ -829,9 +611,9 @@ class FileIndexPage(BasePage):
                 zipMe.write(file, arcname=arcname.name)
         return gr.DownloadButton(label=DOWNLOAD_MESSAGE, value=f"{zip_file_path}.zip")
 
-    def delete_all_files(self, file_list):
+    def delete_all_files(self, file_list, user_id):
         for file_id in file_list.id.values:
-            self.delete_event(file_id)
+            self.delete_event(file_id, user_id)
 
     def set_file_id_selector(self, selected_file_id):
         return [selected_file_id, "select", gr.Tabs(selected="chat-tab")]
@@ -870,8 +652,8 @@ class FileIndexPage(BasePage):
                     quickUploadedEvent = (
                         self._app.chat_page.quick_file_upload.upload(
                             fn=lambda: gr.update(
-                                value="Bitte warte, bis die Indexierung "
-                                "abgeschlossen ist, bevor du deine Frage hinzufügst."
+                                value="Please wait for the indexing process "
+                                "to complete before adding your question."
                             ),
                             outputs=self._app.chat_page.quick_file_upload_status,
                         )
@@ -909,17 +691,12 @@ class FileIndexPage(BasePage):
                             outputs=self._app.chat_page._indices_input[1],
                         )
                         .then(
-                            fn=lambda: gr.update(value="Indexierung abgeschlossen."),
+                            fn=lambda: gr.update(value="Indexing completed."),
                             outputs=self._app.chat_page.quick_file_upload_status,
                         )
                         .then(
                             fn=self.list_file,
-                            inputs=[
-                                self._app.user_id,
-                                self.filter,
-                                self.file_team_state,
-                                self.document_visibility_state,
-                            ],
+                            inputs=[self._app.user_id, self.filter],
                             outputs=[self.file_list_state, self.file_list],
                             concurrency_limit=20,
                         )
@@ -934,8 +711,8 @@ class FileIndexPage(BasePage):
                 quickURLUploadedEvent = (
                     self._app.chat_page.quick_urls.submit(
                         fn=lambda: gr.update(
-                            value="Bitte warte, bis die Indexierung "
-                            "abgeschlossen ist, bevor du deine Frage hinzufügst."
+                            value="Please wait for the indexing process "
+                            "to complete before adding your question."
                         ),
                         outputs=self._app.chat_page.quick_file_upload_status,
                     )
@@ -969,19 +746,14 @@ class FileIndexPage(BasePage):
                     inputs=self.quick_upload_state,
                     outputs=self._app.chat_page._indices_input[1],
                 ).then(
-                    fn=lambda: gr.update(value="Indexierung abgeschlossen."),
+                    fn=lambda: gr.update(value="Indexing completed."),
                     outputs=self._app.chat_page.quick_file_upload_status,
                 )
 
                 if not KH_DEMO_MODE:
                     quickURLUploadedEvent = quickURLUploadedEvent.then(
                         fn=self.list_file,
-                        inputs=[
-                            self._app.user_id,
-                            self.filter,
-                            self.file_team_state,
-                            self.document_visibility_state,
-                        ],
+                        inputs=[self._app.user_id, self.filter],
                         outputs=[self.file_list_state, self.file_list],
                         concurrency_limit=20,
                     )
@@ -1003,53 +775,10 @@ class FileIndexPage(BasePage):
         if KH_DEMO_MODE:
             return
 
-        if self._app.f_user_management:
-            source_team_state = self._app.resources_page.user_management.team_state
-            source_team_state.change(
-                fn=lambda team_state: team_state,
-                inputs=[source_team_state],
-                outputs=[self.file_team_state],
-                show_progress="hidden",
-            ).then(
-                fn=self.list_file,
-                inputs=[
-                    self._app.user_id,
-                    self.filter,
-                    self.file_team_state,
-                    self.document_visibility_state,
-                ],
-                outputs=[self.file_list_state, self.file_list],
-                show_progress="hidden",
-            ).then(
-                fn=self.file_selected,
-                inputs=[
-                    self.selected_file_id,
-                    self._app.user_id,
-                    self.file_team_state,
-                    self.document_visibility_state,
-                ],
-                outputs=[
-                    self.chunks,
-                    self.deselect_button,
-                    self.delete_button,
-                    self.download_single_button,
-                    self.chat_button,
-                    self.current_user_teams,
-                    self.selected_file_origin,
-                    self.selected_file_visibility,
-                    self.selected_file_owner,
-                    self.selected_file_team_ids,
-                    self.selected_file_owner_id,
-                    self.selected_file_team_select,
-                    self.selected_file_save_teams,
-                ],
-                show_progress="hidden",
-            )
-
         onDeleted = (
             self.delete_button.click(
                 fn=self.delete_event,
-                inputs=[self.selected_file_id],
+                inputs=[self.selected_file_id, self._app.user_id],
                 outputs=None,
             )
             .then(
@@ -1060,36 +789,18 @@ class FileIndexPage(BasePage):
             )
             .then(
                 fn=self.list_file,
-                inputs=[
-                    self._app.user_id,
-                    self.filter,
-                    self.file_team_state,
-                    self.document_visibility_state,
-                ],
+                inputs=[self._app.user_id, self.filter],
                 outputs=[self.file_list_state, self.file_list],
             )
             .then(
                 fn=self.file_selected,
-                inputs=[
-                    self.selected_file_id,
-                    self._app.user_id,
-                    self.file_team_state,
-                    self.document_visibility_state,
-                ],
+                inputs=[self.selected_file_id],
                 outputs=[
                     self.chunks,
                     self.deselect_button,
                     self.delete_button,
                     self.download_single_button,
                     self.chat_button,
-                    self.current_user_teams,
-                    self.selected_file_origin,
-                    self.selected_file_visibility,
-                    self.selected_file_owner,
-                    self.selected_file_team_ids,
-                    self.selected_file_owner_id,
-                    self.selected_file_team_select,
-                    self.selected_file_save_teams,
                 ],
                 show_progress="hidden",
             )
@@ -1104,26 +815,13 @@ class FileIndexPage(BasePage):
             show_progress="hidden",
         ).then(
             fn=self.file_selected,
-            inputs=[
-                self.selected_file_id,
-                self._app.user_id,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
+            inputs=[self.selected_file_id],
             outputs=[
                 self.chunks,
                 self.deselect_button,
                 self.delete_button,
                 self.download_single_button,
                 self.chat_button,
-                self.current_user_teams,
-                self.selected_file_origin,
-                self.selected_file_visibility,
-                self.selected_file_owner,
-                self.selected_file_team_ids,
-                self.selected_file_owner_id,
-                self.selected_file_team_select,
-                self.selected_file_save_teams,
             ],
             show_progress="hidden",
         )
@@ -1171,17 +869,12 @@ class FileIndexPage(BasePage):
 
         self.delete_all_button_confirm.click(
             fn=self.delete_all_files,
-            inputs=[self.file_list],
+            inputs=[self.file_list, self._app.user_id],
             outputs=[],
             show_progress="hidden",
         ).then(
             fn=self.list_file,
-            inputs=[
-                self._app.user_id,
-                self.filter,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
+            inputs=[self._app.user_id, self.filter],
             outputs=[self.file_list_state, self.file_list],
         ).then(
             lambda: [
@@ -1200,14 +893,14 @@ class FileIndexPage(BasePage):
         if not KH_SSO_ENABLED:
             self.download_single_button.click(
                 fn=self.download_single_file,
-                inputs=[self.is_zipped_state, self.selected_file_id],
+                inputs=[self.is_zipped_state, self.selected_file_id, self._app.user_id],
                 outputs=[self.is_zipped_state, self.download_single_button],
                 show_progress="hidden",
             )
         else:
             self.download_single_button.click(
                 fn=self.download_single_file_simple,
-                inputs=[self.is_zipped_state, self.chunks, self.selected_file_id],
+                inputs=[self.is_zipped_state, self.chunks, self.selected_file_id, self._app.user_id],
                 outputs=[self.is_zipped_state, self.download_single_button],
                 show_progress="hidden",
             )
@@ -1237,12 +930,7 @@ class FileIndexPage(BasePage):
 
         uploadedEvent = onUploaded.then(
             fn=self.list_file,
-            inputs=[
-                self._app.user_id,
-                self.filter,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
+            inputs=[self._app.user_id, self.filter],
             outputs=[self.file_list_state, self.file_list],
             concurrency_limit=20,
         )
@@ -1266,26 +954,13 @@ class FileIndexPage(BasePage):
             show_progress="hidden",
         ).then(
             fn=self.file_selected,
-            inputs=[
-                self.selected_file_id,
-                self._app.user_id,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
+            inputs=[self.selected_file_id],
             outputs=[
                 self.chunks,
                 self.deselect_button,
                 self.delete_button,
                 self.download_single_button,
                 self.chat_button,
-                self.current_user_teams,
-                self.selected_file_origin,
-                self.selected_file_visibility,
-                self.selected_file_owner,
-                self.selected_file_team_ids,
-                self.selected_file_owner_id,
-                self.selected_file_team_select,
-                self.selected_file_save_teams,
             ],
             show_progress="hidden",
         )
@@ -1319,65 +994,8 @@ class FileIndexPage(BasePage):
 
         self.filter.submit(
             fn=self.list_file,
-            inputs=[
-                self._app.user_id,
-                self.filter,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
+            inputs=[self._app.user_id, self.filter],
             outputs=[self.file_list_state, self.file_list],
-            show_progress="hidden",
-        )
-
-        self.selected_file_save_teams.click(
-            fn=self.save_document_teams,
-            inputs=[
-                self.selected_file_id,
-                self.selected_file_team_select,
-                self._app.user_id,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
-            outputs=[self.document_visibility_state],
-            show_progress="hidden",
-        ).then(
-            fn=None,
-            inputs=[self.document_visibility_state],
-            outputs=[self.document_visibility_storage],
-            js=save_document_visibility_state_js,
-        ).then(
-            fn=self.list_file,
-            inputs=[
-                self._app.user_id,
-                self.filter,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
-            outputs=[self.file_list_state, self.file_list],
-            show_progress="hidden",
-        ).then(
-            fn=self.file_selected,
-            inputs=[
-                self.selected_file_id,
-                self._app.user_id,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
-            outputs=[
-                self.chunks,
-                self.deselect_button,
-                self.delete_button,
-                self.download_single_button,
-                self.chat_button,
-                self.current_user_teams,
-                self.selected_file_origin,
-                self.selected_file_visibility,
-                self.selected_file_owner,
-                self.selected_file_team_ids,
-                self.selected_file_owner_id,
-                self.selected_file_team_select,
-                self.selected_file_save_teams,
-            ],
             show_progress="hidden",
         )
 
@@ -1402,7 +1020,7 @@ class FileIndexPage(BasePage):
 
         self.group_chat_button.click(
             fn=self.set_group_id_selector,
-            inputs=[self.selected_group_id],
+            inputs=[self.selected_group_id, self._app.user_id],
             outputs=[
                 self._index.get_selector_component_ui().selector,
                 self._index.get_selector_component_ui().mode,
@@ -1449,7 +1067,7 @@ class FileIndexPage(BasePage):
         onGroupDeleted = (
             self.group_delete_button.click(
                 fn=self.delete_group,
-                inputs=[self.selected_group_id],
+                inputs=[self.selected_group_id, self._app.user_id],
             )
             .then(
                 self.list_group,
@@ -1469,25 +1087,8 @@ class FileIndexPage(BasePage):
             return
 
         self._app.app.load(
-            self.load_file_team_state,
-            inputs=[self._app.user_id, self.file_team_state_storage],
-            outputs=[self.file_team_state],
-            show_progress="hidden",
-            js=fetch_file_team_state_js,
-        ).then(
-            self.load_document_visibility_state,
-            inputs=[self._app.user_id, self.document_visibility_storage],
-            outputs=[self.document_visibility_state],
-            show_progress="hidden",
-            js=fetch_document_visibility_state_js,
-        ).then(
             self.list_file,
-            inputs=[
-                self._app.user_id,
-                self.filter,
-                self.file_team_state,
-                self.document_visibility_state,
-            ],
+            inputs=[self._app.user_id, self.filter],
             outputs=[self.file_list_state, self.file_list],
         ).then(
             self.list_group,
@@ -1545,6 +1146,10 @@ class FileIndexPage(BasePage):
             selected_files: the list of files already selected
             settings: the settings of the app
         """
+        if not self._check_upload_permission(user_id):
+            yield "", ""
+            return
+
         if urls:
             files = [it.strip() for it in urls.split("\n")]
             errors = self.validate_urls(files)
@@ -1616,6 +1221,8 @@ class FileIndexPage(BasePage):
             settings: the settings of the app
         """
         print("Overriding with default loaders")
+        if not self._check_upload_permission(user_id):
+            return []
         exist_ids = []
         to_process_files = []
         for str_file_path in files:
@@ -1652,6 +1259,8 @@ class FileIndexPage(BasePage):
         user_id,
         request: gr.Request,
     ):
+        if not self._check_upload_permission(user_id):
+            return []
         if KH_DEMO_MODE:
             check_rate_limit("file_upload", request)
 
@@ -1793,31 +1402,7 @@ class FileIndexPage(BasePage):
             num /= 1024.0
         return f"{num:.0f}Yi{suffix}"
 
-    def get_visible_sources(self, user_id, team_state, document_visibility_state):
-        if user_id is None:
-            return []
-
-        Source = self._index._resources["Source"]
-        with Session(engine) as session:
-            statement = select(Source)
-            if KH_DEMO_MODE:
-                statement = statement.limit(MAX_FILE_COUNT)
-            rows = session.execute(statement).all()
-
-        visible_sources = []
-        for (source,) in rows:
-            visibility = get_document_visibility_meta(
-                source,
-                user_id,
-                team_state,
-                document_visibility_state,
-            )
-            if visibility["isVisible"]:
-                visible_sources.append((source, visibility))
-
-        return visible_sources
-
-    def list_file(self, user_id, name_pattern="", team_state=None, document_visibility_state=None):
+    def list_file(self, user_id, name_pattern=""):
         if user_id is None:
             # not signed in
             return [], pd.DataFrame.from_records(
@@ -1825,8 +1410,6 @@ class FileIndexPage(BasePage):
                     {
                         "id": "-",
                         "name": "-",
-                        "sichtbarkeit": "-",
-                        "herkunft": "-",
                         "size": "-",
                         "tokens": "-",
                         "loader": "-",
@@ -1835,61 +1418,52 @@ class FileIndexPage(BasePage):
                 ]
             )
 
-        team_lookup = get_team_name_lookup(team_state)
-        visible_sources = self.get_visible_sources(
-            user_id,
-            team_state,
-            document_visibility_state,
-        )
-        results = []
-        for source, visibility in visible_sources:
-            if name_pattern and name_pattern.lower() not in source.name.lower():
-                continue
-            results.append(
+        Source = self._index._resources["Source"]
+        with Session(engine) as session:
+            statement = select(Source)
+            scope_ids = self._scope_user_ids(session, user_id)
+            if scope_ids == []:
+                return [], pd.DataFrame.from_records(
+                    [
+                        {
+                            "id": "-",
+                            "name": "-",
+                            "size": "-",
+                            "tokens": "-",
+                            "loader": "-",
+                            "date_created": "-",
+                        }
+                    ]
+                )
+            if scope_ids is not None:
+                statement = statement.where(Source.user.in_(scope_ids))
+            if self._index.config.get("private", False):
+                if scope_ids is None:
+                    statement = statement.where(Source.user == user_id)
+            if name_pattern:
+                statement = statement.where(Source.name.ilike(f"%{name_pattern}%"))
+            results = [
                 {
-                    "id": source.id,
-                    "name": source.name,
-                    "ownerId": visibility["ownerId"],
-                    "teamIds": visibility["teamIds"],
-                    "sichtbarkeit": get_visibility_label(
-                        visibility["teamIds"], team_lookup
-                    ),
-                    "herkunft": get_document_origin_label(
-                        visibility["isOwner"], visibility["teamIds"]
-                    ),
-                    "size": self.format_size_human_readable(source.size),
+                    "id": each[0].id,
+                    "name": each[0].name,
+                    "size": self.format_size_human_readable(each[0].size),
                     "tokens": self.format_size_human_readable(
-                        source.note.get("tokens", "-"), suffix=""
+                        each[0].note.get("tokens", "-"), suffix=""
                     ),
-                    "loader": source.note.get("loader", "-"),
-                    "date_created": source.date_created.strftime("%Y-%m-%d %H:%M:%S"),
+                    "loader": each[0].note.get("loader", "-"),
+                    "date_created": each[0].date_created.strftime("%Y-%m-%d %H:%M:%S"),
                 }
-            )
+                for each in session.execute(statement).all()
+            ]
 
         if results:
-            file_list = pd.DataFrame.from_records(
-                [
-                    {
-                        "id": item["id"],
-                        "name": item["name"],
-                        "sichtbarkeit": item["sichtbarkeit"],
-                        "herkunft": item["herkunft"],
-                        "size": item["size"],
-                        "tokens": item["tokens"],
-                        "loader": item["loader"],
-                        "date_created": item["date_created"],
-                    }
-                    for item in results
-                ]
-            )
+            file_list = pd.DataFrame.from_records(results)
         else:
             file_list = pd.DataFrame.from_records(
                 [
                     {
                         "id": "-",
                         "name": "-",
-                        "sichtbarkeit": "-",
-                        "herkunft": "-",
                         "size": "-",
                         "tokens": "-",
                         "loader": "-",
@@ -1899,137 +1473,6 @@ class FileIndexPage(BasePage):
             )
 
         return results, file_list
-
-    def get_selected_document_updates(
-        self,
-        file_id,
-        user_id,
-        team_state,
-        document_visibility_state,
-    ):
-        team_lookup = get_team_name_lookup(team_state)
-        user_team_ids = get_current_user_team_ids(user_id, team_state)
-        user_team_choices = [
-            (team_name, team_id)
-            for team_name, team_id in get_team_choices(normalize_team_state(team_state))
-            if team_id in set(user_team_ids)
-        ]
-        if file_id is None:
-            hidden_dropdown = gr.update(
-                visible=False,
-                choices=user_team_choices,
-                value=[],
-            )
-            return (
-                gr.update(value=f"<div><strong>Meine Teams:</strong> {get_user_team_badges_html(user_id, team_state)}</div>"),
-                gr.update(visible=False, value=""),
-                gr.update(visible=False, value=""),
-                gr.update(visible=False, value=""),
-                [],
-                "",
-                hidden_dropdown,
-                gr.update(visible=False),
-            )
-
-        Source = self._index._resources["Source"]
-        with Session(engine) as session:
-            source_row = session.execute(select(Source).where(Source.id == file_id)).first()
-
-        if not source_row:
-            return self.get_selected_document_updates(
-                None, user_id, team_state, document_visibility_state
-            )
-
-        source = source_row[0]
-        visibility = get_document_visibility_meta(
-            source, user_id, team_state, document_visibility_state
-        )
-        editable = visibility["isOwner"]
-        owner_value = visibility["ownerId"] or "-"
-        selected_team_ids = visibility["teamIds"]
-
-        return (
-            gr.update(value=f"<div><strong>Meine Teams:</strong> {get_user_team_badges_html(user_id, team_state)}</div>"),
-            gr.update(
-                visible=True,
-                value=f"**Status:** {get_document_origin_label(editable, selected_team_ids)}",
-            ),
-            gr.update(
-                visible=True,
-                value=get_visibility_badges_html(selected_team_ids, team_lookup),
-            ),
-            gr.update(visible=True, value=f"**Besitzer-ID:** `{owner_value}`"),
-            selected_team_ids,
-            owner_value,
-            gr.update(
-                visible=editable,
-                choices=user_team_choices,
-                value=[team_id for team_id in selected_team_ids if team_id in set(user_team_ids)],
-            ),
-            gr.update(visible=editable),
-        )
-
-    def save_document_teams(
-        self,
-        file_id,
-        selected_team_ids,
-        user_id,
-        team_state,
-        document_visibility_state,
-    ):
-        document_visibility_state = normalize_document_visibility_state(
-            deepcopy(document_visibility_state)
-        )
-        if not file_id:
-            gr.Warning("Keine Datei ausgewählt")
-            return document_visibility_state
-
-        Source = self._index._resources["Source"]
-        with Session(engine) as session:
-            source_row = session.execute(select(Source).where(Source.id == file_id)).first()
-
-        if not source_row:
-            gr.Warning("Datei nicht gefunden")
-            return document_visibility_state
-
-        source = source_row[0]
-        visibility = get_document_visibility_meta(
-            source, user_id, team_state, document_visibility_state
-        )
-        if not visibility["isOwner"]:
-            gr.Warning("Nur der Besitzer kann die Team-Freigabe ändern")
-            return document_visibility_state
-
-        valid_team_ids = set(get_current_user_team_ids(user_id, team_state))
-        filtered_team_ids = [
-            team_id
-            for team_id in dict.fromkeys(selected_team_ids or [])
-            if team_id in valid_team_ids
-        ]
-        if filtered_team_ids:
-            document_visibility_state["documents"][file_id] = {
-                "ownerId": visibility["ownerId"],
-                "teamIds": filtered_team_ids,
-            }
-        else:
-            document_visibility_state["documents"].pop(file_id, None)
-        gr.Info("Team-Freigabe gespeichert")
-        return document_visibility_state
-
-    def load_document_visibility_state(self, user_id, document_visibility_storage):
-        state = default_document_visibility_state()
-        if document_visibility_storage:
-            try:
-                state = normalize_document_visibility_state(
-                    json.loads(document_visibility_storage)
-                )
-            except Exception:
-                state = default_document_visibility_state()
-        return state
-
-    def load_file_team_state(self, user_id, file_team_state_storage):
-        with Session(engine) as session:
-            return build_team_state(session)
 
     def list_file_names(self, file_list_state):
         if file_list_state:
@@ -2062,8 +1505,23 @@ class FileIndexPage(BasePage):
         FileGroup = self._index._resources["FileGroup"]
         with Session(engine) as session:
             statement = select(FileGroup)
+            scope_ids = self._scope_user_ids(session, user_id)
+            if scope_ids == []:
+                return [], pd.DataFrame.from_records(
+                    [
+                        {
+                            "id": "-",
+                            "name": "-",
+                            "files": "-",
+                            "date_created": "-",
+                        }
+                    ]
+                )
+            if scope_ids is not None:
+                statement = statement.where(FileGroup.user.in_(scope_ids))
             if self._index.config.get("private", False):
-                statement = statement.where(FileGroup.user == user_id)
+                if scope_ids is None:
+                    statement = statement.where(FileGroup.user == user_id)
 
             results = [
                 {
@@ -2106,7 +1564,7 @@ class FileIndexPage(BasePage):
 
         return results, group_list
 
-    def set_group_id_selector(self, selected_group_id):
+    def set_group_id_selector(self, selected_group_id, user_id):
         FileGroup = self._index._resources["FileGroup"]
 
         # check if group_name exist
@@ -2114,6 +1572,11 @@ class FileIndexPage(BasePage):
             current_group = (
                 session.query(FileGroup).filter_by(id=selected_group_id).first()
             )
+            if current_group is None:
+                raise gr.Error("No group found")
+            scope_ids = self._scope_user_ids(session, user_id)
+            if scope_ids is not None and current_group.user not in scope_ids:
+                raise gr.Error("Keine Berechtigung für diese Gruppe")
 
         file_ids = [json.dumps(current_group.data["files"])]
         return [file_ids, "select", gr.Tabs(selected="chat-tab")]
@@ -2124,8 +1587,15 @@ class FileIndexPage(BasePage):
 
         # check if group_name exist
         with Session(engine) as session:
+            scope_ids = self._scope_user_ids(session, user_id)
+            if scope_ids == []:
+                raise gr.Error("Keine Berechtigung")
             if group_id:
                 current_group = session.query(FileGroup).filter_by(id=group_id).first()
+                if scope_ids is not None and (
+                    current_group is None or current_group.user not in scope_ids
+                ):
+                    raise gr.Error("Keine Berechtigung")
                 # update current group with new info
                 current_group.name = group_name
                 current_group.data["files"] = group_files  # Update the files
@@ -2155,7 +1625,7 @@ class FileIndexPage(BasePage):
         gr.Info(f"Group {group_name} has been saved")
         return group_id
 
-    def delete_group(self, group_id):
+    def delete_group(self, group_id, user_id):
         if not group_id:
             raise gr.Error("No group is selected")
 
@@ -2166,6 +1636,9 @@ class FileIndexPage(BasePage):
             ).first()
             if group:
                 item = group[0]
+                scope_ids = self._scope_user_ids(session, user_id)
+                if scope_ids is not None and item.user not in scope_ids:
+                    raise gr.Error("Keine Berechtigung")
                 group_name = item.name
                 session.delete(item)
                 session.commit()
@@ -2249,18 +1722,17 @@ class FileSelector(BasePage):
 
     def default(self):
         if self._app.f_user_management:
-            return "disabled", [], -1, []
-        return "disabled", [], 1, []
+            return "disabled", [], -1
+        return "disabled", [], 1
 
     def on_building_ui(self):
-        default_mode, default_selector, user_id, default_team_filter = self.default()
+        default_mode, default_selector, user_id = self.default()
 
         self.mode = gr.Radio(
             value=default_mode,
             choices=[
                 ("Alle durchsuchen", "all"),
                 ("In Datei(en) suchen", "select"),
-                ("In Teams suchen", "teams"),
             ],
             container=False,
         )
@@ -2274,19 +1746,6 @@ class FileSelector(BasePage):
             visible=False,
         )
         self.selector_user_id = gr.State(value=user_id)
-        self.team_selector = gr.Dropdown(
-            label="Teams",
-            value=default_team_filter,
-            choices=[],
-            multiselect=True,
-            container=False,
-            interactive=True,
-            visible=False,
-        )
-        self.selector_team_state = gr.State(value=default_team_state())
-        self.selector_team_state_storage = gr.Textbox(visible=False, value="")
-        self.selector_document_state = gr.State(value=default_document_visibility_state())
-        self.selector_document_state_storage = gr.Textbox(visible=False, value="")
         self.selector_choices = gr.JSON(
             value=[],
             visible=False,
@@ -2294,13 +1753,9 @@ class FileSelector(BasePage):
 
     def on_register_events(self):
         self.mode.change(
-            fn=lambda mode, user_id: (
-                gr.update(visible=mode == "select"),
-                user_id,
-                gr.update(visible=mode == "teams"),
-            ),
+            fn=lambda mode, user_id: (gr.update(visible=mode == "select"), user_id),
             inputs=[self.mode, self._app.user_id],
-            outputs=[self.selector, self.selector_user_id, self.team_selector],
+            outputs=[self.selector, self.selector_user_id],
         )
         # attach special event for the first index
         if self._index.id == 1:
@@ -2310,43 +1765,12 @@ class FileSelector(BasePage):
                 js=update_file_list_js,
                 show_progress="hidden",
             )
-        if self._app.f_user_management:
-            source_team_state = self._app.resources_page.user_management.team_state
-            source_team_state.change(
-                fn=lambda team_state: team_state,
-                inputs=[source_team_state],
-                outputs=[self.selector_team_state],
-                show_progress="hidden",
-            ).then(
-                fn=self.load_files,
-                inputs=[
-                    self.selector,
-                    self._app.user_id,
-                    self.selector_team_state,
-                    self.selector_document_state,
-                    self.team_selector,
-                ],
-                outputs=[self.selector, self.selector_choices, self.team_selector],
-                show_progress="hidden",
-            )
 
     def as_gradio_component(self):
-        return [
-            self.mode,
-            self.selector,
-            self.selector_user_id,
-            self.team_selector,
-            self.selector_team_state,
-            self.selector_document_state,
-        ]
+        return [self.mode, self.selector, self.selector_user_id]
 
     def get_selected_ids(self, components):
         mode, selected, user_id = components[0], components[1], components[2]
-        team_filter_ids = components[3] if len(components) > 3 else []
-        team_state = components[4] if len(components) > 4 else None
-        document_visibility_state = (
-            components[5] if len(components) > 5 else default_document_visibility_state()
-        )
         if user_id is None:
             return []
 
@@ -2355,65 +1779,66 @@ class FileSelector(BasePage):
         elif mode == "select":
             return selected
 
-        index_page = self._index.get_index_page_ui()
-        visible_sources = index_page.get_visible_sources(
-            user_id, team_state, document_visibility_state
-        )
         file_ids = []
-        for source, visibility in visible_sources:
-            if mode == "teams" and not visibility["isOwner"]:
-                effective_filters = team_filter_ids or visibility["userTeamIds"]
-                if not set(visibility["teamIds"]).intersection(effective_filters):
-                    continue
-            file_ids.append(source.id)
+        with Session(engine) as session:
+            statement = select(self._index._resources["Source"].id)
+            if self._app.f_user_management:
+                actor = get_access_context(session, user_id)
+                if not actor or not has_read_access(actor):
+                    return []
+                scope_ids = allowed_user_ids_for_scope(session, actor)
+                statement = statement.where(self._index._resources["Source"].user.in_(scope_ids))
+            if self._index.config.get("private", False):
+                if not self._app.f_user_management:
+                    statement = statement.where(
+                        self._index._resources["Source"].user == user_id
+                    )
+            results = session.execute(statement).all()
+            for (id,) in results:
+                file_ids.append(id)
 
         return file_ids
 
-    def load_files(
-        self,
-        selected_files,
-        user_id,
-        team_state,
-        document_visibility_state,
-        selected_team_filters,
-    ):
+    def load_files(self, selected_files, user_id):
         options: list = []
         available_ids = []
-        team_state = normalize_team_state(team_state)
-        user_team_ids = get_current_user_team_ids(user_id, team_state)
-        allowed_team_ids = set(user_team_ids)
-        team_choices = [
-            (team_name, team_id)
-            for team_name, team_id in get_team_choices(team_state)
-            if team_id in allowed_team_ids
-        ]
-        selected_team_filters = [
-            team_id for team_id in (selected_team_filters or []) if team_id in {id_ for _, id_ in team_choices}
-        ]
-        if not selected_team_filters:
-            selected_team_filters = user_team_ids
         if user_id is None:
             # not signed in
-            return (
-                gr.update(value=selected_files, choices=options),
-                options,
-                gr.update(choices=[], value=[]),
-            )
-
-        index_page = self._index.get_index_page_ui()
-        visible_sources = index_page.get_visible_sources(
-            user_id, team_state, document_visibility_state
-        )
-        for source, _ in visible_sources:
-            available_ids.append(source.id)
-            options.append((source.name, source.id))
+            return gr.update(value=selected_files, choices=options), options
 
         with Session(engine) as session:
+            # get file list from Source table
+            statement = select(self._index._resources["Source"])
+            scope_ids = None
+            if self._app.f_user_management:
+                actor = get_access_context(session, user_id)
+                if not actor or not has_read_access(actor):
+                    return gr.update(value=selected_files, choices=options), options
+                scope_ids = allowed_user_ids_for_scope(session, actor)
+                statement = statement.where(self._index._resources["Source"].user.in_(scope_ids))
+            if self._index.config.get("private", False):
+                if not self._app.f_user_management:
+                    statement = statement.where(
+                        self._index._resources["Source"].user == user_id
+                    )
+
+            if KH_DEMO_MODE:
+                # limit query by MAX_FILE_COUNT
+                statement = statement.limit(MAX_FILE_COUNT)
+
+            results = session.execute(statement).all()
+            for result in results:
+                available_ids.append(result[0].id)
+                options.append((result[0].name, result[0].id))
+
             # get group list from FileGroup table
             FileGroup = self._index._resources["FileGroup"]
             statement = select(FileGroup)
+            if scope_ids is not None:
+                statement = statement.where(FileGroup.user.in_(scope_ids))
             if self._index.config.get("private", False):
-                statement = statement.where(FileGroup.user == user_id)
+                if scope_ids is None:
+                    statement = statement.where(FileGroup.user == user_id)
             results = session.execute(statement).all()
             for result in results:
                 item = result[0]
@@ -2427,50 +1852,13 @@ class FileSelector(BasePage):
                 each for each in selected_files if each in available_ids_set
             ]
 
-        return (
-            gr.update(value=selected_files, choices=options),
-            options,
-            gr.update(choices=team_choices, value=selected_team_filters),
-        )
-
-    def load_selector_access_state(
-        self, user_id, selector_team_state_storage, selector_document_state_storage
-    ):
-        with Session(engine) as session:
-            team_state = build_team_state(session)
-
-        document_state = default_document_visibility_state()
-        if selector_document_state_storage:
-            try:
-                document_state = normalize_document_visibility_state(
-                    json.loads(selector_document_state_storage)
-                )
-            except Exception:
-                document_state = default_document_visibility_state()
-
-        return team_state, document_state
+        return gr.update(value=selected_files, choices=options), options
 
     def _on_app_created(self):
         self._app.app.load(
-            self.load_selector_access_state,
-            inputs=[
-                self._app.user_id,
-                self.selector_team_state_storage,
-                self.selector_document_state_storage,
-            ],
-            outputs=[self.selector_team_state, self.selector_document_state],
-            show_progress="hidden",
-            js=fetch_selector_access_state_js,
-        ).then(
             self.load_files,
-            inputs=[
-                self.selector,
-                self._app.user_id,
-                self.selector_team_state,
-                self.selector_document_state,
-                self.team_selector,
-            ],
-            outputs=[self.selector, self.selector_choices, self.team_selector],
+            inputs=[self.selector, self._app.user_id],
+            outputs=[self.selector, self.selector_choices],
         )
 
     def on_subscribe_public_events(self):
@@ -2478,14 +1866,8 @@ class FileSelector(BasePage):
             name=f"onFileIndex{self._index.id}Changed",
             definition={
                 "fn": self.load_files,
-                "inputs": [
-                    self.selector,
-                    self._app.user_id,
-                    self.selector_team_state,
-                    self.selector_document_state,
-                    self.team_selector,
-                ],
-                "outputs": [self.selector, self.selector_choices, self.team_selector],
+                "inputs": [self.selector, self._app.user_id],
+                "outputs": [self.selector, self.selector_choices],
                 "show_progress": "hidden",
             },
         )
@@ -2494,32 +1876,9 @@ class FileSelector(BasePage):
                 self._app.subscribe_event(
                     name=event_name,
                     definition={
-                        "fn": self.load_selector_access_state,
-                        "inputs": [
-                            self._app.user_id,
-                            self.selector_team_state_storage,
-                            self.selector_document_state_storage,
-                        ],
-                        "outputs": [
-                            self.selector_team_state,
-                            self.selector_document_state,
-                        ],
-                        "show_progress": "hidden",
-                        "js": fetch_selector_access_state_js,
-                    },
-                )
-                self._app.subscribe_event(
-                    name=event_name,
-                    definition={
                         "fn": self.load_files,
-                        "inputs": [
-                            self.selector,
-                            self._app.user_id,
-                            self.selector_team_state,
-                            self.selector_document_state,
-                            self.team_selector,
-                        ],
-                        "outputs": [self.selector, self.selector_choices, self.team_selector],
+                        "inputs": [self.selector, self._app.user_id],
+                        "outputs": [self.selector, self.selector_choices],
                         "show_progress": "hidden",
                     },
                 )

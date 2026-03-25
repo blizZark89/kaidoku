@@ -1,10 +1,22 @@
 import hashlib
-import json
+from typing import Optional
 
 import gradio as gr
 import pandas as pd
 from ktem.app import BasePage
-from ktem.db.models import Team, User, UserTeamMembership, engine
+from ktem.authz import (
+    ROLE_ADMIN,
+    ROLE_KEY_USER,
+    ROLE_USER,
+    assert_role_supported,
+    can_create_role,
+    can_manage_user,
+    get_access_context,
+    list_teams,
+    team_exists,
+    upsert_user_access,
+)
+from ktem.db.models import Team, User, UserAccess, engine
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -28,272 +40,126 @@ PASSWORD_RULE = """**Passwort-Regeln:**
 """
 
 
-fetch_team_state_js = """
-function(userId, currentValue) {
-    const key = `kaidoku_team_state_${userId || 'anonymous'}`;
-    return [userId, getStorage(key, currentValue || '')];
-}
-"""
-
-
-save_team_state_js = """
-function(userId, teamState) {
-    const key = `kaidoku_team_state_${userId || 'anonymous'}`;
-    const serialized = JSON.stringify(teamState || {teams: [], user_teams: {}});
-    setStorage(key, serialized);
-    return serialized;
-}
-"""
-
-
-def default_team_state():
-    return {"teams": [], "user_teams": {}}
-
-
-def normalize_team_state(team_state):
-    state = default_team_state()
-    if not isinstance(team_state, dict):
-        return state
-
-    teams = []
-    for team in team_state.get("teams", []):
-        if not isinstance(team, dict):
-            continue
-        team_id = str(team.get("id", "")).strip()
-        team_name = str(team.get("name", "")).strip()
-        if team_id and team_name:
-            teams.append({"id": team_id, "name": team_name})
-
-    valid_team_ids = {team["id"] for team in teams}
-    user_teams = {}
-    for username, team_ids in team_state.get("user_teams", {}).items():
-        if not isinstance(team_ids, list):
-            continue
-        filtered_ids = [team_id for team_id in team_ids if team_id in valid_team_ids]
-        user_teams[str(username).lower()] = filtered_ids
-
-    state["teams"] = teams
-    state["user_teams"] = user_teams
-    return state
-
-
-def get_team_choices(team_state):
-    state = normalize_team_state(team_state)
-    return [(team["name"], team["id"]) for team in state["teams"]]
-
-
-def get_team_names_for_user(username_lower, team_state):
-    state = normalize_team_state(team_state)
-    team_lookup = {team["id"]: team["name"] for team in state["teams"]}
-    team_ids = state["user_teams"].get(username_lower.lower(), [])
-    return [team_lookup[team_id] for team_id in team_ids if team_id in team_lookup]
-
-
-def build_team_state(session: Session):
-    teams = session.exec(select(Team)).all()
-    users = session.exec(select(User)).all()
-    memberships = session.exec(select(UserTeamMembership)).all()
-
-    user_lookup = {user.id: user.username_lower for user in users}
-    state = {
-        "teams": [{"id": team.id, "name": team.name} for team in teams],
-        "user_teams": {},
-    }
-    valid_team_ids = {team.id for team in teams}
-    for membership in memberships:
-        username_lower = user_lookup.get(membership.user_id)
-        if not username_lower or membership.team_id not in valid_team_ids:
-            continue
-        state["user_teams"].setdefault(username_lower, []).append(membership.team_id)
-
-    return normalize_team_state(state)
-
-
-def replace_user_team_memberships(session: Session, user_id: str, team_ids: list[str]):
-    memberships = session.exec(
-        select(UserTeamMembership).where(UserTeamMembership.user_id == user_id)
-    ).all()
-    for membership in memberships:
-        session.delete(membership)
-
-    for team_id in dict.fromkeys(team_ids):
-        session.add(UserTeamMembership(user_id=user_id, team_id=team_id))
-
-
-def import_legacy_team_state(session: Session, team_state_storage: str):
-    if not team_state_storage:
-        return
-
-    has_teams = session.exec(select(Team)).first()
-    has_memberships = session.exec(select(UserTeamMembership)).first()
-    if has_teams or has_memberships:
-        return
-
-    try:
-        legacy_state = normalize_team_state(json.loads(team_state_storage))
-    except Exception:
-        return
-
-    user_lookup = {
-        user.username_lower: user.id for user in session.exec(select(User)).all()
-    }
-    for team in legacy_state["teams"]:
-        session.add(
-            Team(
-                id=team["id"],
-                name=team["name"],
-                name_lower=team["name"].lower(),
-            )
-        )
-
-    session.commit()
-
-    valid_team_ids = {team["id"] for team in legacy_state["teams"]}
-    for username_lower, team_ids in legacy_state["user_teams"].items():
-        user_id = user_lookup.get(username_lower)
-        if not user_id:
-            continue
-        for team_id in team_ids:
-            if team_id in valid_team_ids:
-                session.add(UserTeamMembership(user_id=user_id, team_id=team_id))
-
-    session.commit()
-
-
-def format_team_names(team_names):
-    return ", ".join(team_names) if team_names else "-"
-
-
-def render_team_badges(team_names):
-    if not team_names:
-        return "<div>Keine Teams zugeordnet</div>"
-
-    badges = "".join(
-        (
-            "<span style='display:inline-block;padding:4px 10px;margin:0 6px 6px 0;"
-            "border-radius:999px;background:var(--background-fill-secondary);"
-            "border:1px solid var(--border-color-primary);font-size:12px;'>"
-            f"{team_name}</span>"
-        )
-        for team_name in team_names
-    )
-    return f"<div>{badges}</div>"
-
-
 def validate_username(usn):
-    """Validate that whether username is valid
-
-    Args:
-        usn (str): Username
-    """
     errors = []
     if len(usn) < 3:
         errors.append("Der Benutzername muss mindestens 3 Zeichen lang sein")
-
     if len(usn) > 32:
         errors.append("Der Benutzername darf höchstens 32 Zeichen lang sein")
-
     if not usn.replace("_", "").isalnum():
         errors.append(
             "Der Benutzername darf nur Buchstaben, Zahlen und Unterstriche enthalten"
         )
-
     return "; ".join(errors)
 
 
 def validate_password(pwd, pwd_cnf):
-    """Validate that whether password is valid
-
-    - Password must be at least 8 characters long
-    - Password must contain at least one uppercase letter
-    - Password must contain at least one lowercase letter
-    - Password must contain at least one digit
-    - Password must contain at least one special character from the following:
-        ^ $ * . [ ] { } ( ) ? - " ! @ # % & / \\ , > < ' : ; | _ ~  + =
-
-    Args:
-        pwd (str): Password
-        pwd_cnf (str): Confirm password
-
-    Returns:
-        str: Error message if password is not valid
-    """
     errors = []
     if pwd != pwd_cnf:
         errors.append("Die Passwörter stimmen nicht überein")
-
     if len(pwd) < 8:
         errors.append("Das Passwort muss mindestens 8 Zeichen lang sein")
-
     if not any(c.isupper() for c in pwd):
         errors.append("Das Passwort muss mindestens einen Großbuchstaben enthalten")
-
     if not any(c.islower() for c in pwd):
         errors.append("Das Passwort muss mindestens einen Kleinbuchstaben enthalten")
-
     if not any(c.isdigit() for c in pwd):
         errors.append("Das Passwort muss mindestens eine Ziffer enthalten")
-
     special_chars = "^$*.[]{}()?-\"!@#%&/\\,><':;|_~+="
     if not any(c in special_chars for c in pwd):
         errors.append(
             "Das Passwort muss mindestens ein Sonderzeichen aus dieser "
             f"Liste enthalten: {special_chars}"
         )
+    return "; ".join(errors) if errors else ""
 
-    if errors:
-        return "; ".join(errors)
 
-    return ""
+def _normalize_role_permissions(role: str, can_read: bool, can_upload: bool) -> tuple[bool, bool]:
+    if role in {ROLE_ADMIN, ROLE_KEY_USER}:
+        return True, True
+    return bool(can_read), bool(can_upload)
+
+
+def _validate_role_team_constraints(role: str, team_id: Optional[str]) -> Optional[str]:
+    if role in {ROLE_KEY_USER, ROLE_USER} and not team_id:
+        return "Diese Rolle muss einem Team zugeordnet sein"
+    if role == ROLE_ADMIN and team_id:
+        return "Admin darf keinem Team fest zugeordnet sein"
+    return None
+
+
+def _resolve_actor(session: Session, actor_user_id: Optional[str]):
+    actor = get_access_context(session, actor_user_id)
+    if not actor:
+        gr.Warning("Nicht angemeldet")
+        return None
+    return actor
 
 
 def create_user(usn, pwd, user_id=None, is_admin=True) -> bool:
     with Session(engine) as session:
         statement = select(User).where(User.username_lower == usn.lower())
-        result = session.exec(statement).all()
-        if result:
+        if session.exec(statement).all():
             print(f'User "{usn}" already exists')
             return False
 
-        else:
-            hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
-            user = User(
-                id=user_id,
-                username=usn,
-                username_lower=usn.lower(),
-                password=hashed_password,
-                admin=is_admin,
-            )
-            session.add(user)
-            session.commit()
+        hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
+        user = User(
+            id=user_id,
+            username=usn,
+            username_lower=usn.lower(),
+            password=hashed_password,
+            admin=is_admin,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
 
-            return True
+        role = ROLE_ADMIN if is_admin else ROLE_USER
+        upsert_user_access(
+            session=session,
+            user_id=user.id,
+            role=role,
+            team_id=None,
+            can_read=True,
+            can_upload=is_admin,
+        )
+        return True
 
 
 class UserManagement(BasePage):
     def __init__(self, app):
         self._app = app
-
         self.on_building_ui()
         if hasattr(flowsettings, "KH_FEATURE_USER_MANAGEMENT_ADMIN") and hasattr(
             flowsettings, "KH_FEATURE_USER_MANAGEMENT_PASSWORD"
         ):
             usn = flowsettings.KH_FEATURE_USER_MANAGEMENT_ADMIN
             pwd = flowsettings.KH_FEATURE_USER_MANAGEMENT_PASSWORD
-
             is_created = create_user(usn, pwd)
             if is_created:
                 gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
 
-    def on_building_ui(self):
-        self.team_state = gr.State(value=default_team_state())
-        self.team_state_storage = gr.Textbox(visible=False, value="")
+    def _team_choices_for_actor(self, actor_user_id: Optional[str]):
+        with Session(engine) as session:
+            actor = get_access_context(session, actor_user_id)
+            if not actor:
+                return []
+            if actor.is_admin:
+                return [(team.name, team.id) for team in list_teams(session)]
+            if actor.is_key_user and actor.access.team_id:
+                team = session.exec(
+                    select(Team).where(Team.id == actor.access.team_id)
+                ).first()
+                if team:
+                    return [(team.name, team.id)]
+            return []
 
+    def on_building_ui(self):
         with gr.Tab(label="Benutzerliste"):
             self.state_user_list = gr.State(value=None)
             self.user_list = gr.DataFrame(
-                headers=["id", "username", "admin", "teams"],
-                column_widths=[0, 35, 15, 50],
+                headers=["id", "username", "role", "team", "can_read", "can_upload"],
                 interactive=False,
             )
 
@@ -306,173 +172,119 @@ class UserManagement(BasePage):
                         label="Passwortänderung bestätigen",
                         type="password",
                     )
-                self.admin_edit = gr.Checkbox(label="Administrator")
-                self.user_teams_edit = gr.Dropdown(
-                    label="Teams",
-                    choices=[],
-                    value=[],
-                    multiselect=True,
-                    allow_custom_value=False,
+                self.role_edit = gr.Dropdown(
+                    label="Rolle",
+                    choices=[ROLE_ADMIN, ROLE_KEY_USER, ROLE_USER],
+                    value=ROLE_USER,
                 )
-                self.user_teams_badges = gr.HTML("Keine Teams zugeordnet")
+                self.team_edit = gr.Dropdown(label="Team", choices=[], value=None)
+                with gr.Row():
+                    self.can_read_edit = gr.Checkbox(label="Leserechte", value=True)
+                    self.can_upload_edit = gr.Checkbox(label="Upload-Rechte", value=False)
 
             with gr.Row(visible=False) as self._selected_panel_btn:
-                with gr.Column():
-                    self.btn_edit_save = gr.Button("Speichern")
-                with gr.Column():
-                    self.btn_delete = gr.Button("Löschen")
-                    with gr.Row():
-                        self.btn_delete_yes = gr.Button(
-                            "Löschen bestätigen", variant="primary", visible=False
-                        )
-                        self.btn_delete_no = gr.Button("Abbrechen", visible=False)
-                with gr.Column():
-                    self.btn_close = gr.Button("Schließen")
+                self.btn_edit_save = gr.Button("Speichern")
+                self.btn_delete = gr.Button("Löschen")
+                self.btn_delete_yes = gr.Button(
+                    "Löschen bestätigen", variant="primary", visible=False
+                )
+                self.btn_delete_no = gr.Button("Abbrechen", visible=False)
+                self.btn_close = gr.Button("Schließen")
 
         with gr.Tab(label="Benutzer anlegen"):
             self.usn_new = gr.Textbox(label="Benutzername", interactive=True)
-            self.pwd_new = gr.Textbox(
-                label="Passwort", type="password", interactive=True
-            )
+            self.pwd_new = gr.Textbox(label="Passwort", type="password", interactive=True)
             self.pwd_cnf_new = gr.Textbox(
                 label="Passwort bestätigen", type="password", interactive=True
             )
-            self.user_teams_new = gr.Dropdown(
-                label="Teams",
-                choices=[],
-                value=[],
-                multiselect=True,
-                allow_custom_value=False,
+            self.role_new = gr.Dropdown(
+                label="Rolle",
+                choices=[ROLE_USER, ROLE_KEY_USER],
+                value=ROLE_USER,
             )
+            self.team_new = gr.Dropdown(label="Team", choices=[], value=None)
+            with gr.Row():
+                self.can_read_new = gr.Checkbox(label="Leserechte", value=True)
+                self.can_upload_new = gr.Checkbox(label="Upload-Rechte", value=False)
             with gr.Row():
                 gr.Markdown(USERNAME_RULE)
                 gr.Markdown(PASSWORD_RULE)
             self.btn_new = gr.Button("Benutzer anlegen")
 
-        with gr.Tab(label="Teams verwalten"):
-            self.state_team_list = gr.State(value=None)
-            self.team_list = gr.DataFrame(
-                headers=["id", "team", "mitglieder"],
-                column_widths=[0, 35, 65],
-                interactive=False,
-            )
-
-            with gr.Group(visible=False) as self._selected_team_panel:
-                self.selected_team_id = gr.State(value="")
-                self.team_name_edit = gr.Textbox(label="Teamname")
-
-            with gr.Row(visible=False) as self._selected_team_panel_btn:
-                self.btn_team_save = gr.Button("Umbenennen")
-                self.btn_team_delete = gr.Button("Löschen")
-                self.btn_team_close = gr.Button("Schließen")
-
-            self.team_name_new = gr.Textbox(label="Neues Team", interactive=True)
-            self.btn_team_new = gr.Button("Team erstellen")
+        with gr.Tab(label="Teams"):
+            self.team_state = gr.State(value=None)
+            self.team_list = gr.DataFrame(headers=["id", "name"], interactive=False)
+            self.selected_team_id = gr.State(value=None)
+            self.team_name_new = gr.Textbox(label="Teamname")
+            with gr.Row():
+                self.btn_team_create = gr.Button("Team erstellen")
+                self.btn_team_delete = gr.Button("Team löschen")
 
     def on_register_events(self):
         self.btn_new.click(
             self.create_user,
             inputs=[
+                self._app.user_id,
                 self.usn_new,
                 self.pwd_new,
                 self.pwd_cnf_new,
-                self.user_teams_new,
-                self.team_state,
+                self.role_new,
+                self.team_new,
+                self.can_read_new,
+                self.can_upload_new,
             ],
-            outputs=[
-                self.usn_new,
-                self.pwd_new,
-                self.pwd_cnf_new,
-                self.user_teams_new,
-                self.team_state,
-            ],
+            outputs=[self.usn_new, self.pwd_new, self.pwd_cnf_new],
         ).then(
-            self.refresh_management_views,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
-        ).then(
-            fn=None,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[self.team_state_storage],
-            js=save_team_state_js,
+            self.list_users,
+            inputs=self._app.user_id,
+            outputs=[self.state_user_list, self.user_list],
         )
+
         self.user_list.select(
             self.select_user,
             inputs=self.user_list,
             outputs=[self.selected_user_id],
             show_progress="hidden",
         )
+
         self.selected_user_id.change(
             self.on_selected_user_change,
-            inputs=[self.selected_user_id, self.team_state],
+            inputs=[self._app.user_id, self.selected_user_id],
             outputs=[
                 self._selected_panel,
                 self._selected_panel_btn,
-                # delete section
                 self.btn_delete,
                 self.btn_delete_yes,
                 self.btn_delete_no,
-                # edit section
                 self.usn_edit,
                 self.pwd_edit,
                 self.pwd_cnf_edit,
-                self.admin_edit,
-                self.user_teams_edit,
-                self.user_teams_badges,
+                self.role_edit,
+                self.team_edit,
+                self.can_read_edit,
+                self.can_upload_edit,
             ],
             show_progress="hidden",
         )
-        self.user_teams_edit.change(
-            lambda team_ids, team_state: render_team_badges(
-                [
-                    name
-                    for name, team_id in get_team_choices(team_state)
-                    if team_id in (team_ids or [])
-                ]
-            ),
-            inputs=[self.user_teams_edit, self.team_state],
-            outputs=[self.user_teams_badges],
-            show_progress="hidden",
-        )
+
         self.btn_delete.click(
             self.on_btn_delete_click,
             inputs=[self.selected_user_id],
             outputs=[self.btn_delete, self.btn_delete_yes, self.btn_delete_no],
             show_progress="hidden",
         )
+
         self.btn_delete_yes.click(
             self.delete_user,
-            inputs=[self._app.user_id, self.selected_user_id, self.team_state],
-            outputs=[self.selected_user_id, self.team_state],
+            inputs=[self._app.user_id, self.selected_user_id],
+            outputs=[self.selected_user_id],
             show_progress="hidden",
         ).then(
-            self.refresh_management_views,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
-        ).then(
-            fn=None,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[self.team_state_storage],
-            js=save_team_state_js,
+            self.list_users,
+            inputs=self._app.user_id,
+            outputs=[self.state_user_list, self.user_list],
         )
+
         self.btn_delete_no.click(
             lambda: (
                 gr.update(visible=True),
@@ -483,577 +295,508 @@ class UserManagement(BasePage):
             outputs=[self.btn_delete, self.btn_delete_yes, self.btn_delete_no],
             show_progress="hidden",
         )
+
         self.btn_edit_save.click(
             self.save_user,
             inputs=[
+                self._app.user_id,
                 self.selected_user_id,
                 self.usn_edit,
                 self.pwd_edit,
                 self.pwd_cnf_edit,
-                self.admin_edit,
-                self.user_teams_edit,
-                self.team_state,
+                self.role_edit,
+                self.team_edit,
+                self.can_read_edit,
+                self.can_upload_edit,
             ],
-            outputs=[self.pwd_edit, self.pwd_cnf_edit, self.team_state],
+            outputs=[self.pwd_edit, self.pwd_cnf_edit],
             show_progress="hidden",
         ).then(
-            self.refresh_management_views,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
+            self.list_users,
+            inputs=self._app.user_id,
+            outputs=[self.state_user_list, self.user_list],
+        )
+
+        self.btn_close.click(lambda: -1, outputs=[self.selected_user_id])
+
+        self.btn_team_create.click(
+            self.create_team,
+            inputs=[self._app.user_id, self.team_name_new],
+            outputs=[self.team_name_new],
+            show_progress="hidden",
         ).then(
-            fn=None,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[self.team_state_storage],
-            js=save_team_state_js,
+            self.list_teams_ui,
+            inputs=[self._app.user_id],
+            outputs=[self.team_state, self.team_list],
+        ).then(
+            self.refresh_team_dropdowns,
+            inputs=[self._app.user_id],
+            outputs=[self.team_new, self.team_edit],
         )
-        self.btn_close.click(
-            lambda: -1,
-            outputs=[self.selected_user_id],
-        )
+
         self.team_list.select(
             self.select_team,
-            inputs=self.team_list,
+            inputs=[self.team_state],
             outputs=[self.selected_team_id],
             show_progress="hidden",
         )
-        self.selected_team_id.change(
-            self.on_selected_team_change,
-            inputs=[self.selected_team_id, self.team_state],
-            outputs=[
-                self._selected_team_panel,
-                self._selected_team_panel_btn,
-                self.team_name_edit,
-            ],
-            show_progress="hidden",
-        )
-        self.btn_team_new.click(
-            self.create_team,
-            inputs=[self.team_name_new, self.team_state],
-            outputs=[self.team_name_new, self.team_state],
-            show_progress="hidden",
-        ).then(
-            self.refresh_management_views,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
-        ).then(
-            fn=None,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[self.team_state_storage],
-            js=save_team_state_js,
-        )
-        self.btn_team_save.click(
-            self.rename_team,
-            inputs=[self.selected_team_id, self.team_name_edit, self.team_state],
-            outputs=[self.team_name_edit, self.team_state],
-            show_progress="hidden",
-        ).then(
-            self.refresh_management_views,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
-        ).then(
-            fn=None,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[self.team_state_storage],
-            js=save_team_state_js,
-        )
+
         self.btn_team_delete.click(
             self.delete_team,
-            inputs=[self.selected_team_id, self.team_state],
-            outputs=[self.selected_team_id, self.team_state],
+            inputs=[self._app.user_id, self.selected_team_id],
+            outputs=[self.selected_team_id],
             show_progress="hidden",
         ).then(
-            self.refresh_management_views,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
+            self.list_teams_ui,
+            inputs=[self._app.user_id],
+            outputs=[self.team_state, self.team_list],
         ).then(
-            fn=None,
-            inputs=[self._app.user_id, self.team_state],
-            outputs=[self.team_state_storage],
-            js=save_team_state_js,
+            self.refresh_team_dropdowns,
+            inputs=[self._app.user_id],
+            outputs=[self.team_new, self.team_edit],
         )
-        self.btn_team_close.click(lambda: "", outputs=[self.selected_team_id])
 
     def on_subscribe_public_events(self):
         self._app.subscribe_event(
             name="onSignIn",
             definition={
-                "fn": self.load_team_state_and_refresh,
-                "inputs": [self._app.user_id, self.team_state_storage],
-                "outputs": [
-                    self.team_state,
-                    self.state_user_list,
-                    self.user_list,
-                    self.state_team_list,
-                    self.team_list,
-                    self.user_teams_new,
-                    self.user_teams_edit,
-                    self.user_teams_badges,
-                ],
-                "js": fetch_team_state_js,
+                "fn": self.list_users,
+                "inputs": [self._app.user_id],
+                "outputs": [self.state_user_list, self.user_list],
+            },
+        )
+        self._app.subscribe_event(
+            name="onSignIn",
+            definition={
+                "fn": self.list_teams_ui,
+                "inputs": [self._app.user_id],
+                "outputs": [self.team_state, self.team_list],
+            },
+        )
+        self._app.subscribe_event(
+            name="onSignIn",
+            definition={
+                "fn": self.refresh_team_dropdowns,
+                "inputs": [self._app.user_id],
+                "outputs": [self.team_new, self.team_edit],
             },
         )
         self._app.subscribe_event(
             name="onSignOut",
             definition={
-                "fn": lambda team_state: (
+                "fn": lambda: (
                     "",
                     "",
                     "",
-                    gr.update(choices=get_team_choices(team_state), value=[]),
-                    None,
-                    None,
+                    [],
+                    pd.DataFrame.from_records([{"id": "-", "username": "-"}]),
                     -1,
-                    "",
-                    "",
-                    gr.update(choices=get_team_choices(team_state), value=[]),
-                    render_team_badges([]),
+                    [],
+                    pd.DataFrame.from_records([{"id": "-", "name": "-"}]),
+                    None,
                 ),
-                "inputs": [self.team_state],
                 "outputs": [
                     self.usn_new,
                     self.pwd_new,
                     self.pwd_cnf_new,
-                    self.user_teams_new,
                     self.state_user_list,
                     self.user_list,
                     self.selected_user_id,
-                    self.team_name_new,
+                    self.team_state,
+                    self.team_list,
                     self.selected_team_id,
-                    self.user_teams_edit,
-                    self.user_teams_badges,
                 ],
             },
         )
 
-    def create_user(self, usn, pwd, pwd_cnf, team_ids, team_state):
-        team_state = normalize_team_state(team_state)
-        valid_team_ids = {team_id for _, team_id in get_team_choices(team_state)}
-        team_ids = [team_id for team_id in (team_ids or []) if team_id in valid_team_ids]
+    def refresh_team_dropdowns(self, actor_user_id):
+        choices = self._team_choices_for_actor(actor_user_id)
+        return gr.update(choices=choices), gr.update(choices=choices)
+
+    def list_teams_ui(self, actor_user_id):
+        with Session(engine) as session:
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor or not actor.is_admin:
+                return [], pd.DataFrame.from_records([{"id": "-", "name": "-"}])
+
+            teams = list_teams(session)
+            rows = [{"id": t.id, "name": t.name} for t in teams]
+            if not rows:
+                rows = [{"id": "-", "name": "-"}]
+            return rows, pd.DataFrame.from_records(rows)
+
+    def select_team(self, team_rows, ev: gr.SelectData):
+        if (ev.value == "-" and ev.index[0] == 0) or not ev.selected:
+            return None
+        return team_rows[ev.index[0]]["id"]
+
+    def create_team(self, actor_user_id, team_name):
+        team_name = (team_name or "").strip()
+        if not team_name:
+            gr.Warning("Teamname darf nicht leer sein")
+            return team_name
+        with Session(engine) as session:
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor or not actor.is_admin:
+                gr.Warning("Nur Admin darf Teams erstellen")
+                return team_name
+
+            exists = session.exec(select(Team).where(Team.name == team_name)).first()
+            if exists:
+                gr.Warning(f'Team "{team_name}" existiert bereits')
+                return team_name
+
+            session.add(Team(name=team_name))
+            session.commit()
+            gr.Info(f'Team "{team_name}" erstellt')
+            return ""
+
+    def delete_team(self, actor_user_id, team_id):
+        if not team_id:
+            gr.Warning("Kein Team ausgewählt")
+            return None
+        with Session(engine) as session:
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor or not actor.is_admin:
+                gr.Warning("Nur Admin darf Teams löschen")
+                return team_id
+
+            in_use = session.exec(
+                select(UserAccess).where(UserAccess.team_id == team_id)
+            ).first()
+            if in_use:
+                gr.Warning("Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind")
+                return team_id
+
+            team = session.exec(select(Team).where(Team.id == team_id)).first()
+            if not team:
+                gr.Warning("Team nicht gefunden")
+                return None
+            session.delete(team)
+            session.commit()
+            gr.Info(f'Team "{team.name}" gelöscht')
+            return None
+
+    def create_user(
+        self,
+        actor_user_id,
+        usn,
+        pwd,
+        pwd_cnf,
+        role,
+        team_id,
+        can_read,
+        can_upload,
+    ):
         errors = validate_username(usn)
         if errors:
             gr.Warning(errors)
-            return usn, pwd, pwd_cnf, team_ids, team_state
+            return usn, pwd, pwd_cnf
 
         errors = validate_password(pwd, pwd_cnf)
-        print(errors)
         if errors:
             gr.Warning(errors)
-            return usn, pwd, pwd_cnf, team_ids, team_state
+            return usn, pwd, pwd_cnf
+
+        role_err = assert_role_supported(role)
+        if role_err:
+            gr.Warning(role_err)
+            return usn, pwd, pwd_cnf
+
+        role_team_err = _validate_role_team_constraints(role, team_id)
+        if role_team_err:
+            gr.Warning(role_team_err)
+            return usn, pwd, pwd_cnf
 
         with Session(engine) as session:
-            statement = select(User).where(User.username_lower == usn.lower())
-            result = session.exec(statement).all()
-            if result:
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor:
+                return usn, pwd, pwd_cnf
+
+            if not can_create_role(actor, role, team_id):
+                gr.Warning("Du darfst diesen Benutzer/Rolle-Team nicht anlegen")
+                return usn, pwd, pwd_cnf
+
+            if team_id and not team_exists(session, team_id):
+                gr.Warning("Team existiert nicht")
+                return usn, pwd, pwd_cnf
+
+            existing = session.exec(select(User).where(User.username_lower == usn.lower())).first()
+            if existing:
                 gr.Warning(f'Benutzername "{usn}" existiert bereits')
-                return usn, pwd, pwd_cnf, team_ids, team_state
+                return usn, pwd, pwd_cnf
 
-            try:
-                hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
-                user = User(
-                    username=usn, username_lower=usn.lower(), password=hashed_password
-                )
-                session.add(user)
-                session.commit()
-                session.refresh(user)
-                replace_user_team_memberships(session, user.id, list(team_ids or []))
-                session.commit()
-                team_state = build_team_state(session)
-                gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
-            except Exception as e:
-                session.rollback()
-                gr.Warning(f'Benutzer "{usn}" konnte nicht erstellt werden: {e}')
-                return usn, pwd, pwd_cnf, team_ids, team_state
+            hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
+            user = User(
+                username=usn,
+                username_lower=usn.lower(),
+                password=hashed_password,
+                admin=(role == ROLE_ADMIN),
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
 
-        return "", "", "", [], team_state
-
-    def list_users(self, user_id, team_state):
-        if user_id is None:
-            return [], pd.DataFrame.from_records(
-                [{"id": "-", "username": "-", "admin": "-", "teams": "-"}]
+            can_read_norm, can_upload_norm = _normalize_role_permissions(
+                role, can_read, can_upload
+            )
+            upsert_user_access(
+                session=session,
+                user_id=user.id,
+                role=role,
+                team_id=team_id,
+                can_read=can_read_norm,
+                can_upload=can_upload_norm,
             )
 
+            gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
+            return "", "", ""
+
+    def list_users(self, actor_user_id):
+        if actor_user_id is None:
+            return [], pd.DataFrame.from_records([{"id": "-", "username": "-"}])
+
         with Session(engine) as session:
-            team_state = build_team_state(session)
-            statement = select(User).where(User.id == user_id)
-            user = session.exec(statement).one()
-            if not user.admin:
-                return [], pd.DataFrame.from_records(
-                    [{"id": "-", "username": "-", "admin": "-", "teams": "-"}]
-                )
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor:
+                return [], pd.DataFrame.from_records([{"id": "-", "username": "-"}])
 
-            statement = select(User)
-            results = [
-                {
-                    "id": user.id,
-                    "username": user.username,
-                    "admin": user.admin,
-                    "teams": format_team_names(
-                        get_team_names_for_user(user.username_lower, team_state)
-                    ),
-                }
-                for user in session.exec(statement).all()
-            ]
-            if results:
-                user_list = pd.DataFrame.from_records(results)
-            else:
-                user_list = pd.DataFrame.from_records(
-                    [{"id": "-", "username": "-", "admin": "-", "teams": "-"}]
-                )
-
-        return results, user_list
-
-    def list_teams(self, team_state):
-        with Session(engine) as session:
-            team_state = build_team_state(session)
+            teams = {t.id: t.name for t in list_teams(session)}
             users = session.exec(select(User)).all()
+            results = []
+            for user in users:
+                access = session.exec(
+                    select(UserAccess).where(UserAccess.user_id == user.id)
+                ).first()
+                if not access:
+                    access = upsert_user_access(
+                        session=session,
+                        user_id=user.id,
+                        role=ROLE_ADMIN if user.admin else ROLE_USER,
+                        team_id=None,
+                        can_read=True,
+                        can_upload=user.admin,
+                    )
 
-        rows = []
-        for team in team_state["teams"]:
-            members = [
-                user.username
-                for user in users
-                if team["id"] in team_state["user_teams"].get(user.username_lower, [])
-            ]
-            rows.append(
-                {
-                    "id": team["id"],
-                    "team": team["name"],
-                    "mitglieder": ", ".join(members) if members else "-",
-                }
-            )
+                if actor.is_admin:
+                    allowed = True
+                elif actor.is_key_user:
+                    allowed = (
+                        access.role == ROLE_USER and access.team_id == actor.access.team_id
+                    ) or user.id == actor.user.id
+                else:
+                    allowed = user.id == actor.user.id
 
-        if not rows:
-            return [], pd.DataFrame.from_records(
-                [{"id": "-", "team": "-", "mitglieder": "-"}]
-            )
+                if not allowed:
+                    continue
 
-        return rows, pd.DataFrame.from_records(rows)
+                results.append(
+                    {
+                        "id": user.id,
+                        "username": user.username,
+                        "role": access.role,
+                        "team": teams.get(access.team_id, "-"),
+                        "can_read": access.can_read,
+                        "can_upload": access.can_upload,
+                    }
+                )
 
-    def refresh_management_views(self, user_id, team_state):
-        with Session(engine) as session:
-            team_state = build_team_state(session)
-        user_rows, user_df = self.list_users(user_id, team_state)
-        team_rows, team_df = self.list_teams(team_state)
-        empty_choices = gr.update(choices=get_team_choices(team_state), value=[])
-
-        return (
-            team_state,
-            user_rows,
-            user_df,
-            team_rows,
-            team_df,
-            empty_choices,
-            empty_choices,
-            render_team_badges([]),
-        )
-
-    def load_team_state_and_refresh(self, user_id, team_state_storage):
-        with Session(engine) as session:
-            import_legacy_team_state(session, team_state_storage)
-            team_state = build_team_state(session)
-        return self.refresh_management_views(user_id, team_state)
+            if not results:
+                return [], pd.DataFrame.from_records([{"id": "-", "username": "-"}])
+            return results, pd.DataFrame.from_records(results)
 
     def select_user(self, user_list, ev: gr.SelectData):
         if ev.value == "-" and ev.index[0] == 0:
             gr.Info("Kein Benutzer geladen. Bitte die Benutzerliste aktualisieren")
             return -1
-
         if not ev.selected:
             return -1
-
         return user_list["id"][ev.index[0]]
 
-    def on_selected_user_change(self, selected_user_id, team_state):
-        team_state = normalize_team_state(team_state)
+    def on_selected_user_change(self, actor_user_id, selected_user_id):
         if selected_user_id == -1:
-            _selected_panel = gr.update(visible=False)
-            _selected_panel_btn = gr.update(visible=False)
-            btn_delete = gr.update(visible=True)
-            btn_delete_yes = gr.update(visible=False)
-            btn_delete_no = gr.update(visible=False)
-            usn_edit = gr.update(value="")
-            pwd_edit = gr.update(value="")
-            pwd_cnf_edit = gr.update(value="")
-            admin_edit = gr.update(value=False)
-            user_teams_edit = gr.update(choices=get_team_choices(team_state), value=[])
-            user_teams_badges = render_team_badges([])
-        else:
-            _selected_panel = gr.update(visible=True)
-            _selected_panel_btn = gr.update(visible=True)
-            btn_delete = gr.update(visible=True)
-            btn_delete_yes = gr.update(visible=False)
-            btn_delete_no = gr.update(visible=False)
-
-            with Session(engine) as session:
-                statement = select(User).where(User.id == selected_user_id)
-                user = session.exec(statement).one()
-                team_state = build_team_state(session)
-
-            usn_edit = gr.update(value=user.username)
-            pwd_edit = gr.update(value="")
-            pwd_cnf_edit = gr.update(value="")
-            admin_edit = gr.update(value=user.admin)
-            selected_team_ids = team_state["user_teams"].get(user.username_lower, [])
-            selected_team_names = get_team_names_for_user(user.username_lower, team_state)
-            user_teams_edit = gr.update(
-                choices=get_team_choices(team_state),
-                value=selected_team_ids,
+            return (
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=True),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value=""),
+                gr.update(value=""),
+                gr.update(value=""),
+                gr.update(value=ROLE_USER),
+                gr.update(value=None, choices=[]),
+                gr.update(value=True),
+                gr.update(value=False),
             )
-            user_teams_badges = render_team_badges(selected_team_names)
 
-        return (
-            _selected_panel,
-            _selected_panel_btn,
-            btn_delete,
-            btn_delete_yes,
-            btn_delete_no,
-            usn_edit,
-            pwd_edit,
-            pwd_cnf_edit,
-            admin_edit,
-            user_teams_edit,
-            user_teams_badges,
-        )
+        with Session(engine) as session:
+            user = session.exec(select(User).where(User.id == selected_user_id)).first()
+            access = session.exec(
+                select(UserAccess).where(UserAccess.user_id == selected_user_id)
+            ).first()
+            choices = self._team_choices_for_actor(actor_user_id)
+
+            if not user or not access:
+                return (
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(visible=True),
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(value=""),
+                    gr.update(value=""),
+                    gr.update(value=""),
+                    gr.update(value=ROLE_USER),
+                    gr.update(value=None, choices=choices),
+                    gr.update(value=True),
+                    gr.update(value=False),
+                )
+
+            return (
+                gr.update(visible=True),
+                gr.update(visible=True),
+                gr.update(visible=True),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value=user.username),
+                gr.update(value=""),
+                gr.update(value=""),
+                gr.update(value=access.role),
+                gr.update(value=access.team_id, choices=choices),
+                gr.update(value=access.can_read),
+                gr.update(value=access.can_upload),
+            )
 
     def on_btn_delete_click(self, selected_user_id):
         if selected_user_id is None:
             gr.Warning("Kein Benutzer ausgewählt")
-            btn_delete = gr.update(visible=True)
-            btn_delete_yes = gr.update(visible=False)
-            btn_delete_no = gr.update(visible=False)
-            return
+            return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)
+        return gr.update(visible=False), gr.update(visible=True), gr.update(visible=True)
 
-        btn_delete = gr.update(visible=False)
-        btn_delete_yes = gr.update(visible=True)
-        btn_delete_no = gr.update(visible=True)
-
-        return btn_delete, btn_delete_yes, btn_delete_no
-
-    def save_user(self, selected_user_id, usn, pwd, pwd_cnf, admin, team_ids, team_state):
-        team_state = normalize_team_state(team_state)
-        valid_team_ids = {team_id for _, team_id in get_team_choices(team_state)}
-        team_ids = [team_id for team_id in (team_ids or []) if team_id in valid_team_ids]
+    def save_user(
+        self,
+        actor_user_id,
+        selected_user_id,
+        usn,
+        pwd,
+        pwd_cnf,
+        role,
+        team_id,
+        can_read,
+        can_upload,
+    ):
         errors = validate_username(usn)
         if errors:
             gr.Warning(errors)
-            return pwd, pwd_cnf, team_state
+            return pwd, pwd_cnf
+
+        role_err = assert_role_supported(role)
+        if role_err:
+            gr.Warning(role_err)
+            return pwd, pwd_cnf
+
+        role_team_err = _validate_role_team_constraints(role, team_id)
+        if role_team_err:
+            gr.Warning(role_team_err)
+            return pwd, pwd_cnf
 
         if pwd:
             errors = validate_password(pwd, pwd_cnf)
             if errors:
                 gr.Warning(errors)
-                return pwd, pwd_cnf, team_state
+                return pwd, pwd_cnf
 
         with Session(engine) as session:
-            # Check username uniqueness (excluding current user)
-            statement = select(User).where(
-                User.username_lower == usn.lower(),
-                User.id != selected_user_id,
-            )
-            existing = session.exec(statement).first()
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor:
+                return pwd, pwd_cnf
+
+            target_user = session.exec(
+                select(User).where(User.id == selected_user_id)
+            ).first()
+            target_access = session.exec(
+                select(UserAccess).where(UserAccess.user_id == selected_user_id)
+            ).first()
+            if not target_user or not target_access:
+                gr.Warning("Benutzer nicht gefunden")
+                return pwd, pwd_cnf
+
+            if not can_manage_user(actor, target_access):
+                gr.Warning("Keine Berechtigung zur Bearbeitung dieses Benutzers")
+                return pwd, pwd_cnf
+
+            if not can_create_role(actor, role, team_id):
+                gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
+                return pwd, pwd_cnf
+
+            if team_id and not team_exists(session, team_id):
+                gr.Warning("Team existiert nicht")
+                return pwd, pwd_cnf
+
+            existing = session.exec(
+                select(User).where(
+                    User.username_lower == usn.lower(), User.id != selected_user_id
+                )
+            ).first()
             if existing:
                 gr.Warning(
                     f'Benutzername "{usn}" existiert bereits. Bitte einen eindeutigen Namen verwenden.'
                 )
-                return pwd, pwd_cnf, team_state
+                return pwd, pwd_cnf
 
-            statement = select(User).where(User.id == selected_user_id)
-            user = session.exec(statement).one()
-            old_username_lower = user.username_lower
-            user.username = usn
-            user.username_lower = usn.lower()
-            user.admin = admin
+            target_user.username = usn
+            target_user.username_lower = usn.lower()
+            target_user.admin = role == ROLE_ADMIN
             if pwd:
-                user.password = hashlib.sha256(pwd.encode()).hexdigest()
-            replace_user_team_memberships(session, user.id, list(team_ids or []))
+                target_user.password = hashlib.sha256(pwd.encode()).hexdigest()
+            session.add(target_user)
             session.commit()
-            team_state = build_team_state(session)
+
+            can_read_norm, can_upload_norm = _normalize_role_permissions(
+                role, can_read, can_upload
+            )
+            upsert_user_access(
+                session=session,
+                user_id=target_user.id,
+                role=role,
+                team_id=team_id,
+                can_read=can_read_norm,
+                can_upload=can_upload_norm,
+            )
             gr.Info(f'Benutzer "{usn}" erfolgreich aktualisiert')
+            return "", ""
 
-        return "", "", team_state
-
-    def delete_user(self, current_user, selected_user_id, team_state):
+    def delete_user(self, current_user, selected_user_id):
         if current_user == selected_user_id:
             gr.Warning("Du kannst dich nicht selbst löschen")
-            return selected_user_id, team_state
+            return selected_user_id
 
         with Session(engine) as session:
-            statement = select(User).where(User.id == selected_user_id)
-            user = session.exec(statement).one()
-            memberships = session.exec(
-                select(UserTeamMembership).where(
-                    UserTeamMembership.user_id == selected_user_id
-                )
-            ).all()
-            for membership in memberships:
-                session.delete(membership)
-            session.delete(user)
-            session.commit()
-            team_state = build_team_state(session)
-            gr.Info(f'Benutzer "{user.username}" erfolgreich gelöscht')
-        return -1, team_state
+            actor = _resolve_actor(session, current_user)
+            if not actor:
+                return selected_user_id
 
-    def select_team(self, team_list, ev: gr.SelectData):
-        if ev.value == "-" and ev.index[0] == 0:
-            gr.Info("Kein Team geladen")
-            return ""
-
-        if not ev.selected:
-            return ""
-
-        return team_list["id"][ev.index[0]]
-
-    def on_selected_team_change(self, selected_team_id, team_state):
-        with Session(engine) as session:
-            team_state = build_team_state(session)
-        if not selected_team_id:
-            return (
-                gr.update(visible=False),
-                gr.update(visible=False),
-                gr.update(value=""),
-            )
-
-        team = next(
-            (team for team in team_state["teams"] if team["id"] == selected_team_id),
-            None,
-        )
-        if team is None:
-            return (
-                gr.update(visible=False),
-                gr.update(visible=False),
-                gr.update(value=""),
-            )
-
-        return (
-            gr.update(visible=True),
-            gr.update(visible=True),
-            gr.update(value=team["name"]),
-        )
-
-    def create_team(self, team_name, team_state):
-        team_name = team_name.strip()
-        if not team_name:
-            gr.Warning("Der Teamname darf nicht leer sein")
-            return team_name, normalize_team_state(team_state)
-
-        with Session(engine) as session:
-            existing = session.exec(
-                select(Team).where(Team.name_lower == team_name.lower())
+            target_user = session.exec(
+                select(User).where(User.id == selected_user_id)
             ).first()
-            if existing:
-                gr.Warning(f'Team "{team_name}" existiert bereits')
-                return team_name, build_team_state(session)
-
-            session.add(Team(name=team_name, name_lower=team_name.lower()))
-            session.commit()
-            gr.Info(f'Team "{team_name}" erfolgreich erstellt')
-            return "", build_team_state(session)
-
-    def rename_team(self, selected_team_id, team_name, team_state):
-        team_name = team_name.strip()
-        if not selected_team_id:
-            gr.Warning("Kein Team ausgewählt")
-            return team_name, normalize_team_state(team_state)
-        if not team_name:
-            gr.Warning("Der Teamname darf nicht leer sein")
-            return team_name, normalize_team_state(team_state)
-
-        with Session(engine) as session:
-            existing = session.exec(
-                select(Team).where(
-                    Team.name_lower == team_name.lower(),
-                    Team.id != selected_team_id,
-                )
+            target_access = session.exec(
+                select(UserAccess).where(UserAccess.user_id == selected_user_id)
             ).first()
-            if existing:
-                gr.Warning(f'Team "{team_name}" existiert bereits')
-                return team_name, build_team_state(session)
+            if not target_user or not target_access:
+                gr.Warning("Benutzer nicht gefunden")
+                return -1
 
-            team = session.exec(select(Team).where(Team.id == selected_team_id)).first()
-            if not team:
-                gr.Warning("Team nicht gefunden")
-                return team_name, build_team_state(session)
+            if not can_manage_user(actor, target_access):
+                gr.Warning("Keine Berechtigung, diesen Benutzer zu löschen")
+                return selected_user_id
 
-            team.name = team_name
-            team.name_lower = team_name.lower()
+            access_row = session.exec(
+                select(UserAccess).where(UserAccess.user_id == selected_user_id)
+            ).first()
+            if access_row:
+                session.delete(access_row)
+            session.delete(target_user)
             session.commit()
-            gr.Info(f'Team "{team_name}" erfolgreich umbenannt')
-            return team_name, build_team_state(session)
-
-    def delete_team(self, selected_team_id, team_state):
-        if not selected_team_id:
-            gr.Warning("Kein Team ausgewählt")
-            return selected_team_id, normalize_team_state(team_state)
-
-        with Session(engine) as session:
-            team = session.exec(select(Team).where(Team.id == selected_team_id)).first()
-            if team is None:
-                gr.Warning("Team nicht gefunden")
-                return "", build_team_state(session)
-
-            memberships = session.exec(
-                select(UserTeamMembership).where(
-                    UserTeamMembership.team_id == selected_team_id
-                )
-            ).all()
-            for membership in memberships:
-                session.delete(membership)
-            session.delete(team)
-            session.commit()
-
-            gr.Info(f'Team "{team.name}" erfolgreich gelöscht')
-            return "", build_team_state(session)
-
-    def _on_app_created(self):
-        self._app.app.load(
-            self.load_team_state_and_refresh,
-            inputs=[self._app.user_id, self.team_state_storage],
-            outputs=[
-                self.team_state,
-                self.state_user_list,
-                self.user_list,
-                self.state_team_list,
-                self.team_list,
-                self.user_teams_new,
-                self.user_teams_edit,
-                self.user_teams_badges,
-            ],
-            show_progress="hidden",
-            js=fetch_team_state_js,
-        )
+            gr.Info(f'Benutzer "{target_user.username}" erfolgreich gelöscht')
+            return -1

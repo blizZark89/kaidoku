@@ -103,7 +103,7 @@ class BaseIssueReport(SQLModel):
 
 
 class BaseTeam(SQLModel):
-    """Store teams in the database."""
+    """Store team information."""
 
     __table_args__ = {"extend_existing": True}
 
@@ -111,16 +111,15 @@ class BaseTeam(SQLModel):
         default_factory=lambda: uuid.uuid4().hex, primary_key=True, index=True
     )
     name: str = Field(unique=True)
-    name_lower: str = Field(unique=True, index=True)
 
 
-class BaseUserTeamMembership(SQLModel):
-    """Store user-to-team memberships in the database."""
+class BaseUserAccess(SQLModel):
+    """Store role/team/permission assignment for a user."""
 
     __table_args__ = {"extend_existing": True}
 
-    id: str = Field(
-        default_factory=lambda: uuid.uuid4().hex, primary_key=True, index=True
-    )
-    user_id: str = Field(index=True)
-    team_id: str = Field(index=True)
+    user_id: str = Field(primary_key=True, index=True)
+    role: str = Field(default="user")
+    team_id: Optional[str] = Field(default=None, index=True)
+    can_read: bool = Field(default=True)
+    can_upload: bool = Field(default=False)

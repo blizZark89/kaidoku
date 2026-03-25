@@ -34,10 +34,10 @@ _base_team = (
     else base_models.BaseTeam
 )
 
-_base_user_team_membership = (
-    import_dotted_string(settings.KH_TABLE_USER_TEAM_MEMBERSHIP, safe=False)
-    if hasattr(settings, "KH_TABLE_USER_TEAM_MEMBERSHIP")
-    else base_models.BaseUserTeamMembership
+_base_user_access = (
+    import_dotted_string(settings.KH_TABLE_USER_ACCESS, safe=False)
+    if hasattr(settings, "KH_TABLE_USER_ACCESS")
+    else base_models.BaseUserAccess
 )
 
 
@@ -61,8 +61,8 @@ class Team(_base_team, table=True):  # type: ignore
     """Team table"""
 
 
-class UserTeamMembership(_base_user_team_membership, table=True):  # type: ignore
-    """User-team membership table"""
+class UserAccess(_base_user_access, table=True):  # type: ignore
+    """User role, team and permissions"""
 
 
 if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
