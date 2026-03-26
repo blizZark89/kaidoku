@@ -155,6 +155,17 @@ class UserManagement(BasePage):
                     return [(team.name, team.id)]
             return []
 
+    def _role_choices_for_actor(self, actor_user_id: Optional[str]):
+        with Session(engine) as session:
+            actor = get_access_context(session, actor_user_id)
+            if not actor:
+                return [ROLE_USER]
+            if actor.is_admin:
+                return [ROLE_USER, ROLE_KEY_USER, ROLE_ADMIN]
+            if actor.is_key_user:
+                return [ROLE_USER]
+            return [ROLE_USER]
+
     def on_building_ui(self):
         with gr.Tab(label="Benutzerliste"):
             self.state_user_list = gr.State(value=None)
@@ -199,7 +210,7 @@ class UserManagement(BasePage):
             )
             self.role_new = gr.Dropdown(
                 label="Rolle",
-                choices=[ROLE_USER, ROLE_KEY_USER],
+                choices=[ROLE_USER],
                 value=ROLE_USER,
             )
             self.team_new = gr.Dropdown(label="Team", choices=[], value=None)
@@ -331,7 +342,7 @@ class UserManagement(BasePage):
         ).then(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
-            outputs=[self.team_new, self.team_edit],
+            outputs=[self.team_new, self.team_edit, self.role_new],
         )
 
         self.team_list.select(
@@ -353,7 +364,7 @@ class UserManagement(BasePage):
         ).then(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
-            outputs=[self.team_new, self.team_edit],
+            outputs=[self.team_new, self.team_edit, self.role_new],
         )
 
     def on_subscribe_public_events(self):
@@ -378,7 +389,7 @@ class UserManagement(BasePage):
             definition={
                 "fn": self.refresh_team_dropdowns,
                 "inputs": [self._app.user_id],
-                "outputs": [self.team_new, self.team_edit],
+                "outputs": [self.team_new, self.team_edit, self.role_new],
             },
         )
         self._app.subscribe_event(
@@ -411,7 +422,13 @@ class UserManagement(BasePage):
 
     def refresh_team_dropdowns(self, actor_user_id):
         choices = self._team_choices_for_actor(actor_user_id)
-        return gr.update(choices=choices), gr.update(choices=choices)
+        role_choices = self._role_choices_for_actor(actor_user_id)
+        role_value = ROLE_USER if ROLE_USER in role_choices else role_choices[0]
+        return (
+            gr.update(choices=choices),
+            gr.update(choices=choices),
+            gr.update(choices=role_choices, value=role_value),
+        )
 
     def list_teams_ui(self, actor_user_id):
         with Session(engine) as session:
