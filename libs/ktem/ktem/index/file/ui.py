@@ -104,16 +104,18 @@ def _source_team_ids(source) -> list[str]:
     return _normalize_source_team_ids(note.get("team_ids"))
 
 
-def _source_visible_to_actor(source, actor) -> bool:
+def _source_visible_to_actor(source, actor, scope_user_ids=None) -> bool:
     if actor is None:
         return True
     if actor.is_admin:
         return True
     source_team_ids = set(_source_team_ids(source))
     if not source_team_ids:
-        # Legacy documents without explicit document teams stay visible
-        # through uploader-based scope filtering.
-        return True
+        # Legacy behavior (without document team mapping):
+        # only visible within uploader scope.
+        if scope_user_ids is None:
+            return False
+        return getattr(source, "user", None) in set(scope_user_ids)
     actor_team_ids = set(actor.team_ids)
     return bool(actor_team_ids.intersection(source_team_ids))
 
@@ -334,12 +336,7 @@ class FileIndexPage(BasePage):
                 )
 
             scope_ids = self._scope_user_ids(session, user_id)
-            if scope_ids is not None and source.user not in scope_ids:
-                return (
-                    gr.update(choices=[], value=[], visible=False),
-                    gr.update(visible=False),
-                )
-            if not _source_visible_to_actor(source, actor):
+            if not _source_visible_to_actor(source, actor, scope_ids):
                 return (
                     gr.update(choices=[], value=[], visible=False),
                     gr.update(visible=False),
@@ -370,13 +367,17 @@ class FileIndexPage(BasePage):
 
         Source = self._index._resources["Source"]
         with Session(engine) as session:
+            actor = get_access_context(session, user_id)
+            if not actor or not has_upload_access(actor):
+                gr.Warning("Keine Upload-Berechtigung")
+                return gr.update()
             source = session.query(Source).filter_by(id=file_id).first()
             if not source:
                 gr.Warning("Datei nicht gefunden")
                 return gr.update()
 
             scope_ids = self._scope_user_ids(session, user_id)
-            if scope_ids is not None and source.user not in scope_ids:
+            if not _source_visible_to_actor(source, actor, scope_ids):
                 gr.Warning("Keine Berechtigung für diese Datei")
                 return gr.update()
 
@@ -739,7 +740,7 @@ class FileIndexPage(BasePage):
                 if scope_ids is not None and source[0].user not in scope_ids:
                     gr.Warning("Keine Berechtigung für diese Datei")
                     return None, self.selected_panel_false
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, scope_ids):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return None, self.selected_panel_false
                 file_name = source[0].name
@@ -788,7 +789,7 @@ class FileIndexPage(BasePage):
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, scope_ids):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
@@ -837,7 +838,7 @@ class FileIndexPage(BasePage):
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, scope_ids):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
@@ -1744,9 +1745,23 @@ class FileIndexPage(BasePage):
         with Session(engine) as session:
             statement = select(Source)
             actor = None
+            scope_ids = None
             if self._app.f_user_management:
                 actor = get_access_context(session, user_id)
-            scope_ids = self._scope_user_ids(session, user_id)
+                if not actor or not has_read_access(actor):
+                    return [], pd.DataFrame.from_records(
+                        [
+                            {
+                                "id": "-",
+                                "name": "-",
+                                "size": "-",
+                                "tokens": "-",
+                                "loader": "-",
+                                "date_created": "-",
+                            }
+                        ]
+                    )
+                scope_ids = allowed_user_ids_for_scope(session, actor)
             if scope_ids == []:
                 return [], pd.DataFrame.from_records(
                     [
@@ -1760,7 +1775,7 @@ class FileIndexPage(BasePage):
                         }
                     ]
                 )
-            if scope_ids is not None:
+            if scope_ids is not None and not self._app.f_user_management:
                 statement = statement.where(Source.user.in_(scope_ids))
             if self._index.config.get("private", False):
                 if scope_ids is None:
@@ -1770,7 +1785,9 @@ class FileIndexPage(BasePage):
             results = []
             for each in session.execute(statement).all():
                 source = each[0]
-                if self._app.f_user_management and not _source_visible_to_actor(source, actor):
+                if self._app.f_user_management and not _source_visible_to_actor(
+                    source, actor, scope_ids
+                ):
                     continue
                 results.append(
                     {
@@ -2132,14 +2149,13 @@ class FileSelector(BasePage):
         with Session(engine) as session:
             statement = select(self._index._resources["Source"].id)
             actor = None
+            scope_ids = None
             if self._app.f_user_management:
                 actor = get_access_context(session, user_id)
                 if not actor or not has_read_access(actor):
                     return []
                 scope_ids = allowed_user_ids_for_scope(session, actor)
-                statement = select(self._index._resources["Source"]).where(
-                    self._index._resources["Source"].user.in_(scope_ids)
-                )
+                statement = select(self._index._resources["Source"])
             if self._index.config.get("private", False):
                 if not self._app.f_user_management:
                     statement = statement.where(
@@ -2149,7 +2165,7 @@ class FileSelector(BasePage):
             if self._app.f_user_management:
                 for result in results:
                     source = result[0]
-                    if _source_visible_to_actor(source, actor):
+                    if _source_visible_to_actor(source, actor, scope_ids):
                         file_ids.append(source.id)
             else:
                 for (id,) in results:
@@ -2183,7 +2199,6 @@ class FileSelector(BasePage):
                         gr.update(value="", choices=team_filter_choices),
                     )
                 scope_ids = allowed_user_ids_for_scope(session, actor)
-                statement = statement.where(self._index._resources["Source"].user.in_(scope_ids))
 
                 # Team selector choices for chat-side team search/filter.
                 if actor.is_admin:
@@ -2208,7 +2223,7 @@ class FileSelector(BasePage):
             results = session.execute(statement).all()
             for result in results:
                 source = result[0]
-                if actor and not _source_visible_to_actor(source, actor):
+                if actor and not _source_visible_to_actor(source, actor, scope_ids):
                     continue
                 source_team_ids = _source_team_ids(source)
                 if team_filter and team_filter not in source_team_ids:
