@@ -7,8 +7,7 @@ KH_DEMO_MODE = getattr(flowsettings, "KH_DEMO_MODE", False)
 if not KH_DEMO_MODE:
     PLACEHOLDER_TEXT = (
         "Dies ist der Beginn einer neuen Unterhaltung.\n"
-        "Starte mit dem Hochladen einer Datei oder einer Web-URL. "
-        "Im Tab Dateien findest du weitere Optionen (z. B. GraphRAG)."
+        "Starte mit dem Hochladen einer Datei oder einer Web-URL."
     )
 else:
     PLACEHOLDER_TEXT = (
