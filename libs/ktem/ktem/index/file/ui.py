@@ -2133,10 +2133,11 @@ class FileSelector(BasePage):
             )
 
     def as_gradio_component(self):
-        return [self.mode, self.selector, self.selector_user_id]
+        return [self.mode, self.selector, self.selector_user_id, self.team_filter]
 
     def get_selected_ids(self, components):
         mode, selected, user_id = components[0], components[1], components[2]
+        team_filter = components[3] if len(components) > 3 else ""
         if user_id is None:
             return []
 
@@ -2165,8 +2166,17 @@ class FileSelector(BasePage):
             if self._app.f_user_management:
                 for result in results:
                     source = result[0]
-                    if _source_visible_to_actor(source, actor, scope_ids):
-                        file_ids.append(source.id)
+                    if not _source_visible_to_actor(source, actor, scope_ids):
+                        continue
+                    source_team_ids = _source_team_ids(source)
+                    if source_team_ids:
+                        if not team_filter:
+                            continue
+                        if team_filter not in source_team_ids:
+                            continue
+                    elif team_filter:
+                        continue
+                    file_ids.append(source.id)
             else:
                 for (id,) in results:
                     file_ids.append(id)
@@ -2226,7 +2236,15 @@ class FileSelector(BasePage):
                 if actor and not _source_visible_to_actor(source, actor, scope_ids):
                     continue
                 source_team_ids = _source_team_ids(source)
-                if team_filter and team_filter not in source_team_ids:
+                if self._app.f_user_management:
+                    if source_team_ids:
+                        if not team_filter:
+                            continue
+                        if team_filter not in source_team_ids:
+                            continue
+                    elif team_filter:
+                        continue
+                elif team_filter and team_filter not in source_team_ids:
                     continue
                 available_ids.append(source.id)
                 options.append((source.name, source.id))
