@@ -62,7 +62,18 @@ class HelpPage:
                 f"{self.remote_content_url}/v{self.app_version}/docs/about.md"
             )
         if about_md:
-            with gr.Accordion("Über"):
+            about_md = about_md.replace("Kotaemon", "Kaidoku")
+            about_md = about_md.replace("open-source tool", "quelloffenes Werkzeug")
+            about_md = about_md.replace("open source tool", "quelloffenes Werkzeug")
+            about_md = about_md.replace(
+                "open-source",
+                "quelloffenes",
+            )
+            about_md = about_md.replace(
+                "Open-source",
+                "Quelloffenes",
+            )
+            with gr.Accordion("Über Kaidoku"):
                 if self.app_version:
                     about_md = f"Version: {self.app_version}\n\n{about_md}"
                 gr.Markdown(about_md)
@@ -80,18 +91,6 @@ class HelpPage:
                     variant="primary",
                     size="lg",
                 )
-
-        user_guide_md_dir = self.doc_dir / "usage.md"
-        if user_guide_md_dir.exists():
-            with (self.doc_dir / "usage.md").open(encoding="utf-8") as fi:
-                user_guide_md = fi.read()
-        else:
-            user_guide_md = get_remote_doc(
-                f"{self.remote_content_url}/v{self.app_version}/docs/usage.md"
-            )
-        if user_guide_md:
-            with gr.Accordion("Benutzerhandbuch", open=not KH_DEMO_MODE):
-                gr.Markdown(user_guide_md)
 
         if self.app_version:
             changelogs = ""
@@ -136,9 +135,12 @@ class HelpPage:
     def _build_quick_guide(self, user_id=None):
         if not self._app.f_user_management:
             return (
-                "1. **Daten hochladen:** Im Reiter `Dateien` Dokumente oder URLs hochladen.\n"
-                "2. **Chat nutzen:** Im Reiter `Chat` Fragen zu den Daten stellen.\n"
-                "3. **Einstellungen:** Modell und Sprache unter `Einstellungen` anpassen."
+                "### Allgemeiner Ablauf\n"
+                "1. **Daten hochladen:** Öffne den Reiter `Dateien` und lade Dokumente hoch oder füge Web-Links ein.\n"
+                "2. **Daten indexieren:** Nach dem Upload werden die Inhalte verarbeitet und für den Chat vorbereitet.\n"
+                "3. **Chat starten:** Wechsle in den Reiter `Chat` und stelle Fragen zu den hochgeladenen Inhalten.\n"
+                "4. **Einstellungen anpassen:** Unter `Einstellungen` kannst du Modell, Sprache und weitere Optionen setzen.\n"
+                "5. **Ergebnisse prüfen:** Nutze Quellenhinweise und Dateifilter, um Antworten schnell nachzuvollziehen."
             )
 
         role = "user"
@@ -151,19 +153,27 @@ class HelpPage:
                     role = "key_user"
 
         base = (
-            "1. **Daten-Upload:** Im Reiter `Dateien` Dokumente/URLs hochladen.\n"
-            "2. **Chat:** Im Reiter `Chat` mit den freigegebenen Daten arbeiten.\n"
+            "### Kleine Anleitung\n"
+            "1. **Anmelden:** Melde dich mit deinem Benutzerkonto an.\n"
+            "2. **Daten hochladen:** Im Reiter `Dateien` Dokumente oder URLs hochladen und indexieren.\n"
+            "3. **Chat verwenden:** Im Reiter `Chat` Fragen stellen und mit den freigegebenen Daten arbeiten.\n"
+            "4. **Einstellungen prüfen:** Unter `Einstellungen` dein Profil, Sprache und Modelloptionen anpassen.\n"
         )
         if role == "admin":
             return (
                 base
-                + "3. **Benutzer & Teams:** Unter `Ressourcen -> Benutzer` Teams anlegen "
-                "und Benutzern Rollen/Teams zuweisen."
+                + "5. **Benutzer und Teams verwalten:** Unter `Ressourcen -> Benutzer` neue Teams anlegen, "
+                "Benutzer erstellen und Rollen/Teams zuweisen.\n"
+                "6. **Zugriffe steuern:** Vergib Upload- und Leserechte passend zur Rolle."
             )
         if role == "key_user":
             return (
                 base
-                + "3. **Benutzerverwaltung:** Unter `Ressourcen -> Benutzer` Benutzer im "
-                "eigenen Team verwalten."
+                + "5. **Team-Benutzer verwalten:** Unter `Ressourcen -> Benutzer` Benutzer im "
+                "eigenen Team verwalten und Teamzuordnungen prüfen."
             )
-        return base + "3. **Benutzerrechte:** Bei fehlendem Zugriff bitte das KI-Kernteam kontaktieren."
+        return (
+            base
+            + "5. **Benutzerrechte:** Falls dir Daten, Teams oder Funktionen fehlen, "
+            "bitte das KI-Kernteam kontaktieren."
+        )
