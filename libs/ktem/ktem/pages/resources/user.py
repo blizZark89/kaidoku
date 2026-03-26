@@ -128,6 +128,32 @@ def create_user(usn, pwd, user_id=None, is_admin=True) -> bool:
         return True
 
 
+def ensure_admin_user(usn: str, pwd: str) -> bool:
+    """Ensure configured bootstrap admin exists and has admin RBAC."""
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username_lower == usn.lower())).first()
+        if user is None:
+            return create_user(usn=usn, pwd=pwd, is_admin=True)
+
+        changed = False
+        if not user.admin:
+            user.admin = True
+            changed = True
+        if changed:
+            session.add(user)
+            session.commit()
+
+        upsert_user_access(
+            session=session,
+            user_id=user.id,
+            role=ROLE_ADMIN,
+            team_id=None,
+            can_read=True,
+            can_upload=True,
+        )
+        return changed
+
+
 class UserManagement(BasePage):
     def __init__(self, app):
         self._app = app
@@ -137,9 +163,9 @@ class UserManagement(BasePage):
         ):
             usn = flowsettings.KH_FEATURE_USER_MANAGEMENT_ADMIN
             pwd = flowsettings.KH_FEATURE_USER_MANAGEMENT_PASSWORD
-            is_created = create_user(usn, pwd)
-            if is_created:
-                gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
+            is_created_or_upgraded = ensure_admin_user(usn, pwd)
+            if is_created_or_upgraded:
+                gr.Info(f'Admin-Benutzer "{usn}" ist aktiv')
 
     def _team_choices_for_actor(self, actor_user_id: Optional[str]):
         with Session(engine) as session:
