@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import tempfile
+import traceback
 import zipfile
 from copy import deepcopy
 from pathlib import Path
@@ -1175,7 +1176,12 @@ class FileIndexPage(BasePage):
         gr.Info(f"Start indexing {len(files)} files...")
 
         # get the pipeline
-        indexing_pipeline = self._index.get_indexing_pipeline(settings, user_id)
+        try:
+            indexing_pipeline = self._index.get_indexing_pipeline(settings, user_id)
+        except Exception as e:
+            gr.Warning("Indexierungs-Pipeline konnte nicht initialisiert werden")
+            yield "", f"Pipeline-Fehler: {e}\n{traceback.format_exc()}"
+            return
 
         outputs, debugs = [], []
         # stream the output
@@ -1200,6 +1206,7 @@ class FileIndexPage(BasePage):
             results, index_errors, docs = e.value
         except Exception as e:
             debugs.append(f"Error: {e}")
+            debugs.append(traceback.format_exc())
             yield "\n".join(outputs), "\n".join(debugs)
             return
 
@@ -1230,11 +1237,14 @@ class FileIndexPage(BasePage):
         to_process_files = []
         for str_file_path in files:
             file_path = Path(str(str_file_path))
-            exist_id = (
-                self._index.get_indexing_pipeline(settings, user_id)
-                .route(file_path)
-                .get_id_if_exists(file_path)
-            )
+            try:
+                exist_id = (
+                    self._index.get_indexing_pipeline(settings, user_id)
+                    .route(file_path)
+                    .get_id_if_exists(file_path)
+                )
+            except Exception:
+                exist_id = None
             if exist_id:
                 exist_ids.append(exist_id)
             else:
@@ -1289,11 +1299,14 @@ class FileIndexPage(BasePage):
             to_process_files = []
             for str_file_path in output_files:
                 file_path = Path(str_file_path)
-                exist_id = (
-                    self._index.get_indexing_pipeline(settings, user_id)
-                    .route(file_path)
-                    .get_id_if_exists(file_path)
-                )
+                try:
+                    exist_id = (
+                        self._index.get_indexing_pipeline(settings, user_id)
+                        .route(file_path)
+                        .get_id_if_exists(file_path)
+                    )
+                except Exception:
+                    exist_id = None
                 if exist_id:
                     exist_ids.append(exist_id)
                 else:
