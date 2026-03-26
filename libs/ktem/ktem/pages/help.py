@@ -4,6 +4,9 @@ from pathlib import Path
 import gradio as gr
 import requests
 from decouple import config
+from ktem.authz import get_access_context
+from ktem.db.engine import engine
+from sqlmodel import Session
 from theflow.settings import settings
 
 KH_DEMO_MODE = getattr(settings, "KH_DEMO_MODE", False)
@@ -24,7 +27,6 @@ def download_changelogs(release_url: str) -> str:
     try:
         res = requests.get(release_url).json()
         changelogs = res.get("body", "")
-
         return changelogs
     except Exception as e:
         print(f"Failed to fetch changelogs from {release_url}: {e}")
@@ -46,14 +48,16 @@ class HelpPage:
         self.remote_content_url = remote_content_url
         self.app_version = app_version
         self.changelogs_cache_dir = Path(changelogs_cache_dir)
-
         self.changelogs_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        with gr.Accordion("Kleine Anleitung", open=True):
+            self.quick_guide = gr.Markdown()
 
         about_md_dir = self.doc_dir / "about.md"
         if about_md_dir.exists():
             with (self.doc_dir / "about.md").open(encoding="utf-8") as fi:
                 about_md = fi.read()
-        else:  # fetch from remote
+        else:
             about_md = get_remote_doc(
                 f"{self.remote_content_url}/v{self.app_version}/docs/about.md"
             )
@@ -68,9 +72,7 @@ class HelpPage:
                 gr.Markdown(
                     "Dies ist eine Demo mit eingeschränktem Funktionsumfang. "
                     "Nutze die Schaltfläche **Space erstellen**, um kaidoku "
-                    "mit allen Funktionen in deinem eigenen Space zu installieren "
-                    "(einschließlich sicherem Hochladen und Verwalten privater "
-                    "Dokumente)."
+                    "mit allen Funktionen in deinem eigenen Space zu installieren."
                 )
                 gr.Button(
                     value="Eigenen Space erstellen",
@@ -83,7 +85,7 @@ class HelpPage:
         if user_guide_md_dir.exists():
             with (self.doc_dir / "usage.md").open(encoding="utf-8") as fi:
                 user_guide_md = fi.read()
-        else:  # fetch from remote
+        else:
             user_guide_md = get_remote_doc(
                 f"{self.remote_content_url}/v{self.app_version}/docs/usage.md"
             )
@@ -92,28 +94,76 @@ class HelpPage:
                 gr.Markdown(user_guide_md)
 
         if self.app_version:
-            # try retrieve from cache
             changelogs = ""
-
             if (self.changelogs_cache_dir / f"{version}.md").exists():
                 with open(self.changelogs_cache_dir / f"{version}.md", "r") as fi:
                     changelogs = fi.read()
             else:
-                release_url_base = (
-                    "https://api.github.com/repos/Cinnamon/kotaemon/releases"
-                )
+                release_url_base = "https://api.github.com/repos/Cinnamon/kotaemon/releases"
                 changelogs = download_changelogs(
                     release_url=f"{release_url_base}/tags/v{self.app_version}"
                 )
-
-                # cache the changelogs
                 if not self.changelogs_cache_dir.exists():
                     self.changelogs_cache_dir.mkdir(parents=True, exist_ok=True)
-                with open(
-                    self.changelogs_cache_dir / f"{self.app_version}.md", "w"
-                ) as fi:
+                with open(self.changelogs_cache_dir / f"{self.app_version}.md", "w") as fi:
                     fi.write(changelogs)
 
             if changelogs:
                 with gr.Accordion(f"Änderungsprotokoll (v{self.app_version})"):
                     gr.Markdown(changelogs)
+
+        if self._app.f_user_management:
+            self._app.app.load(
+                self._build_quick_guide,
+                inputs=[self._app.user_id],
+                outputs=[self.quick_guide],
+                show_progress="hidden",
+            )
+            self._app.user_id.change(
+                self._build_quick_guide,
+                inputs=[self._app.user_id],
+                outputs=[self.quick_guide],
+                show_progress="hidden",
+            )
+        else:
+            self._app.app.load(
+                self._build_quick_guide,
+                inputs=[],
+                outputs=[self.quick_guide],
+                show_progress="hidden",
+            )
+
+    def _build_quick_guide(self, user_id=None):
+        if not self._app.f_user_management:
+            return (
+                "1. **Daten hochladen:** Im Reiter `Dateien` Dokumente oder URLs hochladen.\n"
+                "2. **Chat nutzen:** Im Reiter `Chat` Fragen zu den Daten stellen.\n"
+                "3. **Einstellungen:** Modell und Sprache unter `Einstellungen` anpassen."
+            )
+
+        role = "user"
+        with Session(engine) as session:
+            actor = get_access_context(session, user_id)
+            if actor:
+                if actor.is_admin:
+                    role = "admin"
+                elif actor.is_key_user:
+                    role = "key_user"
+
+        base = (
+            "1. **Daten-Upload:** Im Reiter `Dateien` Dokumente/URLs hochladen.\n"
+            "2. **Chat:** Im Reiter `Chat` mit den freigegebenen Daten arbeiten.\n"
+        )
+        if role == "admin":
+            return (
+                base
+                + "3. **Benutzer & Teams:** Unter `Ressourcen -> Benutzer` Teams anlegen "
+                "und Benutzern Rollen/Teams zuweisen."
+            )
+        if role == "key_user":
+            return (
+                base
+                + "3. **Benutzerverwaltung:** Unter `Ressourcen -> Benutzer` Benutzer im "
+                "eigenen Team verwalten."
+            )
+        return base + "3. **Benutzerrechte:** Bei fehlendem Zugriff bitte Admin kontaktieren."
