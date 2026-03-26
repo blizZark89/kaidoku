@@ -17,13 +17,31 @@ VALID_ROLES = {ROLE_ADMIN, ROLE_KEY_USER, ROLE_USER}
 def _first(session, statement):
     if hasattr(session, "exec"):
         return session.exec(statement).first()
-    return session.execute(statement).first()
+    row = session.execute(statement).first()
+    if row is None:
+        return None
+    try:
+        if hasattr(row, "_mapping") and len(row) == 1:
+            return row[0]
+    except Exception:
+        pass
+    return row
 
 
 def _all(session, statement):
     if hasattr(session, "exec"):
         return session.exec(statement).all()
-    return session.execute(statement).all()
+    rows = session.execute(statement).all()
+    out = []
+    for row in rows:
+        try:
+            if hasattr(row, "_mapping") and len(row) == 1:
+                out.append(row[0])
+                continue
+        except Exception:
+            pass
+        out.append(row)
+    return out
 
 
 def parse_team_ids(team_value: Optional[str]) -> list[str]:
