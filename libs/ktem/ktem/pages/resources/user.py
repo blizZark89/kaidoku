@@ -597,7 +597,8 @@ class UserManagement(BasePage):
                     allowed = True
                 elif actor.is_key_user:
                     allowed = (
-                        access.role == ROLE_USER and access.team_id == actor.access.team_id
+                        actor.access.team_id is not None
+                        and access.team_id == actor.access.team_id
                     ) or user.id == actor.user.id
                 else:
                     allowed = user.id == actor.user.id
