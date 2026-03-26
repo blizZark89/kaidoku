@@ -14,6 +14,23 @@ ROLE_USER = "user"
 VALID_ROLES = {ROLE_ADMIN, ROLE_KEY_USER, ROLE_USER}
 
 
+def parse_team_ids(team_value: Optional[str]) -> list[str]:
+    if not team_value:
+        return []
+    return [t.strip() for t in str(team_value).split(",") if t.strip()]
+
+
+def encode_team_ids(team_ids: Optional[list[str]]) -> Optional[str]:
+    if not team_ids:
+        return None
+    unique_ids = []
+    for team_id in team_ids:
+        t = str(team_id).strip()
+        if t and t not in unique_ids:
+            unique_ids.append(t)
+    return ",".join(unique_ids) if unique_ids else None
+
+
 @dataclass
 class AccessContext:
     user: User
@@ -32,6 +49,10 @@ class AccessContext:
     @property
     def is_user(self) -> bool:
         return self.access.role == ROLE_USER
+
+    @property
+    def team_ids(self) -> list[str]:
+        return parse_team_ids(self.access.team_id)
 
 
 def _default_access_for_user(user: User) -> UserAccess:
@@ -131,10 +152,12 @@ def can_manage_user(actor: AccessContext, target: UserAccess) -> bool:
     if actor.is_admin:
         return True
     if actor.is_key_user:
+        actor_team_ids = set(actor.team_ids)
+        target_team_ids = set(parse_team_ids(target.team_id))
         return (
             target.role == ROLE_USER
-            and actor.access.team_id is not None
-            and target.team_id == actor.access.team_id
+            and bool(actor_team_ids)
+            and bool(actor_team_ids.intersection(target_team_ids))
         )
     return False
 
@@ -143,10 +166,13 @@ def can_create_role(actor: AccessContext, role: str, team_id: Optional[str]) -> 
     if actor.is_admin:
         return True
     if actor.is_key_user:
+        actor_team_ids = set(actor.team_ids)
+        target_team_ids = set(parse_team_ids(team_id))
         return (
             role == ROLE_USER
-            and actor.access.team_id is not None
-            and team_id == actor.access.team_id
+            and bool(actor_team_ids)
+            and bool(target_team_ids)
+            and target_team_ids.issubset(actor_team_ids)
         )
     return False
 
@@ -155,19 +181,18 @@ def allowed_user_ids_for_scope(session: Session, actor: AccessContext) -> list[s
     if actor.is_admin:
         return [u.id for u in session.exec(select(User)).all()]
 
-    team_id = actor.access.team_id
-    if not team_id:
+    actor_team_ids = set(actor.team_ids)
+    if not actor_team_ids:
         return []
 
-    team_user_ids = [
-        row.user_id
-        for row in session.exec(
-            select(UserAccess.user_id).where(UserAccess.team_id == team_id)
-        ).all()
-    ]
+    team_user_ids = []
+    for access in session.exec(select(UserAccess)).all():
+        target_team_ids = set(parse_team_ids(access.team_id))
+        if actor_team_ids.intersection(target_team_ids):
+            team_user_ids.append(access.user_id)
     if actor.user.id not in team_user_ids:
         team_user_ids.append(actor.user.id)
-    return team_user_ids
+    return list(dict.fromkeys(team_user_ids))
 
 
 def has_read_access(actor: AccessContext) -> bool:

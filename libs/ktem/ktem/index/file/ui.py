@@ -18,6 +18,7 @@ from ktem.authz import (
     has_read_access,
     has_upload_access,
     list_teams,
+    parse_team_ids,
 )
 from ktem.app import BasePage
 from ktem.db.engine import engine
@@ -1851,21 +1852,19 @@ class FileSelector(BasePage):
                 # Team selector choices for chat-side team search/filter.
                 if actor.is_admin:
                     team_filter_choices.extend((t.name, t.id) for t in list_teams(session))
-                elif actor.access.team_id:
-                    team_id = actor.access.team_id
-                    team_name = next(
-                        (t.name for t in list_teams(session) if t.id == team_id),
-                        team_id,
-                    )
-                    team_filter_choices.append((team_name, team_id))
+                elif actor.team_ids:
+                    for team_id in actor.team_ids:
+                        team_name = next(
+                            (t.name for t in list_teams(session) if t.id == team_id),
+                            team_id,
+                        )
+                        team_filter_choices.append((team_name, team_id))
 
                 if team_filter:
-                    team_user_ids = [
-                        row.user_id
-                        for row in session.exec(
-                            select(UserAccess.user_id).where(UserAccess.team_id == team_filter)
-                        ).all()
-                    ]
+                    team_user_ids = []
+                    for access in session.exec(select(UserAccess)).all():
+                        if team_filter in parse_team_ids(access.team_id):
+                            team_user_ids.append(access.user_id)
                     statement = statement.where(
                         self._index._resources["Source"].user.in_(team_user_ids)
                     )

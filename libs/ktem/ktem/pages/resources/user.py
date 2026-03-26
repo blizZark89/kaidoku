@@ -12,9 +12,11 @@ from ktem.authz import (
     assert_role_supported,
     can_create_role,
     can_manage_user,
+    encode_team_ids,
     ensure_user_access,
     get_access_context,
     list_teams,
+    parse_team_ids,
     team_exists,
     upsert_user_access,
 )
@@ -83,10 +85,10 @@ def _normalize_role_permissions(role: str, can_read: bool, can_upload: bool) -> 
     return bool(can_read), bool(can_upload)
 
 
-def _validate_role_team_constraints(role: str, team_id: Optional[str]) -> Optional[str]:
-    if role in {ROLE_KEY_USER, ROLE_USER} and not team_id:
-        return "Diese Rolle muss einem Team zugeordnet sein"
-    if role == ROLE_ADMIN and team_id:
+def _validate_role_team_constraints(role: str, team_ids: list[str]) -> Optional[str]:
+    if role in {ROLE_KEY_USER, ROLE_USER} and not team_ids:
+        return "Diese Rolle muss mindestens einem Team zugeordnet sein"
+    if role == ROLE_ADMIN and team_ids:
         return "Admin darf keinem Team fest zugeordnet sein"
     return None
 
@@ -185,12 +187,13 @@ class UserManagement(BasePage):
                 return []
             if actor.is_admin:
                 return [(team.name, team.id) for team in list_teams(session)]
-            if actor.is_key_user and actor.access.team_id:
-                team = session.exec(
-                    select(Team).where(Team.id == actor.access.team_id)
-                ).first()
-                if team:
-                    return [(team.name, team.id)]
+            if actor.is_key_user and actor.team_ids:
+                result = []
+                for team_id in actor.team_ids:
+                    team = session.exec(select(Team).where(Team.id == team_id)).first()
+                    if team:
+                        result.append((team.name, team.id))
+                return result
             return []
 
     def _role_choices_for_actor(self, actor_user_id: Optional[str]):
@@ -226,7 +229,12 @@ class UserManagement(BasePage):
                     choices=[ROLE_ADMIN, ROLE_KEY_USER, ROLE_USER],
                     value=ROLE_USER,
                 )
-                self.team_edit = gr.Dropdown(label="Team", choices=[], value=None)
+                self.team_edit = gr.Dropdown(
+                    label="Teams",
+                    choices=[],
+                    value=[],
+                    multiselect=True,
+                )
                 with gr.Row():
                     self.can_read_edit = gr.Checkbox(label="Leserechte", value=True)
                     self.can_upload_edit = gr.Checkbox(label="Upload-Rechte", value=False)
@@ -251,7 +259,12 @@ class UserManagement(BasePage):
                 choices=[ROLE_USER],
                 value=ROLE_USER,
             )
-            self.team_new = gr.Dropdown(label="Team", choices=[], value=None)
+            self.team_new = gr.Dropdown(
+                label="Teams",
+                choices=[],
+                value=[],
+                multiselect=True,
+            )
             with gr.Row():
                 self.can_read_new = gr.Checkbox(label="Leserechte", value=True)
                 self.can_upload_new = gr.Checkbox(label="Upload-Rechte", value=False)
@@ -550,8 +563,9 @@ class UserManagement(BasePage):
                 return team_id
 
             in_use = session.exec(
-                select(UserAccess).where(UserAccess.team_id == team_id)
-            ).first()
+                select(UserAccess)
+            ).all()
+            in_use = any(team_id in parse_team_ids(access.team_id) for access in in_use)
             if in_use:
                 gr.Warning("Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind")
                 return team_id
@@ -572,10 +586,11 @@ class UserManagement(BasePage):
         pwd,
         pwd_cnf,
         role,
-        team_id,
+        team_ids,
         can_read,
         can_upload,
     ):
+        team_ids = team_ids or []
         errors = validate_username(usn)
         if errors:
             gr.Warning(errors)
@@ -591,7 +606,7 @@ class UserManagement(BasePage):
             gr.Warning(role_err)
             return usn, pwd, pwd_cnf
 
-        role_team_err = _validate_role_team_constraints(role, team_id)
+        role_team_err = _validate_role_team_constraints(role, team_ids)
         if role_team_err:
             gr.Warning(role_team_err)
             return usn, pwd, pwd_cnf
@@ -601,13 +616,15 @@ class UserManagement(BasePage):
             if not actor:
                 return usn, pwd, pwd_cnf
 
-            if not can_create_role(actor, role, team_id):
+            encoded_team_ids = encode_team_ids(team_ids)
+            if not can_create_role(actor, role, encoded_team_ids):
                 gr.Warning("Du darfst diesen Benutzer/Rolle-Team nicht anlegen")
                 return usn, pwd, pwd_cnf
 
-            if team_id and not team_exists(session, team_id):
-                gr.Warning("Team existiert nicht")
-                return usn, pwd, pwd_cnf
+            for team_id in team_ids:
+                if not team_exists(session, team_id):
+                    gr.Warning("Team existiert nicht")
+                    return usn, pwd, pwd_cnf
 
             existing = session.exec(select(User).where(User.username_lower == usn.lower())).first()
             if existing:
@@ -632,7 +649,7 @@ class UserManagement(BasePage):
                 session=session,
                 user_id=user.id,
                 role=role,
-                team_id=team_id,
+                team_id=encoded_team_ids,
                 can_read=can_read_norm,
                 can_upload=can_upload_norm,
             )
@@ -659,12 +676,18 @@ class UserManagement(BasePage):
                 if actor.is_admin:
                     allowed = True
                 elif actor.is_key_user:
+                    actor_team_ids = set(actor.team_ids)
+                    target_team_ids = set(parse_team_ids(access.team_id))
                     allowed = (
-                        actor.access.team_id is not None
-                        and access.team_id == actor.access.team_id
+                        bool(actor_team_ids.intersection(target_team_ids))
                     ) or user.id == actor.user.id
                 else:
                     allowed = user.id == actor.user.id
+
+                team_names = [
+                    teams.get(team_id, team_id) for team_id in parse_team_ids(access.team_id)
+                ]
+                team_label = ", ".join(team_names) if team_names else "-"
 
                 if not allowed:
                     continue
@@ -674,7 +697,7 @@ class UserManagement(BasePage):
                         "id": user.id,
                         "username": user.username,
                         "role": access.role,
-                        "team": teams.get(access.team_id, "-"),
+                        "team": team_label,
                         "can_read": access.can_read,
                         "can_upload": access.can_upload,
                     }
@@ -704,7 +727,7 @@ class UserManagement(BasePage):
                 gr.update(value=""),
                 gr.update(value=""),
                 gr.update(value=ROLE_USER),
-                gr.update(value=None, choices=[]),
+                gr.update(value=[], choices=[]),
                 gr.update(value=True),
                 gr.update(value=False),
             )
@@ -727,7 +750,7 @@ class UserManagement(BasePage):
                     gr.update(value=""),
                     gr.update(value=""),
                     gr.update(value=ROLE_USER),
-                    gr.update(value=None, choices=choices),
+                    gr.update(value=[], choices=choices),
                     gr.update(value=True),
                     gr.update(value=False),
                 )
@@ -742,7 +765,7 @@ class UserManagement(BasePage):
                 gr.update(value=""),
                 gr.update(value=""),
                 gr.update(value=access.role),
-                gr.update(value=access.team_id, choices=choices),
+                gr.update(value=parse_team_ids(access.team_id), choices=choices),
                 gr.update(value=access.can_read),
                 gr.update(value=access.can_upload),
             )
@@ -761,10 +784,11 @@ class UserManagement(BasePage):
         pwd,
         pwd_cnf,
         role,
-        team_id,
+        team_ids,
         can_read,
         can_upload,
     ):
+        team_ids = team_ids or []
         errors = validate_username(usn)
         if errors:
             gr.Warning(errors)
@@ -775,7 +799,7 @@ class UserManagement(BasePage):
             gr.Warning(role_err)
             return pwd, pwd_cnf
 
-        role_team_err = _validate_role_team_constraints(role, team_id)
+        role_team_err = _validate_role_team_constraints(role, team_ids)
         if role_team_err:
             gr.Warning(role_team_err)
             return pwd, pwd_cnf
@@ -805,13 +829,15 @@ class UserManagement(BasePage):
                 gr.Warning("Keine Berechtigung zur Bearbeitung dieses Benutzers")
                 return pwd, pwd_cnf
 
-            if not can_create_role(actor, role, team_id):
+            encoded_team_ids = encode_team_ids(team_ids)
+            if not can_create_role(actor, role, encoded_team_ids):
                 gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
                 return pwd, pwd_cnf
 
-            if team_id and not team_exists(session, team_id):
-                gr.Warning("Team existiert nicht")
-                return pwd, pwd_cnf
+            for team_id in team_ids:
+                if not team_exists(session, team_id):
+                    gr.Warning("Team existiert nicht")
+                    return pwd, pwd_cnf
 
             existing = session.exec(
                 select(User).where(
@@ -839,7 +865,7 @@ class UserManagement(BasePage):
                 session=session,
                 user_id=target_user.id,
                 role=role,
-                team_id=team_id,
+                team_id=encoded_team_ids,
                 can_read=can_read_norm,
                 can_upload=can_upload_norm,
             )
