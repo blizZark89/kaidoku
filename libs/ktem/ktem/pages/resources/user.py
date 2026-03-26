@@ -239,6 +239,25 @@ class UserManagement(BasePage):
             )
 
     def on_register_events(self):
+        self._app.user_id.change(
+            self.refresh_team_dropdowns,
+            inputs=[self._app.user_id],
+            outputs=[self.team_new, self.team_edit, self.role_new],
+            show_progress="hidden",
+        )
+        self._app.user_id.change(
+            self.toggle_roles_overview,
+            inputs=[self._app.user_id],
+            outputs=[self.roles_overview_tab],
+            show_progress="hidden",
+        )
+        self._app.user_id.change(
+            self.list_roles_overview,
+            inputs=[self._app.user_id],
+            outputs=[self.roles_overview_state, self.roles_overview_list],
+            show_progress="hidden",
+        )
+
         self.btn_new.click(
             self.create_user,
             inputs=[
