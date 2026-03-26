@@ -14,6 +14,18 @@ ROLE_USER = "user"
 VALID_ROLES = {ROLE_ADMIN, ROLE_KEY_USER, ROLE_USER}
 
 
+def _first(session, statement):
+    if hasattr(session, "exec"):
+        return session.exec(statement).first()
+    return session.execute(statement).first()
+
+
+def _all(session, statement):
+    if hasattr(session, "exec"):
+        return session.exec(statement).all()
+    return session.execute(statement).all()
+
+
 def parse_team_ids(team_value: Optional[str]) -> list[str]:
     if not team_value:
         return []
@@ -80,7 +92,7 @@ def _legacy_team_id_for_user(session: Session, user_id: str) -> Optional[str]:
             stmt = text(
                 f"SELECT team_id FROM {table} WHERE user_id = :uid LIMIT 1"
             ).bindparams(uid=user_id)
-            row = session.exec(stmt).first()
+            row = _first(session, stmt)
             if row:
                 if isinstance(row, tuple):
                     return str(row[0]) if row[0] else None
@@ -91,9 +103,7 @@ def _legacy_team_id_for_user(session: Session, user_id: str) -> Optional[str]:
 
 
 def ensure_user_access(session: Session, user: User) -> UserAccess:
-    access = session.exec(
-        select(UserAccess).where(UserAccess.user_id == user.id)
-    ).first()
+    access = _first(session, select(UserAccess).where(UserAccess.user_id == user.id))
     if access:
         # Keep legacy admin flag and RBAC role in sync to avoid UI lockout.
         if user.admin and access.role != ROLE_ADMIN:
@@ -125,7 +135,7 @@ def ensure_user_access(session: Session, user: User) -> UserAccess:
 def get_access_context(session: Session, user_id: Optional[str]) -> Optional[AccessContext]:
     if not user_id:
         return None
-    user = session.exec(select(User).where(User.id == user_id)).first()
+    user = _first(session, select(User).where(User.id == user_id))
     if not user:
         return None
     access = ensure_user_access(session, user)
@@ -135,11 +145,11 @@ def get_access_context(session: Session, user_id: Optional[str]) -> Optional[Acc
 def team_exists(session: Session, team_id: Optional[str]) -> bool:
     if team_id is None:
         return False
-    return session.exec(select(Team).where(Team.id == team_id)).first() is not None
+    return _first(session, select(Team).where(Team.id == team_id)) is not None
 
 
 def list_teams(session: Session) -> Sequence[Team]:
-    return session.exec(select(Team).order_by(Team.name)).all()
+    return _all(session, select(Team).order_by(Team.name))
 
 
 def assert_role_supported(role: str) -> Optional[str]:
@@ -179,14 +189,14 @@ def can_create_role(actor: AccessContext, role: str, team_id: Optional[str]) -> 
 
 def allowed_user_ids_for_scope(session: Session, actor: AccessContext) -> list[str]:
     if actor.is_admin:
-        return [u.id for u in session.exec(select(User)).all()]
+        return [u.id for u in _all(session, select(User))]
 
     actor_team_ids = set(actor.team_ids)
     if not actor_team_ids:
         return []
 
     team_user_ids = []
-    for access in session.exec(select(UserAccess)).all():
+    for access in _all(session, select(UserAccess)):
         target_team_ids = set(parse_team_ids(access.team_id))
         if actor_team_ids.intersection(target_team_ids):
             team_user_ids.append(access.user_id)
@@ -215,9 +225,7 @@ def upsert_user_access(
     can_read: bool,
     can_upload: bool,
 ) -> UserAccess:
-    access = session.exec(
-        select(UserAccess).where(UserAccess.user_id == user_id)
-    ).first()
+    access = _first(session, select(UserAccess).where(UserAccess.user_id == user_id))
     if not access:
         access = UserAccess(user_id=user_id)
     access.role = role
