@@ -11,6 +11,7 @@ from ktem.authz import (
     assert_role_supported,
     can_create_role,
     can_manage_user,
+    ensure_user_access,
     get_access_context,
     list_teams,
     team_exists,
@@ -589,18 +590,8 @@ class UserManagement(BasePage):
             users = session.exec(select(User)).all()
             results = []
             for user in users:
-                access = session.exec(
-                    select(UserAccess).where(UserAccess.user_id == user.id)
-                ).first()
-                if not access:
-                    access = upsert_user_access(
-                        session=session,
-                        user_id=user.id,
-                        role=ROLE_ADMIN if user.admin else ROLE_USER,
-                        team_id=None,
-                        can_read=True,
-                        can_upload=user.admin,
-                    )
+                # Ensure role/team data is available and migrated for each user.
+                access = ensure_user_access(session, user)
 
                 if actor.is_admin:
                     allowed = True
