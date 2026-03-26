@@ -310,6 +310,92 @@ class FileIndexPage(BasePage):
 
         return gr.update(choices=choices, value=values, visible=True)
 
+    def selected_file_team_choices(self, file_id, user_id):
+        if not self._app.f_user_management or user_id is None or not file_id:
+            return (
+                gr.update(choices=[], value=[], visible=False),
+                gr.update(visible=False),
+            )
+
+        Source = self._index._resources["Source"]
+        with Session(engine) as session:
+            actor = get_access_context(session, user_id)
+            if not actor or not has_upload_access(actor):
+                return (
+                    gr.update(choices=[], value=[], visible=False),
+                    gr.update(visible=False),
+                )
+
+            source = session.query(Source).filter_by(id=file_id).first()
+            if not source:
+                return (
+                    gr.update(choices=[], value=[], visible=False),
+                    gr.update(visible=False),
+                )
+
+            scope_ids = self._scope_user_ids(session, user_id)
+            if scope_ids is not None and source.user not in scope_ids:
+                return (
+                    gr.update(choices=[], value=[], visible=False),
+                    gr.update(visible=False),
+                )
+            if not _source_visible_to_actor(source, actor):
+                return (
+                    gr.update(choices=[], value=[], visible=False),
+                    gr.update(visible=False),
+                )
+
+            teams = list_teams(session)
+            team_map = {team.id: team.name for team in teams}
+            if actor.is_admin:
+                choices = [(team.name, team.id) for team in teams]
+            else:
+                choices = [
+                    (team_map.get(team_id, team_id), team_id)
+                    for team_id in actor.team_ids
+                    if team_id in team_map
+                ]
+            selected = [
+                team_id for team_id in _source_team_ids(source) if any(team_id == tid for _, tid in choices)
+            ]
+            return (
+                gr.update(choices=choices, value=selected, visible=True),
+                gr.update(visible=True),
+            )
+
+    def save_selected_file_teams(self, file_id, user_id, selected_team_ids):
+        if not file_id:
+            gr.Warning("Keine Datei ausgewählt")
+            return gr.update()
+
+        Source = self._index._resources["Source"]
+        with Session(engine) as session:
+            source = session.query(Source).filter_by(id=file_id).first()
+            if not source:
+                gr.Warning("Datei nicht gefunden")
+                return gr.update()
+
+            scope_ids = self._scope_user_ids(session, user_id)
+            if scope_ids is not None and source.user not in scope_ids:
+                gr.Warning("Keine Berechtigung für diese Datei")
+                return gr.update()
+
+            resolved_team_ids, error = self._resolve_document_team_assignment(
+                session, user_id, selected_team_ids
+            )
+            if error:
+                gr.Warning(error)
+                return gr.update()
+
+            source_note = dict(source.note or {})
+            source_note["team_ids"] = resolved_team_ids
+            source.note = source_note
+            session.add(source)
+            session.commit()
+
+        gr.Info("Dokument-Teams gespeichert")
+        return gr.update(value=resolved_team_ids)
+
     def render_file_list(self):
         self.filter = gr.Textbox(
             value="",
@@ -360,6 +446,24 @@ class FileIndexPage(BasePage):
             self.selected_file_id = gr.State(value=None)
             with gr.Column(scale=2):
                 self.selected_panel = gr.Markdown(self.selected_panel_false)
+                if self._app.f_user_management:
+                    self.file_team_ids = gr.Dropdown(
+                        label="Dokument-Teams",
+                        choices=[],
+                        value=[],
+                        multiselect=True,
+                        container=False,
+                        interactive=True,
+                        visible=False,
+                    )
+                    self.file_team_save_button = gr.Button(
+                        "Teams speichern",
+                        variant="primary",
+                        visible=False,
+                    )
+                else:
+                    self.file_team_ids = gr.State(value=[])
+                    self.file_team_save_button = gr.State(value=None)
 
         self.chunks = gr.HTML(visible=False)
 
@@ -974,7 +1078,7 @@ class FileIndexPage(BasePage):
         for event in self._app.get_event(f"onFileIndex{self._index.id}Changed"):
             onDeleted = onDeleted.then(**event)
 
-        self.deselect_button.click(
+        onDeselected = self.deselect_button.click(
             fn=lambda: (None, self.selected_panel_false),
             inputs=[],
             outputs=[self.selected_file_id, self.selected_panel],
@@ -991,6 +1095,13 @@ class FileIndexPage(BasePage):
             ],
             show_progress="hidden",
         )
+        if self._app.f_user_management:
+            onDeselected = onDeselected.then(
+                fn=self.selected_file_team_choices,
+                inputs=[self.selected_file_id, self._app.user_id],
+                outputs=[self.file_team_ids, self.file_team_save_button],
+                show_progress="hidden",
+            )
 
         self.chat_button.click(
             fn=self.set_file_id_selector,
@@ -1114,7 +1225,7 @@ class FileIndexPage(BasePage):
             outputs=[self.upload_progress_panel, self.upload_result, self.upload_info],
         )
 
-        self.file_list.select(
+        onFileSelected = self.file_list.select(
             fn=self.interact_file_list,
             inputs=[self.file_list],
             outputs=[self.selected_file_id, self.selected_panel],
@@ -1131,6 +1242,26 @@ class FileIndexPage(BasePage):
             ],
             show_progress="hidden",
         )
+        if self._app.f_user_management:
+            onFileSelected = onFileSelected.then(
+                fn=self.selected_file_team_choices,
+                inputs=[self.selected_file_id, self._app.user_id],
+                outputs=[self.file_team_ids, self.file_team_save_button],
+                show_progress="hidden",
+            )
+            onFileTeamSaved = self.file_team_save_button.click(
+                fn=self.save_selected_file_teams,
+                inputs=[self.selected_file_id, self._app.user_id, self.file_team_ids],
+                outputs=[self.file_team_ids],
+                show_progress="hidden",
+            ).then(
+                fn=self.list_file,
+                inputs=[self._app.user_id, self.filter],
+                outputs=[self.file_list_state, self.file_list],
+                show_progress="hidden",
+            )
+            for event in self._app.get_event(f"onFileIndex{self._index.id}Changed"):
+                onFileTeamSaved = onFileTeamSaved.then(**event)
 
         self.group_list.select(
             fn=self.interact_group_list,
