@@ -14,34 +14,38 @@ ROLE_USER = "user"
 VALID_ROLES = {ROLE_ADMIN, ROLE_KEY_USER, ROLE_USER}
 
 
+def _unwrap_row_value(value):
+    # SQLAlchemy Row -> first selected entity/scalar
+    if hasattr(value, "_mapping"):
+        try:
+            mapping_values = list(value._mapping.values())
+            if mapping_values:
+                return mapping_values[0]
+        except Exception:
+            pass
+        try:
+            return value[0]
+        except Exception:
+            return value
+    if isinstance(value, (tuple, list)):
+        return value[0] if value else value
+    return value
+
+
 def _first(session, statement):
     if hasattr(session, "exec"):
         return session.exec(statement).first()
     row = session.execute(statement).first()
     if row is None:
         return None
-    try:
-        if hasattr(row, "_mapping") and len(row) == 1:
-            return row[0]
-    except Exception:
-        pass
-    return row
+    return _unwrap_row_value(row)
 
 
 def _all(session, statement):
     if hasattr(session, "exec"):
         return session.exec(statement).all()
     rows = session.execute(statement).all()
-    out = []
-    for row in rows:
-        try:
-            if hasattr(row, "_mapping") and len(row) == 1:
-                out.append(row[0])
-                continue
-        except Exception:
-            pass
-        out.append(row)
-    return out
+    return [_unwrap_row_value(row) for row in rows]
 
 
 def parse_team_ids(team_value: Optional[str]) -> list[str]:
