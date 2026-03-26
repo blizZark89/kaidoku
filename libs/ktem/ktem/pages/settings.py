@@ -195,6 +195,14 @@ class SettingsPage(BasePage):
         return name + "___"
 
     def on_register_events(self):
+        if self._app.f_user_management:
+            self._app.user_id.change(
+                self._get_current_username_label,
+                inputs=[self._user_id],
+                outputs=[self.current_name],
+                show_progress="hidden",
+            )
+
         if not KH_SSO_ENABLED:
             save_chain = self.setting_save_btn.click(
                 self.save_setting,
