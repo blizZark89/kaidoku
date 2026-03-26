@@ -23,7 +23,6 @@ from ktem.authz import (
 )
 from ktem.app import BasePage
 from ktem.db.engine import engine
-from ktem.db.models import UserAccess
 from ktem.utils.render import Render
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -83,6 +82,40 @@ function(file_list) {
 """.replace(
     "web_search", WEB_SEARCH_COMMAND
 )
+
+
+def _normalize_source_team_ids(raw_value) -> list[str]:
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, str):
+        return parse_team_ids(raw_value)
+    if isinstance(raw_value, (list, tuple, set)):
+        team_ids: list[str] = []
+        for team_id in raw_value:
+            value = str(team_id).strip()
+            if value and value not in team_ids:
+                team_ids.append(value)
+        return team_ids
+    return []
+
+
+def _source_team_ids(source) -> list[str]:
+    note = getattr(source, "note", None) or {}
+    return _normalize_source_team_ids(note.get("team_ids"))
+
+
+def _source_visible_to_actor(source, actor) -> bool:
+    if actor is None:
+        return True
+    if actor.is_admin:
+        return True
+    source_team_ids = set(_source_team_ids(source))
+    if not source_team_ids:
+        # Legacy documents without explicit document teams stay visible
+        # through uploader-based scope filtering.
+        return True
+    actor_team_ids = set(actor.team_ids)
+    return bool(actor_team_ids.intersection(source_team_ids))
 
 
 class File(gr.File):
@@ -193,6 +226,89 @@ class FileIndexPage(BasePage):
                 gr.Warning("Keine Upload-Berechtigung")
                 return False
             return True
+
+    def _resolve_document_team_assignment(self, session: Session, user_id, selected_team_ids):
+        if not self._app.f_user_management:
+            return [], None
+
+        actor = get_access_context(session, user_id)
+        if not actor:
+            return [], "Nicht angemeldet"
+        if not has_upload_access(actor):
+            return [], "Keine Upload-Berechtigung"
+
+        selected_team_ids = selected_team_ids or []
+        selected_team_ids = [str(team_id).strip() for team_id in selected_team_ids if str(team_id).strip()]
+        selected_team_ids = list(dict.fromkeys(selected_team_ids))
+
+        all_teams = list_teams(session)
+        existing_team_ids = {team.id for team in all_teams}
+
+        if actor.is_admin:
+            allowed_team_ids = existing_team_ids
+            default_team_ids = selected_team_ids
+        else:
+            allowed_team_ids = set(actor.team_ids)
+            # keyuser/user: if not explicitly chosen, default to own teams.
+            default_team_ids = selected_team_ids or list(actor.team_ids)
+
+        invalid_team_ids = [team_id for team_id in default_team_ids if team_id not in allowed_team_ids]
+        if invalid_team_ids:
+            return [], "Keine Berechtigung für ausgewählte Teams"
+        if any(team_id not in existing_team_ids for team_id in default_team_ids):
+            return [], "Mindestens ein ausgewähltes Team existiert nicht"
+
+        return default_team_ids, None
+
+    def _apply_document_teams(self, file_ids, user_id, selected_team_ids):
+        if not self._app.f_user_management:
+            return
+        file_ids = [file_id for file_id in (file_ids or []) if file_id]
+        if not file_ids:
+            return
+
+        Source = self._index._resources["Source"]
+        with Session(engine) as session:
+            resolved_team_ids, error = self._resolve_document_team_assignment(
+                session, user_id, selected_team_ids
+            )
+            if error:
+                gr.Warning(error)
+                return
+
+            for file_id in file_ids:
+                source = session.query(Source).filter_by(id=file_id).first()
+                if not source:
+                    continue
+                source_note = dict(source.note or {})
+                source_note["team_ids"] = resolved_team_ids
+                source.note = source_note
+                session.add(source)
+            session.commit()
+
+    def list_document_team_choices(self, user_id):
+        if not self._app.f_user_management or user_id is None:
+            return gr.update(choices=[], value=[], visible=False)
+
+        with Session(engine) as session:
+            actor = get_access_context(session, user_id)
+            if not actor or not has_upload_access(actor):
+                return gr.update(choices=[], value=[], visible=False)
+
+            teams = list_teams(session)
+            team_map = {team.id: team.name for team in teams}
+            if actor.is_admin:
+                choices = [(team.name, team.id) for team in teams]
+                values = []
+            else:
+                choices = [
+                    (team_map.get(team_id, team_id), team_id)
+                    for team_id in actor.team_ids
+                    if team_id in team_map
+                ]
+                values = [team_id for _, team_id in choices]
+
+        return gr.update(choices=choices, value=values, visible=True)
 
     def render_file_list(self):
         self.filter = gr.Textbox(
@@ -343,6 +459,18 @@ class FileIndexPage(BasePage):
                             self.reindex = gr.Checkbox(
                                 value=False, label="Datei neu indexieren erzwingen", container=False
                             )
+                        if self._app.f_user_management:
+                            self.document_team_ids = gr.Dropdown(
+                                label="Dokument-Teams",
+                                choices=[],
+                                value=[],
+                                multiselect=True,
+                                container=False,
+                                interactive=True,
+                                info="Nur ausgewählte Teams sehen diese Dokumente.",
+                            )
+                        else:
+                            self.document_team_ids = gr.State(value=[])
 
                     self.upload_button = gr.Button(
                         "Hochladen und indexieren", variant="primary"
@@ -414,11 +542,29 @@ class FileIndexPage(BasePage):
                 },
             )
             self._app.subscribe_event(
+                name="onSignIn",
+                definition={
+                    "fn": self.list_document_team_choices,
+                    "inputs": [self._app.user_id],
+                    "outputs": [self.document_team_ids],
+                    "show_progress": "hidden",
+                },
+            )
+            self._app.subscribe_event(
                 name="onSignOut",
                 definition={
                     "fn": self.list_file,
                     "inputs": [self._app.user_id],
                     "outputs": [self.file_list_state, self.file_list],
+                    "show_progress": "hidden",
+                },
+            )
+            self._app.subscribe_event(
+                name="onSignOut",
+                definition={
+                    "fn": self.list_document_team_choices,
+                    "inputs": [self._app.user_id],
+                    "outputs": [self.document_team_ids],
                     "show_progress": "hidden",
                 },
             )
@@ -478,6 +624,7 @@ class FileIndexPage(BasePage):
     def delete_event(self, file_id, user_id):
         file_name = ""
         with Session(engine) as session:
+            actor = get_access_context(session, user_id) if self._app.f_user_management else None
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
@@ -487,6 +634,9 @@ class FileIndexPage(BasePage):
                 scope_ids = self._scope_user_ids(session, user_id)
                 if scope_ids is not None and source[0].user not in scope_ids:
                     gr.Warning("Keine Berechtigung für diese Datei")
+                    return None, self.selected_panel_false
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor):
+                    gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return None, self.selected_panel_false
                 file_name = source[0].name
                 session.delete(source[0])
@@ -521,6 +671,7 @@ class FileIndexPage(BasePage):
 
     def download_single_file(self, is_zipped_state, file_id, user_id):
         with Session(engine) as session:
+            actor = get_access_context(session, user_id) if self._app.f_user_management else None
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
@@ -529,7 +680,12 @@ class FileIndexPage(BasePage):
             if source:
                 scope_ids = self._scope_user_ids(session, user_id)
                 if scope_ids is not None and source[0].user not in scope_ids:
-                    gr.Warning("Keine Berechtigung für diese Datei")
+                    gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
+                    return is_zipped_state, gr.DownloadButton(
+                        label="Download", value=None
+                    )
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor):
+                    gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
@@ -564,6 +720,7 @@ class FileIndexPage(BasePage):
 
     def download_single_file_simple(self, is_zipped_state, file_html, file_id, user_id):
         with Session(engine) as session:
+            actor = get_access_context(session, user_id) if self._app.f_user_management else None
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
@@ -572,7 +729,12 @@ class FileIndexPage(BasePage):
             if source:
                 scope_ids = self._scope_user_ids(session, user_id)
                 if scope_ids is not None and source[0].user not in scope_ids:
-                    gr.Warning("Keine Berechtigung für diese Datei")
+                    gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
+                    return is_zipped_state, gr.DownloadButton(
+                        label="Download", value=None
+                    )
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor):
+                    gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
@@ -922,6 +1084,7 @@ class FileIndexPage(BasePage):
                     self.reindex,
                     self._app.settings_state,
                     self._app.user_id,
+                    self.document_team_ids,
                 ],
                 outputs=[self.upload_result, self.upload_info],
                 concurrency_limit=20,
@@ -1103,6 +1266,12 @@ class FileIndexPage(BasePage):
             inputs=[self.file_list_state],
             outputs=[self.group_files],
         )
+        if self._app.f_user_management:
+            self._app.app.load(
+                self.list_document_team_choices,
+                inputs=[self._app.user_id],
+                outputs=[self.document_team_ids],
+            )
 
     def _may_extract_zip(self, files, zip_dir: str):
         """Handle zip files"""
@@ -1139,7 +1308,7 @@ class FileIndexPage(BasePage):
         return remaining_files, errors
 
     def index_fn(
-        self, files, urls, reindex: bool, settings, user_id
+        self, files, urls, reindex: bool, settings, user_id, document_team_ids=None
     ) -> Generator[tuple[str, str], None, None]:
         """Upload and index the files
 
@@ -1217,6 +1386,8 @@ class FileIndexPage(BasePage):
         if n_errors:
             gr.Warning(f"Have errors for {n_errors} files")
 
+        self._apply_document_teams(results, user_id, document_team_ids)
+
         return results
 
     def index_fn_file_with_default_loaders(
@@ -1255,7 +1426,9 @@ class FileIndexPage(BasePage):
         settings[f"index.options.{self._index.id}.reader_mode"] = "default"
         settings[f"index.options.{self._index.id}.quick_index_mode"] = True
         if to_process_files:
-            _iter = self.index_fn(to_process_files, [], reindex, settings, user_id)
+            _iter = self.index_fn(
+                to_process_files, [], reindex, settings, user_id, None
+            )
             try:
                 while next(_iter):
                     pass
@@ -1314,7 +1487,9 @@ class FileIndexPage(BasePage):
 
             returned_ids = []
             if to_process_files:
-                _iter = self.index_fn(to_process_files, [], reindex, settings, user_id)
+                _iter = self.index_fn(
+                    to_process_files, [], reindex, settings, user_id, None
+                )
                 try:
                     while next(_iter):
                         pass
@@ -1324,7 +1499,7 @@ class FileIndexPage(BasePage):
             returned_ids = exist_ids + returned_ids
         else:
             if urls:
-                _iter = self.index_fn([], urls, reindex, settings, user_id)
+                _iter = self.index_fn([], urls, reindex, settings, user_id, None)
                 try:
                     while next(_iter):
                         pass
@@ -1404,7 +1579,7 @@ class FileIndexPage(BasePage):
             for p in exclude_patterns:
                 files = [f for f in files if not fnmatch.fnmatch(name=f, pat=p)]
 
-        yield from self.index_fn(files, [], reindex, settings, user_id)
+        yield from self.index_fn(files, [], reindex, settings, user_id, None)
 
     def format_size_human_readable(self, num: float | str, suffix="B"):
         try:
@@ -1437,6 +1612,9 @@ class FileIndexPage(BasePage):
         Source = self._index._resources["Source"]
         with Session(engine) as session:
             statement = select(Source)
+            actor = None
+            if self._app.f_user_management:
+                actor = get_access_context(session, user_id)
             scope_ids = self._scope_user_ids(session, user_id)
             if scope_ids == []:
                 return [], pd.DataFrame.from_records(
@@ -1458,19 +1636,23 @@ class FileIndexPage(BasePage):
                     statement = statement.where(Source.user == user_id)
             if name_pattern:
                 statement = statement.where(Source.name.ilike(f"%{name_pattern}%"))
-            results = [
-                {
-                    "id": each[0].id,
-                    "name": each[0].name,
-                    "size": self.format_size_human_readable(each[0].size),
-                    "tokens": self.format_size_human_readable(
-                        each[0].note.get("tokens", "-"), suffix=""
-                    ),
-                    "loader": each[0].note.get("loader", "-"),
-                    "date_created": each[0].date_created.strftime("%Y-%m-%d %H:%M:%S"),
-                }
-                for each in session.execute(statement).all()
-            ]
+            results = []
+            for each in session.execute(statement).all():
+                source = each[0]
+                if self._app.f_user_management and not _source_visible_to_actor(source, actor):
+                    continue
+                results.append(
+                    {
+                        "id": source.id,
+                        "name": source.name,
+                        "size": self.format_size_human_readable(source.size),
+                        "tokens": self.format_size_human_readable(
+                            (source.note or {}).get("tokens", "-"), suffix=""
+                        ),
+                        "loader": (source.note or {}).get("loader", "-"),
+                        "date_created": source.date_created.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
 
         if results:
             file_list = pd.DataFrame.from_records(results)
@@ -1818,20 +2000,29 @@ class FileSelector(BasePage):
         file_ids = []
         with Session(engine) as session:
             statement = select(self._index._resources["Source"].id)
+            actor = None
             if self._app.f_user_management:
                 actor = get_access_context(session, user_id)
                 if not actor or not has_read_access(actor):
                     return []
                 scope_ids = allowed_user_ids_for_scope(session, actor)
-                statement = statement.where(self._index._resources["Source"].user.in_(scope_ids))
+                statement = select(self._index._resources["Source"]).where(
+                    self._index._resources["Source"].user.in_(scope_ids)
+                )
             if self._index.config.get("private", False):
                 if not self._app.f_user_management:
                     statement = statement.where(
                         self._index._resources["Source"].user == user_id
                     )
             results = session.execute(statement).all()
-            for (id,) in results:
-                file_ids.append(id)
+            if self._app.f_user_management:
+                for result in results:
+                    source = result[0]
+                    if _source_visible_to_actor(source, actor):
+                        file_ids.append(source.id)
+            else:
+                for (id,) in results:
+                    file_ids.append(id)
 
         return file_ids
 
@@ -1851,6 +2042,7 @@ class FileSelector(BasePage):
             # get file list from Source table
             statement = select(self._index._resources["Source"])
             scope_ids = None
+            actor = None
             if self._app.f_user_management:
                 actor = get_access_context(session, user_id)
                 if not actor or not has_read_access(actor):
@@ -1872,15 +2064,6 @@ class FileSelector(BasePage):
                             team_id,
                         )
                         team_filter_choices.append((team_name, team_id))
-
-                if team_filter:
-                    team_user_ids = []
-                    for access in session.exec(select(UserAccess)).all():
-                        if team_filter in parse_team_ids(access.team_id):
-                            team_user_ids.append(access.user_id)
-                    statement = statement.where(
-                        self._index._resources["Source"].user.in_(team_user_ids)
-                    )
             if self._index.config.get("private", False):
                 if not self._app.f_user_management:
                     statement = statement.where(
@@ -1893,8 +2076,14 @@ class FileSelector(BasePage):
 
             results = session.execute(statement).all()
             for result in results:
-                available_ids.append(result[0].id)
-                options.append((result[0].name, result[0].id))
+                source = result[0]
+                if actor and not _source_visible_to_actor(source, actor):
+                    continue
+                source_team_ids = _source_team_ids(source)
+                if team_filter and team_filter not in source_team_ids:
+                    continue
+                available_ids.append(source.id)
+                options.append((source.name, source.id))
 
             # get group list from FileGroup table
             FileGroup = self._index._resources["FileGroup"]
