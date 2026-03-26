@@ -166,4 +166,4 @@ class HelpPage:
                 + "3. **Benutzerverwaltung:** Unter `Ressourcen -> Benutzer` Benutzer im "
                 "eigenen Team verwalten."
             )
-        return base + "3. **Benutzerrechte:** Bei fehlendem Zugriff bitte Admin kontaktieren."
+        return base + "3. **Benutzerrechte:** Bei fehlendem Zugriff bitte das KI-Kernteam kontaktieren."
