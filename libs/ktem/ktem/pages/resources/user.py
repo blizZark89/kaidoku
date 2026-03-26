@@ -1,4 +1,5 @@
 import hashlib
+import uuid
 from typing import Optional
 
 import gradio as gr
@@ -18,6 +19,7 @@ from ktem.authz import (
     upsert_user_access,
 )
 from ktem.db.models import Team, User, UserAccess, engine
+from sqlalchemy import text
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -95,6 +97,15 @@ def _resolve_actor(session: Session, actor_user_id: Optional[str]):
         gr.Warning("Nicht angemeldet")
         return None
     return actor
+
+
+def _team_table_has_name_lower(session: Session) -> bool:
+    rows = session.exec(text("PRAGMA table_info(team)")).all()
+    for row in rows:
+        # PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
+        if len(row) > 1 and str(row[1]) == "name_lower":
+            return True
+    return False
 
 
 def create_user(usn, pwd, user_id=None, is_admin=True) -> bool:
@@ -509,8 +520,22 @@ class UserManagement(BasePage):
                 gr.Warning(f'Team "{team_name}" existiert bereits')
                 return team_name
 
-            session.add(Team(name=team_name))
-            session.commit()
+            # Backward compatibility for existing databases that still have
+            # the legacy `name_lower` column on team table.
+            if _team_table_has_name_lower(session):
+                session.exec(
+                    text(
+                        "INSERT INTO team (id, name, name_lower) VALUES (:id, :name, :name_lower)"
+                    ).bindparams(
+                        id=uuid.uuid4().hex,
+                        name=team_name,
+                        name_lower=team_name.lower(),
+                    )
+                )
+                session.commit()
+            else:
+                session.add(Team(name=team_name))
+                session.commit()
             gr.Info(f'Team "{team_name}" erstellt')
             return ""
 
