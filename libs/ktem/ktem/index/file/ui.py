@@ -17,9 +17,11 @@ from ktem.authz import (
     get_access_context,
     has_read_access,
     has_upload_access,
+    list_teams,
 )
 from ktem.app import BasePage
 from ktem.db.engine import engine
+from ktem.db.models import UserAccess
 from ktem.utils.render import Render
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -1741,8 +1743,18 @@ class FileSelector(BasePage):
             value=default_selector,
             choices=[],
             multiselect=True,
+            filterable=True,
             container=False,
             interactive=True,
+            visible=False,
+        )
+        self.team_filter = gr.Dropdown(
+            label="Team",
+            value="",
+            choices=[("Alle Teams", "")],
+            container=False,
+            interactive=True,
+            filterable=True,
             visible=False,
         )
         self.selector_user_id = gr.State(value=user_id)
@@ -1753,9 +1765,19 @@ class FileSelector(BasePage):
 
     def on_register_events(self):
         self.mode.change(
-            fn=lambda mode, user_id: (gr.update(visible=mode == "select"), user_id),
+            fn=lambda mode, user_id: (
+                gr.update(visible=mode == "select"),
+                gr.update(visible=mode == "select" and self._app.f_user_management),
+                user_id,
+            ),
             inputs=[self.mode, self._app.user_id],
-            outputs=[self.selector, self.selector_user_id],
+            outputs=[self.selector, self.team_filter, self.selector_user_id],
+        )
+        self.team_filter.change(
+            self.load_files,
+            inputs=[self.selector, self._app.user_id, self.team_filter],
+            outputs=[self.selector, self.selector_choices, self.team_filter],
+            show_progress="hidden",
         )
         # attach special event for the first index
         if self._index.id == 1:
@@ -1799,12 +1821,17 @@ class FileSelector(BasePage):
 
         return file_ids
 
-    def load_files(self, selected_files, user_id):
+    def load_files(self, selected_files, user_id, team_filter=""):
         options: list = []
         available_ids = []
+        team_filter_choices = [("Alle Teams", "")]
         if user_id is None:
             # not signed in
-            return gr.update(value=selected_files, choices=options), options
+            return (
+                gr.update(value=selected_files, choices=options),
+                options,
+                gr.update(value="", choices=team_filter_choices),
+            )
 
         with Session(engine) as session:
             # get file list from Source table
@@ -1813,9 +1840,35 @@ class FileSelector(BasePage):
             if self._app.f_user_management:
                 actor = get_access_context(session, user_id)
                 if not actor or not has_read_access(actor):
-                    return gr.update(value=selected_files, choices=options), options
+                    return (
+                        gr.update(value=selected_files, choices=options),
+                        options,
+                        gr.update(value="", choices=team_filter_choices),
+                    )
                 scope_ids = allowed_user_ids_for_scope(session, actor)
                 statement = statement.where(self._index._resources["Source"].user.in_(scope_ids))
+
+                # Team selector choices for chat-side team search/filter.
+                if actor.is_admin:
+                    team_filter_choices.extend((t.name, t.id) for t in list_teams(session))
+                elif actor.access.team_id:
+                    team_id = actor.access.team_id
+                    team_name = next(
+                        (t.name for t in list_teams(session) if t.id == team_id),
+                        team_id,
+                    )
+                    team_filter_choices.append((team_name, team_id))
+
+                if team_filter:
+                    team_user_ids = [
+                        row.user_id
+                        for row in session.exec(
+                            select(UserAccess.user_id).where(UserAccess.team_id == team_filter)
+                        ).all()
+                    ]
+                    statement = statement.where(
+                        self._index._resources["Source"].user.in_(team_user_ids)
+                    )
             if self._index.config.get("private", False):
                 if not self._app.f_user_management:
                     statement = statement.where(
@@ -1852,13 +1905,18 @@ class FileSelector(BasePage):
                 each for each in selected_files if each in available_ids_set
             ]
 
-        return gr.update(value=selected_files, choices=options), options
+        current_team = team_filter if any(v == team_filter for _, v in team_filter_choices) else ""
+        return (
+            gr.update(value=selected_files, choices=options),
+            options,
+            gr.update(value=current_team, choices=team_filter_choices),
+        )
 
     def _on_app_created(self):
         self._app.app.load(
             self.load_files,
-            inputs=[self.selector, self._app.user_id],
-            outputs=[self.selector, self.selector_choices],
+            inputs=[self.selector, self._app.user_id, self.team_filter],
+            outputs=[self.selector, self.selector_choices, self.team_filter],
         )
 
     def on_subscribe_public_events(self):
@@ -1866,8 +1924,8 @@ class FileSelector(BasePage):
             name=f"onFileIndex{self._index.id}Changed",
             definition={
                 "fn": self.load_files,
-                "inputs": [self.selector, self._app.user_id],
-                "outputs": [self.selector, self.selector_choices],
+                "inputs": [self.selector, self._app.user_id, self.team_filter],
+                "outputs": [self.selector, self.selector_choices, self.team_filter],
                 "show_progress": "hidden",
             },
         )
@@ -1877,8 +1935,8 @@ class FileSelector(BasePage):
                     name=event_name,
                     definition={
                         "fn": self.load_files,
-                        "inputs": [self.selector, self._app.user_id],
-                        "outputs": [self.selector, self.selector_choices],
+                        "inputs": [self.selector, self._app.user_id, self.team_filter],
+                        "outputs": [self.selector, self.selector_choices, self.team_filter],
                         "show_progress": "hidden",
                     },
                 )

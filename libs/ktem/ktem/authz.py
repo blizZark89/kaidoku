@@ -20,7 +20,9 @@ class AccessContext:
 
     @property
     def is_admin(self) -> bool:
-        return self.access.role == ROLE_ADMIN
+        # Backward compatibility: existing installs may still have admin flag set
+        # while UserAccess.role is stale.
+        return self.access.role == ROLE_ADMIN or bool(self.user.admin)
 
     @property
     def is_key_user(self) -> bool:
@@ -54,6 +56,15 @@ def ensure_user_access(session: Session, user: User) -> UserAccess:
         select(UserAccess).where(UserAccess.user_id == user.id)
     ).first()
     if access:
+        # Keep legacy admin flag and RBAC role in sync to avoid UI lockout.
+        if user.admin and access.role != ROLE_ADMIN:
+            access.role = ROLE_ADMIN
+            access.team_id = None
+            access.can_read = True
+            access.can_upload = True
+            session.add(access)
+            session.commit()
+            session.refresh(access)
         return access
 
     access = _default_access_for_user(user)
