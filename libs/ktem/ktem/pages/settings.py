@@ -196,15 +196,20 @@ class SettingsPage(BasePage):
 
     def on_register_events(self):
         if not KH_SSO_ENABLED:
-            self.setting_save_btn.click(
+            save_chain = self.setting_save_btn.click(
                 self.save_setting,
                 inputs=[self._user_id] + self.components(),
                 outputs=self._settings_state,
-            ).then(
-                self._app.update_graph_collection_tabs,
-                inputs=[self._user_id, self._settings_state],
-                outputs=self._app.graph_index_tabs(),
-            ).then(
+            )
+            if hasattr(self._app, "update_graph_collection_tabs") and hasattr(
+                self._app, "graph_index_tabs"
+            ):
+                save_chain = save_chain.then(
+                    self._app.update_graph_collection_tabs,
+                    inputs=[self._user_id, self._settings_state],
+                    outputs=self._app.graph_index_tabs(),
+                )
+            save_chain.then(
                 lambda: gr.Tabs(selected="chat-tab"),
                 outputs=self._app.tabs,
             )

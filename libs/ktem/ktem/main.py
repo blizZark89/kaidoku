@@ -1,11 +1,13 @@
 import gradio as gr
 from decouple import config
 from ktem.app import BaseApp
+from ktem.db.models import Settings, User, engine
 from ktem.pages.chat import ChatPage
 from ktem.pages.help import HelpPage
 from ktem.pages.resources import ResourcesTab
 from ktem.pages.settings import SettingsPage
 from ktem.pages.setup import SetupPage
+from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
 KH_DEMO_MODE = getattr(flowsettings, "KH_DEMO_MODE", False)
@@ -42,6 +44,7 @@ class App(BaseApp):
     def ui(self):
         """Render the UI"""
         self._tabs = {}
+        self._graph_index_tab_keys = []
 
         with gr.Tabs() as self.tabs:
             if self.f_user_management:
@@ -84,12 +87,19 @@ class App(BaseApp):
                     visible=not self.f_user_management and not KH_DEMO_MODE,
                 ) as self._tabs["indices-tab"]:
                     for index in self.index_manager.indices:
+                        is_graph_collection = index.name.lower() in {
+                            "graphrag sammlung",
+                            "lightrag sammlung",
+                        }
                         with gr.Tab(
                             index.name,
                             elem_id=f"{index.id}-tab",
+                            visible=not is_graph_collection,
                         ) as self._tabs[f"{index.id}-tab"]:
                             page = index.get_index_page_ui()
                             setattr(self, f"_index_{index.id}", page)
+                        if is_graph_collection:
+                            self._graph_index_tab_keys.append(f"{index.id}-tab")
 
             if not KH_DEMO_MODE:
                 if not KH_SSO_ENABLED:
@@ -123,6 +133,33 @@ class App(BaseApp):
         if KH_ENABLE_FIRST_SETUP:
             with gr.Column(visible=False) as self.setup_page_wrapper:
                 self.setup_page = SetupPage(self)
+
+    def graph_index_tabs(self):
+        return [self._tabs[key] for key in self._graph_index_tab_keys]
+
+    def update_graph_collection_tabs(self, user_id=None, settings_state=None):
+        show_graph_tabs = False
+
+        if settings_state is None:
+            settings_state = self.default_settings.flatten()
+            with Session(engine) as session:
+                statement = select(Settings).where(Settings.user == user_id)
+                result = session.exec(statement).first()
+                if result:
+                    settings_state = result.setting
+
+        if self.f_user_management and user_id:
+            with Session(engine) as session:
+                user = session.exec(select(User).where(User.id == user_id)).first()
+                if user and user.admin:
+                    show_graph_tabs = True
+
+        if not show_graph_tabs:
+            show_graph_tabs = bool(
+                settings_state.get("application.show_graphrag_collections", False)
+            )
+
+        return [gr.update(visible=show_graph_tabs) for _ in self._graph_index_tab_keys]
 
     def on_subscribe_public_events(self):
         if self.f_user_management:
@@ -178,6 +215,17 @@ class App(BaseApp):
                 },
             )
 
+            if self._graph_index_tab_keys:
+                self.subscribe_event(
+                    name="onSignIn",
+                    definition={
+                        "fn": self.update_graph_collection_tabs,
+                        "inputs": [self.user_id],
+                        "outputs": self.graph_index_tabs(),
+                        "show_progress": "hidden",
+                    },
+                )
+
             self.subscribe_event(
                 name="onSignOut",
                 definition={
@@ -201,6 +249,14 @@ class App(BaseApp):
 
     def _on_app_created(self):
         """Called when the app is created"""
+
+        if self._graph_index_tab_keys:
+            self.app.load(
+                self.update_graph_collection_tabs,
+                inputs=[self.user_id],
+                outputs=self.graph_index_tabs(),
+                show_progress="hidden",
+            )
 
         if KH_ENABLE_FIRST_SETUP:
             self.app.load(
