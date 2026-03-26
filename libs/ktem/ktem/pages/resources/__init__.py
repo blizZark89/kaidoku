@@ -59,6 +59,17 @@ class ResourcesTab(BasePage):
                 },
             )
 
+    def on_register_events(self):
+        if self._app.f_user_management:
+            # Defensive update path: keep visibility in sync even if a public event
+            # chain fails or is skipped.
+            self._app.user_id.change(
+                self.toggle_user_management,
+                inputs=[self._app.user_id],
+                outputs=[self.user_management_tab],
+                show_progress="hidden",
+            )
+
     def toggle_user_management(self, user_id):
         """Show/hide the user management, depending on the user's role"""
         with Session(engine) as session:

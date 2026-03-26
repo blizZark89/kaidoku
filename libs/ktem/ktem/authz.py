@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
+from sqlalchemy import text
 from sqlmodel import Session, select
 
 from ktem.db.models import Team, User, UserAccess
@@ -51,6 +52,23 @@ def _default_access_for_user(user: User) -> UserAccess:
     )
 
 
+def _legacy_team_id_for_user(session: Session, user_id: str) -> Optional[str]:
+    # Migration helper for installs that still have the previous membership table.
+    for table in ("userteammembership", "baseuserteammembership"):
+        try:
+            stmt = text(
+                f"SELECT team_id FROM {table} WHERE user_id = :uid LIMIT 1"
+            ).bindparams(uid=user_id)
+            row = session.exec(stmt).first()
+            if row:
+                if isinstance(row, tuple):
+                    return str(row[0]) if row[0] else None
+                return str(row) if row else None
+        except Exception:
+            continue
+    return None
+
+
 def ensure_user_access(session: Session, user: User) -> UserAccess:
     access = session.exec(
         select(UserAccess).where(UserAccess.user_id == user.id)
@@ -62,12 +80,21 @@ def ensure_user_access(session: Session, user: User) -> UserAccess:
             access.team_id = None
             access.can_read = True
             access.can_upload = True
-            session.add(access)
-            session.commit()
-            session.refresh(access)
+        # Keep legacy team memberships available after RBAC table migration.
+        if not user.admin and not access.team_id:
+            legacy_team_id = _legacy_team_id_for_user(session, user.id)
+            if legacy_team_id:
+                access.team_id = legacy_team_id
+        session.add(access)
+        session.commit()
+        session.refresh(access)
         return access
 
     access = _default_access_for_user(user)
+    if not user.admin:
+        legacy_team_id = _legacy_team_id_for_user(session, user.id)
+        if legacy_team_id:
+            access.team_id = legacy_team_id
     session.add(access)
     session.commit()
     session.refresh(access)

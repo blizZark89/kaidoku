@@ -1755,7 +1755,7 @@ class FileSelector(BasePage):
             container=False,
             interactive=True,
             filterable=True,
-            visible=False,
+            visible=self._app.f_user_management,
         )
         self.selector_user_id = gr.State(value=user_id)
         self.selector_choices = gr.JSON(
@@ -1767,7 +1767,7 @@ class FileSelector(BasePage):
         self.mode.change(
             fn=lambda mode, user_id: (
                 gr.update(visible=mode == "select"),
-                gr.update(visible=mode == "select" and self._app.f_user_management),
+                gr.update(visible=self._app.f_user_management),
                 user_id,
             ),
             inputs=[self.mode, self._app.user_id],
