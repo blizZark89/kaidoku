@@ -231,30 +231,11 @@ class UserManagement(BasePage):
                 self.btn_team_create = gr.Button("Team erstellen")
                 self.btn_team_delete = gr.Button("Team löschen")
 
-        with gr.Tab(label="Rollenübersicht", visible=False) as self.roles_overview_tab:
-            self.roles_overview_state = gr.State(value=[])
-            self.roles_overview_list = gr.DataFrame(
-                headers=["rolle", "benutzername", "team", "leserechte", "upload-rechte"],
-                interactive=False,
-            )
-
     def on_register_events(self):
         self._app.user_id.change(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
             outputs=[self.team_new, self.team_edit, self.role_new],
-            show_progress="hidden",
-        )
-        self._app.user_id.change(
-            self.toggle_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_tab],
-            show_progress="hidden",
-        )
-        self._app.user_id.change(
-            self.list_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_state, self.roles_overview_list],
             show_progress="hidden",
         )
 
@@ -275,10 +256,6 @@ class UserManagement(BasePage):
             self.list_users,
             inputs=self._app.user_id,
             outputs=[self.state_user_list, self.user_list],
-        ).then(
-            self.list_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_state, self.roles_overview_list],
         )
 
         self.user_list.select(
@@ -324,10 +301,6 @@ class UserManagement(BasePage):
             self.list_users,
             inputs=self._app.user_id,
             outputs=[self.state_user_list, self.user_list],
-        ).then(
-            self.list_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_state, self.roles_overview_list],
         )
 
         self.btn_delete_no.click(
@@ -360,10 +333,6 @@ class UserManagement(BasePage):
             self.list_users,
             inputs=self._app.user_id,
             outputs=[self.state_user_list, self.user_list],
-        ).then(
-            self.list_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_state, self.roles_overview_list],
         )
 
         self.btn_close.click(lambda: -1, outputs=[self.selected_user_id])
@@ -381,10 +350,6 @@ class UserManagement(BasePage):
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
             outputs=[self.team_new, self.team_edit, self.role_new],
-        ).then(
-            self.list_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_state, self.roles_overview_list],
         )
 
         self.team_list.select(
@@ -407,10 +372,6 @@ class UserManagement(BasePage):
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
             outputs=[self.team_new, self.team_edit, self.role_new],
-        ).then(
-            self.list_roles_overview,
-            inputs=[self._app.user_id],
-            outputs=[self.roles_overview_state, self.roles_overview_list],
         )
 
     def on_subscribe_public_events(self):
@@ -436,22 +397,6 @@ class UserManagement(BasePage):
                 "fn": self.refresh_team_dropdowns,
                 "inputs": [self._app.user_id],
                 "outputs": [self.team_new, self.team_edit, self.role_new],
-            },
-        )
-        self._app.subscribe_event(
-            name="onSignIn",
-            definition={
-                "fn": self.toggle_roles_overview,
-                "inputs": [self._app.user_id],
-                "outputs": [self.roles_overview_tab],
-            },
-        )
-        self._app.subscribe_event(
-            name="onSignIn",
-            definition={
-                "fn": self.list_roles_overview,
-                "inputs": [self._app.user_id],
-                "outputs": [self.roles_overview_state, self.roles_overview_list],
             },
         )
         self._app.subscribe_event(
@@ -481,66 +426,6 @@ class UserManagement(BasePage):
                 ],
             },
         )
-        self._app.subscribe_event(
-            name="onSignOut",
-            definition={
-                "fn": lambda: gr.update(visible=False),
-                "outputs": [self.roles_overview_tab],
-            },
-        )
-        self._app.subscribe_event(
-            name="onSignOut",
-            definition={
-                "fn": lambda: (
-                    [],
-                    pd.DataFrame.from_records([{"rolle": "-", "benutzername": "-"}]),
-                ),
-                "outputs": [self.roles_overview_state, self.roles_overview_list],
-            },
-        )
-
-    def toggle_roles_overview(self, actor_user_id):
-        with Session(engine) as session:
-            actor = get_access_context(session, actor_user_id)
-            return gr.update(visible=bool(actor and actor.is_admin))
-
-    def list_roles_overview(self, actor_user_id):
-        with Session(engine) as session:
-            actor = _resolve_actor(session, actor_user_id)
-            if not actor or not actor.is_admin:
-                return [], pd.DataFrame.from_records([{"rolle": "-", "benutzername": "-"}])
-
-            teams = {t.id: t.name for t in list_teams(session)}
-            rows = []
-            users = session.exec(select(User)).all()
-            for user in users:
-                access = session.exec(
-                    select(UserAccess).where(UserAccess.user_id == user.id)
-                ).first()
-                if not access:
-                    access = upsert_user_access(
-                        session=session,
-                        user_id=user.id,
-                        role=ROLE_ADMIN if user.admin else ROLE_USER,
-                        team_id=None,
-                        can_read=True,
-                        can_upload=user.admin,
-                    )
-                rows.append(
-                    {
-                        "rolle": access.role,
-                        "benutzername": user.username,
-                        "team": teams.get(access.team_id, "-"),
-                        "leserechte": access.can_read,
-                        "upload-rechte": access.can_upload,
-                    }
-                )
-
-            order = {ROLE_ADMIN: 0, ROLE_KEY_USER: 1, ROLE_USER: 2}
-            rows.sort(key=lambda r: (order.get(r["rolle"], 99), str(r["benutzername"]).lower()))
-            if not rows:
-                rows = [{"rolle": "-", "benutzername": "-"}]
-            return rows, pd.DataFrame.from_records(rows)
 
     def refresh_team_dropdowns(self, actor_user_id):
         choices = self._team_choices_for_actor(actor_user_id)
