@@ -3,6 +3,7 @@ import hashlib
 import gradio as gr
 from ktem.app import BasePage
 from ktem.components import reasonings
+from ktem.authz import get_access_context
 from ktem.db.models import Settings, User, engine
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
@@ -130,6 +131,26 @@ class SettingsPage(BasePage):
         self.index_tab()
         self.reasoning_tab()
 
+    def _user_can_manage_advanced_settings(self, user_id) -> bool:
+        if not self._app.f_user_management:
+            return True
+        if not user_id:
+            return False
+
+        with Session(engine) as session:
+            actor = get_access_context(session, user_id)
+            return bool(actor and actor.is_admin)
+
+    def _advanced_settings_tab_updates(self, user_id):
+        can_manage_advanced_settings = self._user_can_manage_advanced_settings(user_id)
+        return [
+            gr.update(visible=self._render_app_tab and can_manage_advanced_settings),
+            gr.update(visible=self._render_index_tab and can_manage_advanced_settings),
+            gr.update(
+                visible=self._render_reasoning_tab and can_manage_advanced_settings
+            ),
+        ]
+
     def on_subscribe_public_events(self):
         """
         Subscribes to public events related to user management.
@@ -180,6 +201,34 @@ class SettingsPage(BasePage):
                     "fn": get_name,
                     "inputs": self._user_id,
                     "outputs": [self.current_name],
+                    "show_progress": "hidden",
+                },
+            )
+
+            self._app.subscribe_event(
+                name="onSignIn",
+                definition={
+                    "fn": self._advanced_settings_tab_updates,
+                    "inputs": self._user_id,
+                    "outputs": [
+                        self.general_settings_tab,
+                        self.retrieval_settings_tab,
+                        self.reasoning_settings_tab,
+                    ],
+                    "show_progress": "hidden",
+                },
+            )
+
+            self._app.subscribe_event(
+                name="onSignOut",
+                definition={
+                    "fn": self._advanced_settings_tab_updates,
+                    "inputs": self._user_id,
+                    "outputs": [
+                        self.general_settings_tab,
+                        self.retrieval_settings_tab,
+                        self.reasoning_settings_tab,
+                    ],
                     "show_progress": "hidden",
                 },
             )
@@ -285,6 +334,16 @@ class SettingsPage(BasePage):
                 outputs=[self.current_name],
                 show_progress="hidden",
             )
+            self._app.app.load(
+                self._advanced_settings_tab_updates,
+                inputs=[self._user_id],
+                outputs=[
+                    self.general_settings_tab,
+                    self.retrieval_settings_tab,
+                    self.reasoning_settings_tab,
+                ],
+                show_progress="hidden",
+            )
 
     def change_password(self, user_id, password, password_confirm):
         from ktem.pages.resources.user import validate_password
@@ -311,7 +370,7 @@ class SettingsPage(BasePage):
         return "", ""
 
     def app_tab(self):
-        with gr.Tab("Allgemein", visible=self._render_app_tab):
+        with gr.Tab("Allgemein", visible=self._render_app_tab) as self.general_settings_tab:
             for n, si in self._default_settings.application.settings.items():
                 obj = render_setting_item(si, si.value)
                 self._components[f"application.{n}"] = obj
@@ -328,7 +387,7 @@ class SettingsPage(BasePage):
         #         self._components[f"index.{n}"] = obj
 
         id2name = {k: v.name for k, v in self._app.index_manager.info().items()}
-        with gr.Tab("Abruf-Einstellungen", visible=self._render_index_tab):
+        with gr.Tab("Abruf-Einstellungen", visible=self._render_index_tab) as self.retrieval_settings_tab:
             for pn, sig in self._default_settings.index.options.items():
                 name = id2name.get(pn, f"<id {pn}>")
                 with gr.Tab(name):
@@ -341,7 +400,7 @@ class SettingsPage(BasePage):
                             self._embeddings.append(obj)
 
     def reasoning_tab(self):
-        with gr.Tab("Reasoning-Einstellungen", visible=self._render_reasoning_tab):
+        with gr.Tab("Reasoning-Einstellungen", visible=self._render_reasoning_tab) as self.reasoning_settings_tab:
             with gr.Group():
                 for n, si in self._default_settings.reasoning.settings.items():
                     if n == "use":
