@@ -1,5 +1,6 @@
 import ktem.db.base_models as base_models
 from ktem.db.engine import engine
+from sqlalchemy import inspect, text
 from sqlmodel import SQLModel
 from theflow.settings import settings
 from theflow.utils.modules import import_dotted_string
@@ -65,5 +66,27 @@ class UserAccess(_base_user_access, table=True):  # type: ignore
     """User role, team and permissions"""
 
 
+def _ensure_team_global_schema():
+    inspector = inspect(engine)
+    table_name = Team.__tablename__
+    if not inspector.has_table(table_name):
+        return
+
+    columns = {column["name"] for column in inspector.get_columns(table_name)}
+    if "is_global" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                f'ALTER TABLE "{table_name}" ADD COLUMN is_global BOOLEAN DEFAULT 0'
+            )
+        )
+        connection.execute(
+            text(f'UPDATE "{table_name}" SET is_global = 0 WHERE is_global IS NULL')
+        )
+
+
 if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
     SQLModel.metadata.create_all(engine)
+    _ensure_team_global_schema()

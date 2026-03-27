@@ -16,6 +16,7 @@ from gradio.utils import NamedString
 from ktem.authz import (
     allowed_user_ids_for_scope,
     get_access_context,
+    globally_visible_team_ids,
     has_read_access,
     has_upload_access,
     list_teams,
@@ -104,12 +105,15 @@ def _source_team_ids(source) -> list[str]:
     return _normalize_source_team_ids(note.get("team_ids"))
 
 
-def _source_visible_to_actor(source, actor, scope_user_ids=None) -> bool:
+def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None) -> bool:
     if actor is None:
         return True
     if actor.is_admin:
         return True
     source_team_ids = set(_source_team_ids(source))
+    global_team_ids = set(global_team_ids or [])
+    if source_team_ids and source_team_ids.intersection(global_team_ids):
+        return True
     if not source_team_ids:
         # Legacy behavior (without document team mapping):
         # only visible within uploader scope.
@@ -336,7 +340,7 @@ class FileIndexPage(BasePage):
                 )
 
             scope_ids = self._scope_user_ids(session, user_id)
-            if not _source_visible_to_actor(source, actor, scope_ids):
+            if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids):
                 return (
                     gr.update(choices=[], value=[], visible=False),
                     gr.update(visible=False),
@@ -377,7 +381,7 @@ class FileIndexPage(BasePage):
                 return gr.update()
 
             scope_ids = self._scope_user_ids(session, user_id)
-            if not _source_visible_to_actor(source, actor, scope_ids):
+            if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids):
                 gr.Warning("Keine Berechtigung für diese Datei")
                 return gr.update()
 
@@ -740,7 +744,7 @@ class FileIndexPage(BasePage):
                 if scope_ids is not None and source[0].user not in scope_ids:
                     gr.Warning("Keine Berechtigung für diese Datei")
                     return None, self.selected_panel_false
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, scope_ids):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return None, self.selected_panel_false
                 file_name = source[0].name
@@ -789,7 +793,7 @@ class FileIndexPage(BasePage):
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, scope_ids):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
@@ -838,7 +842,7 @@ class FileIndexPage(BasePage):
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, scope_ids):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
@@ -1786,7 +1790,7 @@ class FileIndexPage(BasePage):
             for each in session.execute(statement).all():
                 source = each[0]
                 if self._app.f_user_management and not _source_visible_to_actor(
-                    source, actor, scope_ids
+                    source, actor, globally_visible_team_ids(session), scope_ids
                 ):
                     continue
                 results.append(
@@ -2164,15 +2168,18 @@ class FileSelector(BasePage):
                     )
             results = session.execute(statement).all()
             if self._app.f_user_management:
+                visible_global_team_ids = globally_visible_team_ids(session)
                 for result in results:
                     source = result[0]
-                    if not _source_visible_to_actor(source, actor, scope_ids):
+                    if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids):
                         continue
                     source_team_ids = _source_team_ids(source)
+                    has_global_team = bool(set(source_team_ids).intersection(visible_global_team_ids))
                     if source_team_ids:
-                        if not team_filter:
-                            continue
-                        if team_filter not in source_team_ids:
+                        if team_filter:
+                            if team_filter not in source_team_ids:
+                                continue
+                        elif not has_global_team:
                             continue
                     elif team_filter:
                         continue
@@ -2211,15 +2218,17 @@ class FileSelector(BasePage):
                 scope_ids = allowed_user_ids_for_scope(session, actor)
 
                 # Team selector choices for chat-side team search/filter.
+                visible_teams = list_teams(session)
+                visible_team_map = {t.id: t.name for t in visible_teams}
+                visible_team_ids = []
                 if actor.is_admin:
-                    team_filter_choices.extend((t.name, t.id) for t in list_teams(session))
-                elif actor.team_ids:
-                    for team_id in actor.team_ids:
-                        team_name = next(
-                            (t.name for t in list_teams(session) if t.id == team_id),
-                            team_id,
-                        )
-                        team_filter_choices.append((team_name, team_id))
+                    visible_team_ids = [team.id for team in visible_teams]
+                else:
+                    visible_team_ids = list(dict.fromkeys(list(actor.team_ids) + [
+                        team.id for team in visible_teams if bool(getattr(team, "is_global", False))
+                    ]))
+                for team_id in visible_team_ids:
+                    team_filter_choices.append((visible_team_map.get(team_id, team_id), team_id))
             if self._index.config.get("private", False):
                 if not self._app.f_user_management:
                     statement = statement.where(
@@ -2231,16 +2240,19 @@ class FileSelector(BasePage):
                 statement = statement.limit(MAX_FILE_COUNT)
 
             results = session.execute(statement).all()
+            visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
             for result in results:
                 source = result[0]
-                if actor and not _source_visible_to_actor(source, actor, scope_ids):
+                if actor and not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids):
                     continue
                 source_team_ids = _source_team_ids(source)
+                has_global_team = bool(set(source_team_ids).intersection(visible_global_team_ids))
                 if self._app.f_user_management:
                     if source_team_ids:
-                        if not team_filter:
-                            continue
-                        if team_filter not in source_team_ids:
+                        if team_filter:
+                            if team_filter not in source_team_ids:
+                                continue
+                        elif not has_global_team:
                             continue
                     elif team_filter:
                         continue

@@ -111,6 +111,7 @@ class BaseTeam(SQLModel):
         default_factory=lambda: uuid.uuid4().hex, primary_key=True, index=True
     )
     name: str = Field(unique=True)
+    is_global: bool = Field(default=False)
 
 
 class BaseUserAccess(SQLModel):

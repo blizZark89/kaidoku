@@ -174,17 +174,32 @@ def list_teams(session: Session) -> Sequence[Team]:
     return _all(session, select(Team).order_by(Team.name))
 
 
+def global_team_ids(session: Session) -> set[str]:
+    return {team.id for team in list_teams(session) if bool(getattr(team, "is_global", False))}
+
+
+def managed_team_ids(session: Session, actor: AccessContext) -> set[str]:
+    actor_team_ids = set(actor.team_ids)
+    if actor.is_admin:
+        return actor_team_ids
+    return actor_team_ids.difference(global_team_ids(session))
+
+
+def globally_visible_team_ids(session: Session) -> set[str]:
+    return global_team_ids(session)
+
+
 def assert_role_supported(role: str) -> Optional[str]:
     if role not in VALID_ROLES:
         return f"Unbekannte Rolle: {role}"
     return None
 
 
-def can_manage_user(actor: AccessContext, target: UserAccess) -> bool:
+def can_manage_user(session: Session, actor: AccessContext, target: UserAccess) -> bool:
     if actor.is_admin:
         return True
     if actor.is_key_user:
-        actor_team_ids = set(actor.team_ids)
+        actor_team_ids = managed_team_ids(session, actor)
         target_team_ids = set(parse_team_ids(target.team_id))
         return (
             target.role == ROLE_USER
@@ -194,11 +209,11 @@ def can_manage_user(actor: AccessContext, target: UserAccess) -> bool:
     return False
 
 
-def can_create_role(actor: AccessContext, role: str, team_id: Optional[str]) -> bool:
+def can_create_role(session: Session, actor: AccessContext, role: str, team_id: Optional[str]) -> bool:
     if actor.is_admin:
         return True
     if actor.is_key_user:
-        actor_team_ids = set(actor.team_ids)
+        actor_team_ids = managed_team_ids(session, actor)
         target_team_ids = set(parse_team_ids(team_id))
         return (
             role == ROLE_USER
@@ -213,7 +228,7 @@ def allowed_user_ids_for_scope(session: Session, actor: AccessContext) -> list[s
     if actor.is_admin:
         return [u.id for u in _all(session, select(User))]
 
-    actor_team_ids = set(actor.team_ids)
+    actor_team_ids = managed_team_ids(session, actor)
     if not actor_team_ids:
         return []
 

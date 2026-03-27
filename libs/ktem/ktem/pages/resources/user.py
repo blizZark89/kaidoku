@@ -16,6 +16,7 @@ from ktem.authz import (
     ensure_user_access,
     get_access_context,
     list_teams,
+    managed_team_ids,
     parse_team_ids,
     team_exists,
     upsert_user_access,
@@ -188,8 +189,11 @@ class UserManagement(BasePage):
             if actor.is_admin:
                 return [(team.name, team.id) for team in list_teams(session)]
             if actor.is_key_user and actor.team_ids:
+                manageable_team_ids = managed_team_ids(session, actor)
                 result = []
                 for team_id in actor.team_ids:
+                    if team_id not in manageable_team_ids:
+                        continue
                     team = session.exec(select(Team).where(Team.id == team_id)).first()
                     if team:
                         result.append((team.name, team.id))
@@ -275,9 +279,11 @@ class UserManagement(BasePage):
 
         with gr.Tab(label="Teams"):
             self.team_state = gr.State(value=None)
-            self.team_list = gr.DataFrame(headers=["id", "name"], interactive=False)
+            self.team_list = gr.DataFrame(headers=["id", "name", "global"], interactive=False)
             self.selected_team_id = gr.State(value=None)
             self.team_name_new = gr.Textbox(label="Teamname")
+            self.team_global_edit = gr.Checkbox(label="Globales Team", value=False)
+            self.btn_team_save = gr.Button("Global-Status speichern")
             with gr.Row():
                 self.btn_team_create = gr.Button("Team erstellen")
                 self.btn_team_delete = gr.Button("Team löschen")
@@ -421,6 +427,27 @@ class UserManagement(BasePage):
             outputs=[self.selected_team_id],
             show_progress="hidden",
         )
+        self.selected_team_id.change(
+            self.on_selected_team_change,
+            inputs=[self.team_state, self.selected_team_id],
+            outputs=[self.team_global_edit],
+            show_progress="hidden",
+        )
+
+        self.btn_team_save.click(
+            self.save_team_global_status,
+            inputs=[self._app.user_id, self.selected_team_id, self.team_global_edit],
+            outputs=[self.team_global_edit],
+            show_progress="hidden",
+        ).then(
+            self.list_teams_ui,
+            inputs=[self._app.user_id],
+            outputs=[self.team_state, self.team_list],
+        ).then(
+            self.refresh_team_dropdowns,
+            inputs=[self._app.user_id],
+            outputs=[self.team_new, self.team_edit, self.role_new],
+        )
 
         self.btn_team_delete.click(
             self.delete_team,
@@ -473,8 +500,9 @@ class UserManagement(BasePage):
                     pd.DataFrame.from_records([{"id": "-", "username": "-"}]),
                     -1,
                     [],
-                    pd.DataFrame.from_records([{"id": "-", "name": "-"}]),
+                    pd.DataFrame.from_records([{"id": "-", "name": "-", "global": "-"}]),
                     None,
+                    False,
                 ),
                 "outputs": [
                     self.usn_new,
@@ -486,6 +514,7 @@ class UserManagement(BasePage):
                     self.team_state,
                     self.team_list,
                     self.selected_team_id,
+                    self.team_global_edit,
                 ],
             },
         )
@@ -504,13 +533,21 @@ class UserManagement(BasePage):
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
             if not actor or not actor.is_admin:
-                return [], pd.DataFrame.from_records([{"id": "-", "name": "-"}])
+                return [], pd.DataFrame.from_records([{"id": "-", "name": "-", "global": "-"}])
 
             teams = list_teams(session)
-            rows = [{"id": t.id, "name": t.name} for t in teams]
+            rows = [{"id": t.id, "name": t.name, "global": bool(getattr(t, "is_global", False))} for t in teams]
             if not rows:
-                rows = [{"id": "-", "name": "-"}]
+                rows = [{"id": "-", "name": "-", "global": "-"}]
             return rows, pd.DataFrame.from_records(rows)
+
+    def on_selected_team_change(self, team_rows, selected_team_id):
+        if not selected_team_id:
+            return gr.update(value=False)
+        for row in team_rows or []:
+            if row.get("id") == selected_team_id:
+                return gr.update(value=bool(row.get("global", False)))
+        return gr.update(value=False)
 
     def select_team(self, team_rows, ev: gr.SelectData):
         if (ev.value == "-" and ev.index[0] == 0) or not ev.selected:
@@ -538,19 +575,41 @@ class UserManagement(BasePage):
             if _team_table_has_name_lower(session):
                 session.exec(
                     text(
-                        "INSERT INTO team (id, name, name_lower) VALUES (:id, :name, :name_lower)"
+                        "INSERT INTO team (id, name, name_lower, is_global) VALUES (:id, :name, :name_lower, :is_global)"
                     ).bindparams(
                         id=uuid.uuid4().hex,
                         name=team_name,
                         name_lower=team_name.lower(),
+                        is_global=False,
                     )
                 )
                 session.commit()
             else:
-                session.add(Team(name=team_name))
+                session.add(Team(name=team_name, is_global=False))
                 session.commit()
             gr.Info(f'Team "{team_name}" erstellt')
             return ""
+
+    def save_team_global_status(self, actor_user_id, team_id, is_global):
+        if not team_id:
+            gr.Warning("Kein Team ausgewählt")
+            return gr.update(value=bool(is_global))
+        with Session(engine) as session:
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor or not actor.is_admin:
+                gr.Warning("Nur Admin darf Team-Status ändern")
+                return gr.update(value=bool(is_global))
+
+            team = session.exec(select(Team).where(Team.id == team_id)).first()
+            if not team:
+                gr.Warning("Team nicht gefunden")
+                return gr.update(value=bool(is_global))
+
+            team.is_global = bool(is_global)
+            session.add(team)
+            session.commit()
+            gr.Info(f'Team "{team.name}" aktualisiert')
+            return gr.update(value=bool(team.is_global))
 
     def delete_team(self, actor_user_id, team_id):
         if not team_id:
@@ -617,7 +676,7 @@ class UserManagement(BasePage):
                 return usn, pwd, pwd_cnf
 
             encoded_team_ids = encode_team_ids(team_ids)
-            if not can_create_role(actor, role, encoded_team_ids):
+            if not can_create_role(session, actor, role, encoded_team_ids):
                 gr.Warning("Du darfst diesen Benutzer/Rolle-Team nicht anlegen")
                 return usn, pwd, pwd_cnf
 
@@ -676,7 +735,7 @@ class UserManagement(BasePage):
                 if actor.is_admin:
                     allowed = True
                 elif actor.is_key_user:
-                    actor_team_ids = set(actor.team_ids)
+                    actor_team_ids = managed_team_ids(session, actor)
                     target_team_ids = set(parse_team_ids(access.team_id))
                     allowed = (
                         bool(actor_team_ids.intersection(target_team_ids))
@@ -825,12 +884,12 @@ class UserManagement(BasePage):
                 gr.Warning("Benutzer nicht gefunden")
                 return pwd, pwd_cnf
 
-            if not can_manage_user(actor, target_access):
+            if not can_manage_user(session, actor, target_access):
                 gr.Warning("Keine Berechtigung zur Bearbeitung dieses Benutzers")
                 return pwd, pwd_cnf
 
             encoded_team_ids = encode_team_ids(team_ids)
-            if not can_create_role(actor, role, encoded_team_ids):
+            if not can_create_role(session, actor, role, encoded_team_ids):
                 gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
                 return pwd, pwd_cnf
 
@@ -892,7 +951,7 @@ class UserManagement(BasePage):
                 gr.Warning("Benutzer nicht gefunden")
                 return -1
 
-            if not can_manage_user(actor, target_access):
+            if not can_manage_user(session, actor, target_access):
                 gr.Warning("Keine Berechtigung, diesen Benutzer zu löschen")
                 return selected_user_id
 
