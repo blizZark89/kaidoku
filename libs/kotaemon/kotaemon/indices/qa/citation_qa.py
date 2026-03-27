@@ -118,6 +118,14 @@ class AnswerWithContextPipeline(BaseComponent):
     lang: str = "English"  # support English and Japanese
     n_last_interactions: int = 5
 
+    def get_language_system_message(self) -> SystemMessage:
+        return SystemMessage(
+            content=(
+                f"Respond only in {self.lang}. "
+                "This output language is mandatory and overrides the user's input language."
+            )
+        )
+
     def get_prompt(self, question, evidence, evidence_mode: int):
         """Prepare the prompt and other information for LLM"""
         if evidence_mode == EVIDENCE_MODE_TEXT:
@@ -234,6 +242,7 @@ class AnswerWithContextPipeline(BaseComponent):
         messages = []
         if self.system_prompt:
             messages.append(SystemMessage(content=self.system_prompt))
+        messages.append(self.get_language_system_message())
 
         for human, ai in history[-self.n_last_interactions :]:
             messages.append(HumanMessage(content=human))

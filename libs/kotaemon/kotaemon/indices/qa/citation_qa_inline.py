@@ -228,6 +228,7 @@ class AnswerWithInlineCitation(AnswerWithContextPipeline):
         messages = []
         if self.system_prompt:
             messages.append(SystemMessage(content=self.system_prompt))
+        messages.append(self.get_language_system_message())
 
         for human, ai in history[-self.n_last_interactions :]:
             messages.append(HumanMessage(content=human))
