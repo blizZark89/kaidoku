@@ -18,7 +18,7 @@ Use the following pieces of context to answer the question at the end.
 Provide DETAILED ansswer with clear explanation.
 Format answer with easy to follow bullets / paragraphs.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
-Use the same language as the question to response.
+Give answer in {lang}.
 
 CONTEXT:
 ----
@@ -95,6 +95,7 @@ class AnswerWithInlineCitation(AnswerWithContextPipeline):
         prompt = prompt_template.populate(
             context=evidence,
             question=question,
+            lang=self.lang,
             safe=False,
         )
 
