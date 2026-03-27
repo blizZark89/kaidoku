@@ -18,19 +18,19 @@ class ResourcesTab(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
-        with gr.Tab("Index-Sammlungen") as self.index_management_tab:
+        with gr.Tab("Index-Sammlungen", visible=False) as self.index_management_tab:
             self.index_management = IndexManagement(self._app)
 
-        with gr.Tab("LLMs") as self.llm_management_tab:
+        with gr.Tab("LLMs", visible=False) as self.llm_management_tab:
             self.llm_management = LLMManagement(self._app)
 
-        with gr.Tab("Embeddings") as self.emb_management_tab:
+        with gr.Tab("Embeddings", visible=False) as self.emb_management_tab:
             self.emb_management = EmbeddingManagement(self._app)
 
-        with gr.Tab("Rerankings") as self.rerank_management_tab:
+        with gr.Tab("Rerankings", visible=False) as self.rerank_management_tab:
             self.rerank_management = RerankingManagement(self._app)
 
-        with gr.Tab("MCP-Server") as self.mcp_management_tab:
+        with gr.Tab("MCP-Server", visible=False) as self.mcp_management_tab:
             self.mcp_management = MCPManagement(self._app)
 
         if self._app.f_user_management:
@@ -42,9 +42,9 @@ class ResourcesTab(BasePage):
             self._app.subscribe_event(
                 name="onSignIn",
                 definition={
-                    "fn": self.toggle_user_management,
+                    "fn": self.toggle_management_tabs,
                     "inputs": [self._app.user_id],
-                    "outputs": [self.user_management_tab],
+                    "outputs": self._management_tabs(),
                     "show_progress": "hidden",
                 },
             )
@@ -52,9 +52,9 @@ class ResourcesTab(BasePage):
             self._app.subscribe_event(
                 name="onSignOut",
                 definition={
-                    "fn": self.toggle_user_management,
+                    "fn": self.toggle_management_tabs,
                     "inputs": [self._app.user_id],
-                    "outputs": [self.user_management_tab],
+                    "outputs": self._management_tabs(),
                     "show_progress": "hidden",
                 },
             )
@@ -64,17 +64,35 @@ class ResourcesTab(BasePage):
             # Defensive update path: keep visibility in sync even if a public event
             # chain fails or is skipped.
             self._app.user_id.change(
-                self.toggle_user_management,
+                self.toggle_management_tabs,
                 inputs=[self._app.user_id],
-                outputs=[self.user_management_tab],
+                outputs=self._management_tabs(),
                 show_progress="hidden",
             )
 
-    def toggle_user_management(self, user_id):
-        """Show/hide the user management, depending on the user's role"""
+    def _management_tabs(self):
+        tabs = [
+            self.index_management_tab,
+            self.llm_management_tab,
+            self.emb_management_tab,
+            self.rerank_management_tab,
+            self.mcp_management_tab,
+        ]
+        if self._app.f_user_management:
+            tabs.append(self.user_management_tab)
+        return tabs
+
+    def toggle_management_tabs(self, user_id):
         with Session(engine) as session:
             actor = get_access_context(session, user_id)
-            if actor and (actor.is_admin or actor.is_key_user):
-                return gr.update(visible=True)
+            is_admin = bool(actor and actor.is_admin)
+            can_manage_users = bool(actor and (actor.is_admin or actor.is_key_user))
 
-            return gr.update(visible=False)
+        return [
+            gr.update(visible=is_admin),
+            gr.update(visible=is_admin),
+            gr.update(visible=is_admin),
+            gr.update(visible=is_admin),
+            gr.update(visible=is_admin),
+            gr.update(visible=can_manage_users),
+        ]
