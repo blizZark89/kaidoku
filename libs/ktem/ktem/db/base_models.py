@@ -122,5 +122,6 @@ class BaseUserAccess(SQLModel):
     user_id: str = Field(primary_key=True, index=True)
     role: str = Field(default="user")
     team_id: Optional[str] = Field(default=None, index=True)
+    default_team_id: Optional[str] = Field(default=None, index=True)
     can_read: bool = Field(default=True)
     can_upload: bool = Field(default=False)

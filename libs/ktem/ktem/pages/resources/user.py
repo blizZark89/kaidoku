@@ -12,11 +12,13 @@ from ktem.authz import (
     assert_role_supported,
     can_create_role,
     can_manage_user,
+    default_team_choices,
     encode_team_ids,
     ensure_user_access,
     get_access_context,
     list_teams,
     managed_team_ids,
+    normalize_default_team_id,
     parse_team_ids,
     team_exists,
     upsert_user_access,
@@ -200,6 +202,18 @@ class UserManagement(BasePage):
                 return result
             return []
 
+    def _default_team_choices_for_actor(self, actor_user_id: Optional[str]):
+        with Session(engine) as session:
+            actor = get_access_context(session, actor_user_id)
+            choices = [("Kein Standardteam", "")]
+            if not actor:
+                return choices
+            team_map = {team.id: team.name for team in list_teams(session)}
+            for team_id in default_team_choices(session, actor):
+                if team_id in team_map:
+                    choices.append((team_map[team_id], team_id))
+            return choices
+
     def _role_choices_for_actor(self, actor_user_id: Optional[str]):
         with Session(engine) as session:
             actor = get_access_context(session, actor_user_id)
@@ -215,7 +229,7 @@ class UserManagement(BasePage):
         with gr.Tab(label="Benutzerliste"):
             self.state_user_list = gr.State(value=None)
             self.user_list = gr.DataFrame(
-                headers=["id", "username", "role", "team", "can_read", "can_upload"],
+                headers=["id", "username", "role", "team", "standardteam", "can_read", "can_upload"],
                 interactive=False,
             )
 
@@ -238,6 +252,12 @@ class UserManagement(BasePage):
                     choices=[],
                     value=[],
                     multiselect=True,
+                )
+                self.default_team_edit = gr.Dropdown(
+                    label="Standardteam",
+                    choices=[("Kein Standardteam", "")],
+                    value="",
+                    multiselect=False,
                 )
                 with gr.Row():
                     self.can_read_edit = gr.Checkbox(label="Leserechte", value=True)
@@ -268,6 +288,12 @@ class UserManagement(BasePage):
                 choices=[],
                 value=[],
                 multiselect=True,
+            )
+            self.default_team_new = gr.Dropdown(
+                label="Standardteam",
+                choices=[("Kein Standardteam", "")],
+                value="",
+                multiselect=False,
             )
             with gr.Row():
                 self.can_read_new = gr.Checkbox(label="Leserechte", value=True)
@@ -304,7 +330,7 @@ class UserManagement(BasePage):
         self._app.user_id.change(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
-            outputs=[self.team_new, self.team_edit, self.role_new],
+            outputs=[self.team_new, self.team_edit, self.role_new, self.default_team_new, self.default_team_edit],
             show_progress="hidden",
         )
 
@@ -317,6 +343,7 @@ class UserManagement(BasePage):
                 self.pwd_cnf_new,
                 self.role_new,
                 self.team_new,
+                self.default_team_new,
                 self.can_read_new,
                 self.can_upload_new,
             ],
@@ -348,6 +375,7 @@ class UserManagement(BasePage):
                 self.pwd_cnf_edit,
                 self.role_edit,
                 self.team_edit,
+                self.default_team_edit,
                 self.can_read_edit,
                 self.can_upload_edit,
             ],
@@ -393,6 +421,7 @@ class UserManagement(BasePage):
                 self.pwd_cnf_edit,
                 self.role_edit,
                 self.team_edit,
+                self.default_team_edit,
                 self.can_read_edit,
                 self.can_upload_edit,
             ],
@@ -418,7 +447,7 @@ class UserManagement(BasePage):
         ).then(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
-            outputs=[self.team_new, self.team_edit, self.role_new],
+            outputs=[self.team_new, self.team_edit, self.role_new, self.default_team_new, self.default_team_edit],
         )
 
         self.team_list.select(
@@ -446,7 +475,7 @@ class UserManagement(BasePage):
         ).then(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
-            outputs=[self.team_new, self.team_edit, self.role_new],
+            outputs=[self.team_new, self.team_edit, self.role_new, self.default_team_new, self.default_team_edit],
         )
 
         self.btn_team_delete.click(
@@ -461,7 +490,7 @@ class UserManagement(BasePage):
         ).then(
             self.refresh_team_dropdowns,
             inputs=[self._app.user_id],
-            outputs=[self.team_new, self.team_edit, self.role_new],
+            outputs=[self.team_new, self.team_edit, self.role_new, self.default_team_new, self.default_team_edit],
         )
 
     def on_subscribe_public_events(self):
@@ -486,7 +515,7 @@ class UserManagement(BasePage):
             definition={
                 "fn": self.refresh_team_dropdowns,
                 "inputs": [self._app.user_id],
-                "outputs": [self.team_new, self.team_edit, self.role_new],
+                "outputs": [self.team_new, self.team_edit, self.role_new, self.default_team_new, self.default_team_edit],
             },
         )
         self._app.subscribe_event(
@@ -503,6 +532,8 @@ class UserManagement(BasePage):
                     pd.DataFrame.from_records([{"id": "-", "name": "-", "global": "-"}]),
                     None,
                     False,
+                    gr.update(choices=[("Kein Standardteam", "")], value=""),
+                    gr.update(choices=[("Kein Standardteam", "")], value=""),
                 ),
                 "outputs": [
                     self.usn_new,
@@ -515,18 +546,23 @@ class UserManagement(BasePage):
                     self.team_list,
                     self.selected_team_id,
                     self.team_global_edit,
+                    self.default_team_new,
+                    self.default_team_edit,
                 ],
             },
         )
 
     def refresh_team_dropdowns(self, actor_user_id):
         choices = self._team_choices_for_actor(actor_user_id)
+        default_choices = self._default_team_choices_for_actor(actor_user_id)
         role_choices = self._role_choices_for_actor(actor_user_id)
         role_value = ROLE_USER if ROLE_USER in role_choices else role_choices[0]
         return (
             gr.update(choices=choices),
             gr.update(choices=choices),
             gr.update(choices=role_choices, value=role_value),
+            gr.update(choices=default_choices, value=""),
+            gr.update(choices=default_choices, value=""),
         )
 
     def list_teams_ui(self, actor_user_id):
@@ -621,12 +657,11 @@ class UserManagement(BasePage):
                 gr.Warning("Nur Admin darf Teams löschen")
                 return team_id
 
-            in_use = session.exec(
-                select(UserAccess)
-            ).all()
-            in_use = any(team_id in parse_team_ids(access.team_id) for access in in_use)
-            if in_use:
-                gr.Warning("Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind")
+            accesses = session.exec(select(UserAccess)).all()
+            in_membership_use = any(team_id in parse_team_ids(access.team_id) for access in accesses)
+            in_default_use = any(access.default_team_id == team_id for access in accesses)
+            if in_membership_use or in_default_use:
+                gr.Warning("Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind oder es als Standardteam verwendet wird")
                 return team_id
 
             team = session.exec(select(Team).where(Team.id == team_id)).first()
@@ -646,6 +681,7 @@ class UserManagement(BasePage):
         pwd_cnf,
         role,
         team_ids,
+        default_team_id,
         can_read,
         can_upload,
     ):
@@ -690,6 +726,13 @@ class UserManagement(BasePage):
                 gr.Warning(f'Benutzername "{usn}" existiert bereits')
                 return usn, pwd, pwd_cnf
 
+            normalized_default_team_id = normalize_default_team_id(
+                session, actor, role, encoded_team_ids, default_team_id
+            )
+            if default_team_id and not normalized_default_team_id:
+                gr.Warning("Ungültiges Standardteam für diesen Benutzer")
+                return usn, pwd, pwd_cnf
+
             hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
             user = User(
                 username=usn,
@@ -711,6 +754,7 @@ class UserManagement(BasePage):
                 team_id=encoded_team_ids,
                 can_read=can_read_norm,
                 can_upload=can_upload_norm,
+                default_team_id=normalized_default_team_id,
             )
 
             gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
@@ -751,12 +795,14 @@ class UserManagement(BasePage):
                 if not allowed:
                     continue
 
+                default_team_label = teams.get(access.default_team_id, access.default_team_id) if access.default_team_id else "-"
                 results.append(
                     {
                         "id": user.id,
                         "username": user.username,
                         "role": access.role,
                         "team": team_label,
+                        "standardteam": default_team_label,
                         "can_read": access.can_read,
                         "can_upload": access.can_upload,
                     }
@@ -787,16 +833,16 @@ class UserManagement(BasePage):
                 gr.update(value=""),
                 gr.update(value=ROLE_USER),
                 gr.update(value=[], choices=[]),
+                gr.update(value="", choices=[("Kein Standardteam", "")]),
                 gr.update(value=True),
                 gr.update(value=False),
             )
 
         with Session(engine) as session:
             user = session.exec(select(User).where(User.id == selected_user_id)).first()
-            access = session.exec(
-                select(UserAccess).where(UserAccess.user_id == selected_user_id)
-            ).first()
+            access = ensure_user_access(session, user) if user else None
             choices = self._team_choices_for_actor(actor_user_id)
+            default_choices = self._default_team_choices_for_actor(actor_user_id)
 
             if not user or not access:
                 return (
@@ -810,6 +856,7 @@ class UserManagement(BasePage):
                     gr.update(value=""),
                     gr.update(value=ROLE_USER),
                     gr.update(value=[], choices=choices),
+                    gr.update(value="", choices=default_choices),
                     gr.update(value=True),
                     gr.update(value=False),
                 )
@@ -825,6 +872,7 @@ class UserManagement(BasePage):
                 gr.update(value=""),
                 gr.update(value=access.role),
                 gr.update(value=parse_team_ids(access.team_id), choices=choices),
+                gr.update(value=access.default_team_id or "", choices=default_choices),
                 gr.update(value=access.can_read),
                 gr.update(value=access.can_upload),
             )
@@ -844,6 +892,7 @@ class UserManagement(BasePage):
         pwd_cnf,
         role,
         team_ids,
+        default_team_id,
         can_read,
         can_upload,
     ):
@@ -877,19 +926,22 @@ class UserManagement(BasePage):
             target_user = session.exec(
                 select(User).where(User.id == selected_user_id)
             ).first()
-            target_access = session.exec(
-                select(UserAccess).where(UserAccess.user_id == selected_user_id)
-            ).first()
+            target_access = ensure_user_access(session, target_user) if target_user else None
             if not target_user or not target_access:
                 gr.Warning("Benutzer nicht gefunden")
                 return pwd, pwd_cnf
 
-            if not can_manage_user(session, actor, target_access):
+            is_self = actor.user.id == selected_user_id
+            if not is_self and not can_manage_user(session, actor, target_access):
                 gr.Warning("Keine Berechtigung zur Bearbeitung dieses Benutzers")
                 return pwd, pwd_cnf
 
             encoded_team_ids = encode_team_ids(team_ids)
-            if not can_create_role(session, actor, role, encoded_team_ids):
+            if is_self and not actor.is_admin:
+                if role != target_access.role or encoded_team_ids != target_access.team_id or bool(can_read) != bool(target_access.can_read) or bool(can_upload) != bool(target_access.can_upload):
+                    gr.Warning("Du darfst für dich selbst nur das Standardteam ändern")
+                    return pwd, pwd_cnf
+            elif not can_create_role(session, actor, role, encoded_team_ids):
                 gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
                 return pwd, pwd_cnf
 
@@ -907,6 +959,13 @@ class UserManagement(BasePage):
                 gr.Warning(
                     f'Benutzername "{usn}" existiert bereits. Bitte einen eindeutigen Namen verwenden.'
                 )
+                return pwd, pwd_cnf
+
+            normalized_default_team_id = normalize_default_team_id(
+                session, actor, role, encoded_team_ids, default_team_id
+            )
+            if default_team_id and not normalized_default_team_id:
+                gr.Warning("Ungültiges Standardteam für diesen Benutzer")
                 return pwd, pwd_cnf
 
             target_user.username = usn
@@ -927,6 +986,7 @@ class UserManagement(BasePage):
                 team_id=encoded_team_ids,
                 can_read=can_read_norm,
                 can_upload=can_upload_norm,
+                default_team_id=normalized_default_team_id,
             )
             gr.Info(f'Benutzer "{usn}" erfolgreich aktualisiert')
             return "", ""
@@ -944,9 +1004,7 @@ class UserManagement(BasePage):
             target_user = session.exec(
                 select(User).where(User.id == selected_user_id)
             ).first()
-            target_access = session.exec(
-                select(UserAccess).where(UserAccess.user_id == selected_user_id)
-            ).first()
+            target_access = ensure_user_access(session, target_user) if target_user else None
             if not target_user or not target_access:
                 gr.Warning("Benutzer nicht gefunden")
                 return -1

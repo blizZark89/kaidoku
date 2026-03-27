@@ -87,6 +87,25 @@ def _ensure_team_global_schema():
         )
 
 
+def _ensure_user_access_default_team_schema():
+    inspector = inspect(engine)
+    table_name = UserAccess.__tablename__
+    if not inspector.has_table(table_name):
+        return
+
+    columns = {column["name"] for column in inspector.get_columns(table_name)}
+    if "default_team_id" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                f'ALTER TABLE "{table_name}" ADD COLUMN default_team_id VARCHAR'
+            )
+        )
+
+
 if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
     SQLModel.metadata.create_all(engine)
     _ensure_team_global_schema()
+    _ensure_user_access_default_team_schema()

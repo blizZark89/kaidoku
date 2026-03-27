@@ -131,6 +131,7 @@ def ensure_user_access(session: Session, user: User) -> UserAccess:
         if user.admin and access.role != ROLE_ADMIN:
             access.role = ROLE_ADMIN
             access.team_id = None
+            access.default_team_id = None
             access.can_read = True
             access.can_upload = True
         # Keep legacy team memberships available after RBAC table migration.
@@ -138,6 +139,8 @@ def ensure_user_access(session: Session, user: User) -> UserAccess:
             legacy_team_id = _legacy_team_id_for_user(session, user.id)
             if legacy_team_id:
                 access.team_id = legacy_team_id
+            if not access.default_team_id:
+                access.default_team_id = legacy_team_id
         session.add(access)
         session.commit()
         session.refresh(access)
@@ -148,6 +151,8 @@ def ensure_user_access(session: Session, user: User) -> UserAccess:
         legacy_team_id = _legacy_team_id_for_user(session, user.id)
         if legacy_team_id:
             access.team_id = legacy_team_id
+            if not access.default_team_id:
+                access.default_team_id = legacy_team_id
     session.add(access)
     session.commit()
     session.refresh(access)
@@ -187,6 +192,40 @@ def managed_team_ids(session: Session, actor: AccessContext) -> set[str]:
 
 def globally_visible_team_ids(session: Session) -> set[str]:
     return global_team_ids(session)
+
+
+def default_team_choices(session: Session, actor: AccessContext) -> list[str]:
+    if actor.is_admin:
+        return [team.id for team in list_teams(session)]
+
+    visible_team_ids = list(actor.team_ids) + [
+        team.id for team in list_teams(session) if bool(getattr(team, "is_global", False))
+    ]
+    ordered = []
+    for team_id in visible_team_ids:
+        if team_id and team_id not in ordered:
+            ordered.append(team_id)
+    return ordered
+
+
+def normalize_default_team_id(
+    session: Session,
+    actor: AccessContext,
+    role: str,
+    team_id: Optional[str],
+    default_team_id: Optional[str],
+) -> Optional[str]:
+    default_team_id = str(default_team_id).strip() if default_team_id else None
+    if not default_team_id:
+        return None
+    if role == ROLE_ADMIN:
+        return default_team_id if team_exists(session, default_team_id) else None
+
+    if default_team_id in global_team_ids(session):
+        return default_team_id
+
+    allowed_team_ids = set(parse_team_ids(team_id))
+    return default_team_id if default_team_id in allowed_team_ids else None
 
 
 def assert_role_supported(role: str) -> Optional[str]:
@@ -261,6 +300,7 @@ def upsert_user_access(
     team_id: Optional[str],
     can_read: bool,
     can_upload: bool,
+    default_team_id: Optional[str] = None,
 ) -> UserAccess:
     access = _first(session, select(UserAccess).where(UserAccess.user_id == user_id))
     if not access:
@@ -269,6 +309,7 @@ def upsert_user_access(
     access.team_id = team_id
     access.can_read = can_read
     access.can_upload = can_upload
+    access.default_team_id = default_team_id
     session.add(access)
     session.commit()
     session.refresh(access)

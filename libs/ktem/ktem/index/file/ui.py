@@ -2282,7 +2282,12 @@ class FileSelector(BasePage):
                 each for each in selected_files if each in available_ids_set
             ]
 
-        current_team = team_filter if any(v == team_filter for _, v in team_filter_choices) else ""
+        valid_team_ids = {value for _, value in team_filter_choices}
+        current_team = team_filter if team_filter in valid_team_ids else ""
+        if not current_team and actor and self._app.f_user_management:
+            default_team_id = getattr(actor.access, "default_team_id", None)
+            if default_team_id in valid_team_ids:
+                current_team = default_team_id
         return (
             gr.update(value=selected_files, choices=options),
             options,
