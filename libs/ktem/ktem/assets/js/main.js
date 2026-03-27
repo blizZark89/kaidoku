@@ -62,13 +62,13 @@ function run() {
 
   // move use mind-map checkbox
   let mindmap_checkbox = document.getElementById("use-mindmap-checkbox");
-  let citation_dropdown = document.getElementById("citation-dropdown");
+  let language_dropdown = document.getElementById("language-dropdown");
   let chat_setting_panel = document.getElementById("chat-settings-expand");
   chat_setting_panel.insertBefore(
     mindmap_checkbox,
     chat_setting_panel.childNodes[2]
   );
-  chat_setting_panel.insertBefore(citation_dropdown, mindmap_checkbox);
+  chat_setting_panel.insertBefore(language_dropdown, mindmap_checkbox);
 
   // move share conv checkbox
   let report_div = document.querySelector(

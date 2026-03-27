@@ -246,7 +246,7 @@ mark {
   right: 25px;
 }
 
-#citation-dropdown {
+#language-dropdown {
   width: min(25%, 100px);
   position: absolute;
   top: 2px;
