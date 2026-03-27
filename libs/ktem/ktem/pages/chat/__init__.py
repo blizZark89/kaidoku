@@ -322,7 +322,7 @@ class ChatPage(BasePage):
                 self.chat_panel = ChatPanel(self._app)
 
                 with gr.Accordion(
-                    label="Chat-Einstellungen",
+                    label="Sprache",
                     elem_id="chat-settings-expand",
                     open=False,
                     visible=not KH_DEMO_MODE,
@@ -332,7 +332,7 @@ class ChatPage(BasePage):
                         gr.HTML(
                             "Modell", visible=not KH_DEMO_MODE and not KH_SSO_ENABLED
                         )
-                        gr.HTML("Sprache")
+                        gr.HTML("Chat-Einstellungen")
 
                     with gr.Row():
                         reasoning_setting = (
@@ -361,13 +361,6 @@ class ChatPage(BasePage):
                             show_label=False,
                             visible=not KH_DEMO_MODE and not KH_SSO_ENABLED,
                         )
-                        self.language = gr.Dropdown(
-                            choices=language_setting.choices,
-                            value=language_setting.value,
-                            container=False,
-                            show_label=False,
-                        )
-
                         self.citation = gr.Dropdown(
                             choices=citation_setting.choices,
                             value=citation_setting.value,
@@ -375,6 +368,13 @@ class ChatPage(BasePage):
                             show_label=False,
                             interactive=True,
                             elem_id="citation-dropdown",
+                        )
+
+                        self.language = gr.Dropdown(
+                            choices=language_setting.choices,
+                            value=language_setting.value,
+                            container=False,
+                            show_label=False,
                         )
 
                         if not config("USE_LOW_LLM_REQUESTS", default=False, cast=bool):
