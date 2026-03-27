@@ -321,78 +321,78 @@ class ChatPage(BasePage):
 
                 self.chat_panel = ChatPanel(self._app)
 
+                reasoning_setting = (
+                    self._app.default_settings.reasoning.settings["use"]
+                )
+                model_setting = self._app.default_settings.reasoning.options[
+                    "simple"
+                ].settings["llm"]
+                language_setting = (
+                    self._app.default_settings.reasoning.settings["lang"]
+                )
+                citation_setting = self._app.default_settings.reasoning.options[
+                    "simple"
+                ].settings["highlight_citation"]
+
+                with gr.Row(elem_id="quick-setting-labels", visible=not KH_DEMO_MODE):
+                    gr.HTML("Reasoning-Methode")
+                    gr.HTML(
+                        "Modell", visible=not KH_DEMO_MODE and not KH_SSO_ENABLED
+                    )
+                    gr.HTML("Chat-Einstellungen")
+
+                with gr.Row(visible=not KH_DEMO_MODE):
+                    self.reasoning_type = gr.Dropdown(
+                        choices=reasoning_setting.choices[:REASONING_LIMITS],
+                        value=reasoning_setting.value,
+                        container=False,
+                        show_label=False,
+                    )
+                    self.model_type = gr.Dropdown(
+                        choices=model_setting.choices,
+                        value=model_setting.value,
+                        container=False,
+                        show_label=False,
+                        visible=not KH_DEMO_MODE and not KH_SSO_ENABLED,
+                    )
+                    self.language = gr.Dropdown(
+                        choices=language_setting.choices,
+                        value=language_setting.value,
+                        container=False,
+                        show_label=False,
+                    )
+
+                    if not config("USE_LOW_LLM_REQUESTS", default=False, cast=bool):
+                        self.use_mindmap = gr.State(value=False)
+                        self.use_mindmap_check = gr.Checkbox(
+                            label="Mindmap (aus)",
+                            container=False,
+                            elem_id="use-mindmap-checkbox",
+                            value=False,
+                        )
+                    else:
+                        self.use_mindmap = gr.State(value=False)
+                        self.use_mindmap_check = gr.Checkbox(
+                            label="Mindmap (aus)",
+                            container=False,
+                            elem_id="use-mindmap-checkbox",
+                            value=False,
+                        )
+
                 with gr.Accordion(
                     label="Sprache",
                     elem_id="chat-settings-expand",
                     open=False,
                     visible=not KH_DEMO_MODE,
                 ) as self.chat_settings:
-                    with gr.Row(elem_id="quick-setting-labels"):
-                        gr.HTML("Reasoning-Methode")
-                        gr.HTML(
-                            "Modell", visible=not KH_DEMO_MODE and not KH_SSO_ENABLED
-                        )
-                        gr.HTML("Chat-Einstellungen")
-
-                    with gr.Row():
-                        reasoning_setting = (
-                            self._app.default_settings.reasoning.settings["use"]
-                        )
-                        model_setting = self._app.default_settings.reasoning.options[
-                            "simple"
-                        ].settings["llm"]
-                        language_setting = (
-                            self._app.default_settings.reasoning.settings["lang"]
-                        )
-                        citation_setting = self._app.default_settings.reasoning.options[
-                            "simple"
-                        ].settings["highlight_citation"]
-
-                        self.reasoning_type = gr.Dropdown(
-                            choices=reasoning_setting.choices[:REASONING_LIMITS],
-                            value=reasoning_setting.value,
-                            container=False,
-                            show_label=False,
-                        )
-                        self.model_type = gr.Dropdown(
-                            choices=model_setting.choices,
-                            value=model_setting.value,
-                            container=False,
-                            show_label=False,
-                            visible=not KH_DEMO_MODE and not KH_SSO_ENABLED,
-                        )
-                        self.citation = gr.Dropdown(
-                            choices=citation_setting.choices,
-                            value=citation_setting.value,
-                            container=False,
-                            show_label=False,
-                            interactive=True,
-                            elem_id="citation-dropdown",
-                        )
-
-                        self.language = gr.Dropdown(
-                            choices=language_setting.choices,
-                            value=language_setting.value,
-                            container=False,
-                            show_label=False,
-                        )
-
-                        if not config("USE_LOW_LLM_REQUESTS", default=False, cast=bool):
-                            self.use_mindmap = gr.State(value=False)
-                            self.use_mindmap_check = gr.Checkbox(
-                                label="Mindmap (aus)",
-                                container=False,
-                                elem_id="use-mindmap-checkbox",
-                                value=False,
-                            )
-                        else:
-                            self.use_mindmap = gr.State(value=False)
-                            self.use_mindmap_check = gr.Checkbox(
-                                label="Mindmap (aus)",
-                                container=False,
-                                elem_id="use-mindmap-checkbox",
-                                value=False,
-                            )
+                    self.citation = gr.Dropdown(
+                        choices=citation_setting.choices,
+                        value=citation_setting.value,
+                        container=False,
+                        show_label=False,
+                        interactive=True,
+                        elem_id="citation-dropdown",
+                    )
 
             with gr.Column(
                 scale=INFO_PANEL_SCALES[False], elem_id="chat-info-panel"
