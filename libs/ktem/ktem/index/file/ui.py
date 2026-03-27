@@ -2123,8 +2123,8 @@ class FileSelector(BasePage):
         )
         self.team_filter.change(
             self.load_files,
-            inputs=[self.selector, self._app.user_id, self.team_filter],
-            outputs=[self.selector, self.selector_choices, self.team_filter],
+            inputs=[self.selector, self._app.user_id, self.team_filter, self.mode],
+            outputs=[self.selector, self.selector_choices, self.team_filter, self.mode],
             show_progress="hidden",
         )
         # attach special event for the first index
@@ -2190,16 +2190,18 @@ class FileSelector(BasePage):
 
         return file_ids
 
-    def load_files(self, selected_files, user_id, team_filter=""):
+    def load_files(self, selected_files, user_id, team_filter="", current_mode="disabled"):
         options: list = []
         available_ids = []
         team_filter_choices = [("Alle Teams", "")]
+        resolved_mode = current_mode
         if user_id is None:
             # not signed in
             return (
                 gr.update(value=selected_files, choices=options),
                 options,
                 gr.update(value="", choices=team_filter_choices),
+                gr.update(value=resolved_mode),
             )
 
         with Session(engine) as session:
@@ -2214,6 +2216,7 @@ class FileSelector(BasePage):
                         gr.update(value=selected_files, choices=options),
                         options,
                         gr.update(value="", choices=team_filter_choices),
+                        gr.update(value=resolved_mode),
                     )
                 scope_ids = allowed_user_ids_for_scope(session, actor)
 
@@ -2288,17 +2291,20 @@ class FileSelector(BasePage):
             default_team_id = getattr(actor.access, "default_team_id", None)
             if default_team_id in valid_team_ids:
                 current_team = default_team_id
+                if resolved_mode == "disabled":
+                    resolved_mode = "all"
         return (
             gr.update(value=selected_files, choices=options),
             options,
             gr.update(value=current_team, choices=team_filter_choices),
+            gr.update(value=resolved_mode),
         )
 
     def _on_app_created(self):
         self._app.app.load(
             self.load_files,
-            inputs=[self.selector, self._app.user_id, self.team_filter],
-            outputs=[self.selector, self.selector_choices, self.team_filter],
+            inputs=[self.selector, self._app.user_id, self.team_filter, self.mode],
+            outputs=[self.selector, self.selector_choices, self.team_filter, self.mode],
         )
 
     def on_subscribe_public_events(self):
@@ -2306,8 +2312,8 @@ class FileSelector(BasePage):
             name=f"onFileIndex{self._index.id}Changed",
             definition={
                 "fn": self.load_files,
-                "inputs": [self.selector, self._app.user_id, self.team_filter],
-                "outputs": [self.selector, self.selector_choices, self.team_filter],
+                "inputs": [self.selector, self._app.user_id, self.team_filter, self.mode],
+                "outputs": [self.selector, self.selector_choices, self.team_filter, self.mode],
                 "show_progress": "hidden",
             },
         )
@@ -2317,8 +2323,8 @@ class FileSelector(BasePage):
                     name=event_name,
                     definition={
                         "fn": self.load_files,
-                        "inputs": [self.selector, self._app.user_id, self.team_filter],
-                        "outputs": [self.selector, self.selector_choices, self.team_filter],
+                        "inputs": [self.selector, self._app.user_id, self.team_filter, self.mode],
+                        "outputs": [self.selector, self.selector_choices, self.team_filter, self.mode],
                         "show_progress": "hidden",
                     },
                 )
