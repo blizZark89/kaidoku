@@ -322,7 +322,7 @@ class ChatPage(BasePage):
                 self.chat_panel = ChatPanel(self._app)
 
                 with gr.Accordion(
-                    label="Chat-Einstellungen",
+                    label="Sprache",
                     elem_id="chat-settings-expand",
                     open=False,
                     visible=not KH_DEMO_MODE,
@@ -332,7 +332,7 @@ class ChatPage(BasePage):
                         gr.HTML(
                             "Modell", visible=not KH_DEMO_MODE and not KH_SSO_ENABLED
                         )
-                        gr.HTML("Sprache")
+                        gr.HTML("Chat-Einstellungen")
 
                     with gr.Row():
                         reasoning_setting = (
