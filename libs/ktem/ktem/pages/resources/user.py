@@ -171,6 +171,16 @@ def ensure_admin_user(usn: str, pwd: str) -> bool:
 
 
 class UserManagement(BasePage):
+    USER_LIST_COLUMNS = [
+        "id",
+        "username",
+        "role",
+        "team",
+        "standardteam",
+        "can_read",
+        "can_upload",
+    ]
+
     def __init__(self, app):
         self._app = app
         self.on_building_ui()
@@ -228,8 +238,14 @@ class UserManagement(BasePage):
     def on_building_ui(self):
         with gr.Tab(label="Benutzerliste"):
             self.state_user_list = gr.State(value=None)
+            self.user_sort_column = gr.Dropdown(
+                label="Sortieren nach",
+                choices=self.USER_LIST_COLUMNS,
+                value="username",
+            )
+            self.user_sort_ascending = gr.Checkbox(label="Aufsteigend", value=True)
             self.user_list = gr.DataFrame(
-                headers=["id", "username", "role", "team", "standardteam", "can_read", "can_upload"],
+                headers=self.USER_LIST_COLUMNS,
                 interactive=False,
             )
 
@@ -316,8 +332,8 @@ class UserManagement(BasePage):
 
     def on_register_events(self):
         self._app.user_id.change(
-            self.list_users,
-            inputs=[self._app.user_id],
+            self.refresh_user_list_view,
+            inputs=[self._app.user_id, self.user_sort_column, self.user_sort_ascending],
             outputs=[self.state_user_list, self.user_list],
             show_progress="hidden",
         )
@@ -349,9 +365,22 @@ class UserManagement(BasePage):
             ],
             outputs=[self.usn_new, self.pwd_new, self.pwd_cnf_new],
         ).then(
-            self.list_users,
-            inputs=self._app.user_id,
+            self.refresh_user_list_view,
+            inputs=[self._app.user_id, self.user_sort_column, self.user_sort_ascending],
             outputs=[self.state_user_list, self.user_list],
+        )
+
+        self.user_sort_column.change(
+            self.apply_user_sort,
+            inputs=[self.state_user_list, self.user_sort_column, self.user_sort_ascending],
+            outputs=[self.user_list],
+            show_progress="hidden",
+        )
+        self.user_sort_ascending.change(
+            self.apply_user_sort,
+            inputs=[self.state_user_list, self.user_sort_column, self.user_sort_ascending],
+            outputs=[self.user_list],
+            show_progress="hidden",
         )
 
         self.user_list.select(
@@ -395,8 +424,8 @@ class UserManagement(BasePage):
             outputs=[self.selected_user_id],
             show_progress="hidden",
         ).then(
-            self.list_users,
-            inputs=self._app.user_id,
+            self.refresh_user_list_view,
+            inputs=[self._app.user_id, self.user_sort_column, self.user_sort_ascending],
             outputs=[self.state_user_list, self.user_list],
         )
 
@@ -428,8 +457,8 @@ class UserManagement(BasePage):
             outputs=[self.pwd_edit, self.pwd_cnf_edit],
             show_progress="hidden",
         ).then(
-            self.list_users,
-            inputs=self._app.user_id,
+            self.refresh_user_list_view,
+            inputs=[self._app.user_id, self.user_sort_column, self.user_sort_ascending],
             outputs=[self.state_user_list, self.user_list],
         )
 
@@ -497,8 +526,8 @@ class UserManagement(BasePage):
         self._app.subscribe_event(
             name="onSignIn",
             definition={
-                "fn": self.list_users,
-                "inputs": [self._app.user_id],
+                "fn": self.refresh_user_list_view,
+                "inputs": [self._app.user_id, self.user_sort_column, self.user_sort_ascending],
                 "outputs": [self.state_user_list, self.user_list],
             },
         )
@@ -526,7 +555,7 @@ class UserManagement(BasePage):
                     "",
                     "",
                     [],
-                    pd.DataFrame.from_records([{"id": "-", "username": "-"}]),
+                    self._user_placeholder_frame(),
                     -1,
                     [],
                     pd.DataFrame.from_records([{"id": "-", "name": "-", "global": "-"}]),
@@ -564,6 +593,36 @@ class UserManagement(BasePage):
             gr.update(choices=default_choices, value=""),
             gr.update(choices=default_choices, value=""),
         )
+
+    def _user_placeholder_frame(self):
+        return pd.DataFrame.from_records([{column: "-" for column in self.USER_LIST_COLUMNS}])
+
+    def _sort_value(self, value):
+        if isinstance(value, str):
+            if value == "-":
+                return (1, "")
+            return (0, value.lower())
+        if value is None:
+            return (1, "")
+        return (0, value)
+
+    def apply_user_sort(self, user_rows, sort_column, ascending):
+        rows = list(user_rows or [])
+        if not rows:
+            return self._user_placeholder_frame()
+
+        if sort_column not in self.USER_LIST_COLUMNS:
+            sort_column = "username"
+
+        rows.sort(
+            key=lambda row: self._sort_value(row.get(sort_column)),
+            reverse=not bool(ascending),
+        )
+        return pd.DataFrame.from_records(rows, columns=self.USER_LIST_COLUMNS)
+
+    def refresh_user_list_view(self, actor_user_id, sort_column, ascending):
+        user_rows = self.list_users(actor_user_id)
+        return user_rows, self.apply_user_sort(user_rows, sort_column, ascending)
 
     def list_teams_ui(self, actor_user_id):
         with Session(engine) as session:
@@ -762,12 +821,12 @@ class UserManagement(BasePage):
 
     def list_users(self, actor_user_id):
         if actor_user_id is None:
-            return [], pd.DataFrame.from_records([{"id": "-", "username": "-"}])
+            return []
 
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
             if not actor:
-                return [], pd.DataFrame.from_records([{"id": "-", "username": "-"}])
+                return []
 
             teams = {t.id: t.name for t in list_teams(session)}
             users = session.exec(select(User)).all()
@@ -809,8 +868,8 @@ class UserManagement(BasePage):
                 )
 
             if not results:
-                return [], pd.DataFrame.from_records([{"id": "-", "username": "-"}])
-            return results, pd.DataFrame.from_records(results)
+                return []
+            return results
 
     def select_user(self, user_list, ev: gr.SelectData):
         if ev.value == "-" and ev.index[0] == 0:
