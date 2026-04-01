@@ -2083,12 +2083,23 @@ class FileSelector(BasePage):
             choices=[
                 ("Alle durchsuchen", "all"),
                 ("In Datei(en) suchen", "select"),
+                ("In Dateigruppe(n) suchen", "group_select"),
             ],
             container=False,
         )
         self.selector = gr.Dropdown(
             label="Dateien",
             value=default_selector,
+            choices=[],
+            multiselect=True,
+            filterable=True,
+            container=False,
+            interactive=True,
+            visible=False,
+        )
+        self.group_selector = gr.Dropdown(
+            label="Dateigruppen",
+            value=[],
             choices=[],
             multiselect=True,
             filterable=True,
@@ -2115,16 +2126,17 @@ class FileSelector(BasePage):
         self.mode.change(
             fn=lambda mode, user_id: (
                 gr.update(visible=mode == "select"),
+                gr.update(visible=mode == "group_select"),
                 gr.update(visible=self._app.f_user_management),
                 user_id,
             ),
             inputs=[self.mode, self._app.user_id],
-            outputs=[self.selector, self.team_filter, self.selector_user_id],
+            outputs=[self.selector, self.group_selector, self.team_filter, self.selector_user_id],
         )
         self.team_filter.change(
             self.load_files,
-            inputs=[self.selector, self._app.user_id, self.team_filter, self.mode],
-            outputs=[self.selector, self.selector_choices, self.team_filter, self.mode],
+            inputs=[self.selector, self.group_selector, self._app.user_id, self.team_filter, self.mode],
+            outputs=[self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
             show_progress="hidden",
         )
         # attach special event for the first index
@@ -2137,11 +2149,12 @@ class FileSelector(BasePage):
             )
 
     def as_gradio_component(self):
-        return [self.mode, self.selector, self.selector_user_id, self.team_filter]
+        return [self.mode, self.selector, self.selector_user_id, self.team_filter, self.group_selector]
 
     def get_selected_ids(self, components):
         mode, selected, user_id = components[0], components[1], components[2]
         team_filter = components[3] if len(components) > 3 else ""
+        selected_groups = components[4] if len(components) > 4 else []
         if user_id is None:
             return []
 
@@ -2149,6 +2162,17 @@ class FileSelector(BasePage):
             return []
         elif mode == "select":
             return selected
+        elif mode == "group_select":
+            file_ids = []
+            for group_value in selected_groups or []:
+                try:
+                    group_file_ids = json.loads(group_value)
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                for file_id in group_file_ids:
+                    if file_id not in file_ids:
+                        file_ids.append(file_id)
+            return file_ids
 
         file_ids = []
         with Session(engine) as session:
@@ -2190,9 +2214,11 @@ class FileSelector(BasePage):
 
         return file_ids
 
-    def load_files(self, selected_files, user_id, team_filter="", current_mode="disabled"):
+    def load_files(self, selected_files, selected_groups, user_id, team_filter="", current_mode="disabled"):
         options: list = []
+        group_options: list = []
         available_ids = []
+        available_group_values = []
         team_filter_choices = [("Alle Teams", "")]
         resolved_mode = current_mode
         if user_id is None:
@@ -2200,6 +2226,7 @@ class FileSelector(BasePage):
             return (
                 gr.update(value=selected_files, choices=options),
                 options,
+                gr.update(value=selected_groups, choices=group_options),
                 gr.update(value="", choices=team_filter_choices),
                 gr.update(value=resolved_mode),
             )
@@ -2215,6 +2242,7 @@ class FileSelector(BasePage):
                     return (
                         gr.update(value=selected_files, choices=options),
                         options,
+                        gr.update(value=selected_groups, choices=group_options),
                         gr.update(value="", choices=team_filter_choices),
                         gr.update(value=resolved_mode),
                     )
@@ -2275,14 +2303,20 @@ class FileSelector(BasePage):
             results = session.execute(statement).all()
             for result in results:
                 item = result[0]
-                options.append(
-                    (f"group: '{item.name}'", json.dumps(item.data.get("files", [])))
-                )
+                group_value = json.dumps(item.data.get("files", []))
+                available_group_values.append(group_value)
+                group_options.append((item.name, group_value))
 
         if selected_files:
             available_ids_set = set(available_ids)
             selected_files = [
                 each for each in selected_files if each in available_ids_set
+            ]
+
+        if selected_groups:
+            available_group_values_set = set(available_group_values)
+            selected_groups = [
+                each for each in selected_groups if each in available_group_values_set
             ]
 
         valid_team_ids = {value for _, value in team_filter_choices}
@@ -2296,6 +2330,7 @@ class FileSelector(BasePage):
         return (
             gr.update(value=selected_files, choices=options),
             options,
+            gr.update(value=selected_groups, choices=group_options),
             gr.update(value=current_team, choices=team_filter_choices),
             gr.update(value=resolved_mode),
         )
@@ -2303,8 +2338,8 @@ class FileSelector(BasePage):
     def _on_app_created(self):
         self._app.app.load(
             self.load_files,
-            inputs=[self.selector, self._app.user_id, self.team_filter, self.mode],
-            outputs=[self.selector, self.selector_choices, self.team_filter, self.mode],
+            inputs=[self.selector, self.group_selector, self._app.user_id, self.team_filter, self.mode],
+            outputs=[self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
         )
 
     def on_subscribe_public_events(self):
@@ -2312,8 +2347,8 @@ class FileSelector(BasePage):
             name=f"onFileIndex{self._index.id}Changed",
             definition={
                 "fn": self.load_files,
-                "inputs": [self.selector, self._app.user_id, self.team_filter, self.mode],
-                "outputs": [self.selector, self.selector_choices, self.team_filter, self.mode],
+                "inputs": [self.selector, self.group_selector, self._app.user_id, self.team_filter, self.mode],
+                "outputs": [self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
                 "show_progress": "hidden",
             },
         )
@@ -2323,8 +2358,8 @@ class FileSelector(BasePage):
                     name=event_name,
                     definition={
                         "fn": self.load_files,
-                        "inputs": [self.selector, self._app.user_id, self.team_filter, self.mode],
-                        "outputs": [self.selector, self.selector_choices, self.team_filter, self.mode],
+                        "inputs": [self.selector, self.group_selector, self._app.user_id, self.team_filter, self.mode],
+                        "outputs": [self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
                         "show_progress": "hidden",
                     },
                 )
