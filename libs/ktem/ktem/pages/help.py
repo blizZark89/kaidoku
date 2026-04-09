@@ -50,9 +50,6 @@ class HelpPage:
         self.changelogs_cache_dir = Path(changelogs_cache_dir)
         self.changelogs_cache_dir.mkdir(parents=True, exist_ok=True)
 
-        with gr.Accordion("Kleine Anleitung", open=True):
-            self.quick_guide = gr.Markdown()
-
         about_md_dir = self.doc_dir / "about.md"
         if about_md_dir.exists():
             with (self.doc_dir / "about.md").open(encoding="utf-8") as fi:
@@ -77,6 +74,9 @@ class HelpPage:
                 if self.app_version:
                     about_md = f"Version: {self.app_version}\n\n{about_md}"
                 gr.Markdown(about_md)
+
+        with gr.Accordion("Anleitung", open=True):
+            self.quick_guide = gr.Markdown()
 
         if KH_DEMO_MODE:
             with gr.Accordion("Eigenen Space erstellen"):
