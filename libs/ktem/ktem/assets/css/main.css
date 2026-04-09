@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --main-area-height: calc(100vh - 110px);
 }
 
@@ -199,8 +199,9 @@ mark {
   display: none !important;
 }
 
-/* Show sort button only in File list*/
-#file_list_view .sort-button {
+/* Show sort button only in File and User lists*/
+#file_list_view .sort-button,
+#user_list_view .sort-button {
   display: block !important;
 }
 

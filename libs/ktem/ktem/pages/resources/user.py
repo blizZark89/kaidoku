@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import uuid
 from typing import Optional
 
@@ -30,9 +30,9 @@ from theflow.settings import settings as flowsettings
 
 USERNAME_RULE = """**Benutzername-Regeln:**
 
-- Groß-/Kleinschreibung wird nicht unterschieden
+- GroÃŸ-/Kleinschreibung wird nicht unterschieden
 - Mindestens 3 Zeichen
-- Höchstens 32 Zeichen
+- HÃ¶chstens 32 Zeichen
 - Nur Buchstaben, Zahlen und Unterstriche
 """
 
@@ -40,7 +40,7 @@ USERNAME_RULE = """**Benutzername-Regeln:**
 PASSWORD_RULE = """**Passwort-Regeln:**
 
 - Mindestens 8 Zeichen
-- Mindestens ein Großbuchstabe
+- Mindestens ein GroÃŸbuchstabe
 - Mindestens ein Kleinbuchstabe
 - Mindestens eine Ziffer
 - Mindestens ein Sonderzeichen aus dieser Liste:
@@ -53,7 +53,7 @@ def validate_username(usn):
     if len(usn) < 3:
         errors.append("Der Benutzername muss mindestens 3 Zeichen lang sein")
     if len(usn) > 32:
-        errors.append("Der Benutzername darf höchstens 32 Zeichen lang sein")
+        errors.append("Der Benutzername darf hÃ¶chstens 32 Zeichen lang sein")
     if not usn.replace("_", "").isalnum():
         errors.append(
             "Der Benutzername darf nur Buchstaben, Zahlen und Unterstriche enthalten"
@@ -64,11 +64,11 @@ def validate_username(usn):
 def validate_password(pwd, pwd_cnf):
     errors = []
     if pwd != pwd_cnf:
-        errors.append("Die Passwörter stimmen nicht überein")
+        errors.append("Die PasswÃ¶rter stimmen nicht Ã¼berein")
     if len(pwd) < 8:
         errors.append("Das Passwort muss mindestens 8 Zeichen lang sein")
     if not any(c.isupper() for c in pwd):
-        errors.append("Das Passwort muss mindestens einen Großbuchstaben enthalten")
+        errors.append("Das Passwort muss mindestens einen GroÃŸbuchstaben enthalten")
     if not any(c.islower() for c in pwd):
         errors.append("Das Passwort muss mindestens einen Kleinbuchstaben enthalten")
     if not any(c.isdigit() for c in pwd):
@@ -247,15 +247,16 @@ class UserManagement(BasePage):
             self.user_list = gr.DataFrame(
                 headers=self.USER_LIST_COLUMNS,
                 interactive=False,
+                elem_id="user_list_view",
             )
 
             with gr.Group(visible=False) as self._selected_panel:
                 self.selected_user_id = gr.State(value=-1)
                 self.usn_edit = gr.Textbox(label="Benutzername")
                 with gr.Row():
-                    self.pwd_edit = gr.Textbox(label="Passwort ändern", type="password")
+                    self.pwd_edit = gr.Textbox(label="Passwort Ã¤ndern", type="password")
                     self.pwd_cnf_edit = gr.Textbox(
-                        label="Passwortänderung bestätigen",
+                        label="PasswortÃ¤nderung bestÃ¤tigen",
                         type="password",
                     )
                 self.role_edit = gr.Dropdown(
@@ -281,18 +282,18 @@ class UserManagement(BasePage):
 
             with gr.Row(visible=False) as self._selected_panel_btn:
                 self.btn_edit_save = gr.Button("Speichern")
-                self.btn_delete = gr.Button("Löschen")
+                self.btn_delete = gr.Button("LÃ¶schen")
                 self.btn_delete_yes = gr.Button(
-                    "Löschen bestätigen", variant="primary", visible=False
+                    "LÃ¶schen bestÃ¤tigen", variant="primary", visible=False
                 )
                 self.btn_delete_no = gr.Button("Abbrechen", visible=False)
-                self.btn_close = gr.Button("Schließen")
+                self.btn_close = gr.Button("SchlieÃŸen")
 
         with gr.Tab(label="Benutzer anlegen"):
             self.usn_new = gr.Textbox(label="Benutzername", interactive=True)
             self.pwd_new = gr.Textbox(label="Passwort", type="password", interactive=True)
             self.pwd_cnf_new = gr.Textbox(
-                label="Passwort bestätigen", type="password", interactive=True
+                label="Passwort bestÃ¤tigen", type="password", interactive=True
             )
             self.role_new = gr.Dropdown(
                 label="Rolle",
@@ -328,7 +329,7 @@ class UserManagement(BasePage):
             self.btn_team_save = gr.Button("Global-Status speichern")
             with gr.Row():
                 self.btn_team_create = gr.Button("Team erstellen")
-                self.btn_team_delete = gr.Button("Team löschen")
+                self.btn_team_delete = gr.Button("Team lÃ¶schen")
 
     def on_register_events(self):
         self._app.user_id.change(
@@ -687,12 +688,12 @@ class UserManagement(BasePage):
 
     def save_team_global_status(self, actor_user_id, team_id, is_global):
         if not team_id:
-            gr.Warning("Kein Team ausgewählt")
+            gr.Warning("Kein Team ausgewÃ¤hlt")
             return gr.update(value=bool(is_global))
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
             if not actor or not actor.is_admin:
-                gr.Warning("Nur Admin darf Team-Status ändern")
+                gr.Warning("Nur Admin darf Team-Status Ã¤ndern")
                 return gr.update(value=bool(is_global))
 
             team = session.exec(select(Team).where(Team.id == team_id)).first()
@@ -708,19 +709,19 @@ class UserManagement(BasePage):
 
     def delete_team(self, actor_user_id, team_id):
         if not team_id:
-            gr.Warning("Kein Team ausgewählt")
+            gr.Warning("Kein Team ausgewÃ¤hlt")
             return None
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
             if not actor or not actor.is_admin:
-                gr.Warning("Nur Admin darf Teams löschen")
+                gr.Warning("Nur Admin darf Teams lÃ¶schen")
                 return team_id
 
             accesses = session.exec(select(UserAccess)).all()
             in_membership_use = any(team_id in parse_team_ids(access.team_id) for access in accesses)
             in_default_use = any(access.default_team_id == team_id for access in accesses)
             if in_membership_use or in_default_use:
-                gr.Warning("Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind oder es als Standardteam verwendet wird")
+                gr.Warning("Team kann nicht gelÃ¶scht werden, solange Benutzer zugeordnet sind oder es als Standardteam verwendet wird")
                 return team_id
 
             team = session.exec(select(Team).where(Team.id == team_id)).first()
@@ -729,7 +730,7 @@ class UserManagement(BasePage):
                 return None
             session.delete(team)
             session.commit()
-            gr.Info(f'Team "{team.name}" gelöscht')
+            gr.Info(f'Team "{team.name}" gelÃ¶scht')
             return None
 
     def create_user(
@@ -789,7 +790,7 @@ class UserManagement(BasePage):
                 session, actor, role, encoded_team_ids, default_team_id
             )
             if default_team_id and not normalized_default_team_id:
-                gr.Warning("Ungültiges Standardteam für diesen Benutzer")
+                gr.Warning("UngÃ¼ltiges Standardteam fÃ¼r diesen Benutzer")
                 return usn, pwd, pwd_cnf
 
             hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
@@ -938,7 +939,7 @@ class UserManagement(BasePage):
 
     def on_btn_delete_click(self, selected_user_id):
         if selected_user_id is None:
-            gr.Warning("Kein Benutzer ausgewählt")
+            gr.Warning("Kein Benutzer ausgewÃ¤hlt")
             return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)
         return gr.update(visible=False), gr.update(visible=True), gr.update(visible=True)
 
@@ -998,10 +999,10 @@ class UserManagement(BasePage):
             encoded_team_ids = encode_team_ids(team_ids)
             if is_self and not actor.is_admin:
                 if role != target_access.role or encoded_team_ids != target_access.team_id or bool(can_read) != bool(target_access.can_read) or bool(can_upload) != bool(target_access.can_upload):
-                    gr.Warning("Du darfst für dich selbst nur das Standardteam ändern")
+                    gr.Warning("Du darfst fÃ¼r dich selbst nur das Standardteam Ã¤ndern")
                     return pwd, pwd_cnf
             elif not can_create_role(session, actor, role, encoded_team_ids):
-                gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
+                gr.Warning("Keine Berechtigung fÃ¼r diese Rolle/Team-Zuordnung")
                 return pwd, pwd_cnf
 
             for team_id in team_ids:
@@ -1024,7 +1025,7 @@ class UserManagement(BasePage):
                 session, actor, role, encoded_team_ids, default_team_id
             )
             if default_team_id and not normalized_default_team_id:
-                gr.Warning("Ungültiges Standardteam für diesen Benutzer")
+                gr.Warning("UngÃ¼ltiges Standardteam fÃ¼r diesen Benutzer")
                 return pwd, pwd_cnf
 
             target_user.username = usn
@@ -1052,7 +1053,7 @@ class UserManagement(BasePage):
 
     def delete_user(self, current_user, selected_user_id):
         if current_user == selected_user_id:
-            gr.Warning("Du kannst dich nicht selbst löschen")
+            gr.Warning("Du kannst dich nicht selbst lÃ¶schen")
             return selected_user_id
 
         with Session(engine) as session:
@@ -1069,7 +1070,7 @@ class UserManagement(BasePage):
                 return -1
 
             if not can_manage_user(session, actor, target_access):
-                gr.Warning("Keine Berechtigung, diesen Benutzer zu löschen")
+                gr.Warning("Keine Berechtigung, diesen Benutzer zu lÃ¶schen")
                 return selected_user_id
 
             access_row = session.exec(
@@ -1079,5 +1080,5 @@ class UserManagement(BasePage):
                 session.delete(access_row)
             session.delete(target_user)
             session.commit()
-            gr.Info(f'Benutzer "{target_user.username}" erfolgreich gelöscht')
+            gr.Info(f'Benutzer "{target_user.username}" erfolgreich gelÃ¶scht')
             return -1
