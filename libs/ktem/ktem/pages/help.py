@@ -157,7 +157,7 @@ class HelpPage:
 * **Datenqualit\u00e4t beachten:** Hochgeladene Inhalte sollten strukturiert und gut lesbar sein, um optimale Ergebnisse zu erzielen.
 * **Zugriffsrechte:** Du siehst nur Daten, f\u00fcr die du freigeschaltet bist. Wenn etwas fehlt, k\u00f6nnte es an fehlenden Berechtigungen liegen.
 * **Support:** Falls dir Daten, Teams oder bestimmte Funktionen fehlen oder unklar sind, wende dich bitte an das KI-Kernteam. Sie unterst\u00fctzen dich gerne weiter und helfen dabei, offene Fragen zu kl\u00e4ren oder fehlende Zug\u00e4nge bereitzustellen.
-""".encode('utf-8').decode('unicode_escape')
+"""
 
         if not self._app.f_user_management:
             return guide_common
@@ -188,7 +188,7 @@ class HelpPage:
 
 7. **System\u00fcbersicht behalten:**
    \u00dcberpr\u00fcfe regelm\u00e4\u00dfig Benutzeraktivit\u00e4ten, Teamstrukturen und Datenzugriffe, um eine saubere Organisation sicherzustellen.
-""".encode('utf-8').decode('unicode_escape')
+"""
 
         if role == "key_user":
             return guide_common + """
@@ -206,6 +206,6 @@ class HelpPage:
 
 7. **Ansprechpartner im Team:**
    Sei erste Anlaufstelle f\u00fcr Fragen innerhalb deines Teams und koordiniere bei Bedarf die Abstimmung mit dem KI-Kernteam.
-""".encode('utf-8').decode('unicode_escape')
+"""
 
         return guide_common
