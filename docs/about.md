@@ -1,8 +1,8 @@
-# ?ber Kaidoku
+# Über Kaidoku
 
-Ein Open-Source-Framework f?r konversationelle Dokumentenanalyse, ausgelegt f?r Anwender und Entwickler.
-Hervorgegangen aus dem Kotaemon-Projekt auf GitHub.
+Ein Open-Source-Framework für konversationelle Dokumentenanalyse, ausgelegt für Anwender und Entwickler.
+Hervorgegangen aus dem Kaidoku-Projekt auf GitHub.
 
-Falls dir Daten, Teams oder bestimmte Funktionen fehlen oder unklar sind, wende dich bitte an das KI-Kernteam. Sie unterst?tzen dich gerne weiter und helfen dabei, offene Fragen zu kl?ren oder fehlende Zug?nge bereitzustellen.
+Falls dir Daten, Teams oder bestimmte Funktionen fehlen oder unklar sind, wende dich bitte an das KI-Kernteam. Sie unterstützen dich gerne weiter und helfen dabei, offene Fragen zu klären oder fehlende Zugänge bereitzustellen.
 
-Solltest du dir unsicher sein oder zus?tzliche Informationen ben?tigen, z?gere nicht, aktiv nachzufragen.
+Solltest du dir unsicher sein oder zusätzliche Informationen benötigen, zögere nicht, aktiv nachzufragen.
