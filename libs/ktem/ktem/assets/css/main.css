@@ -228,6 +228,23 @@ mark {
   z-index: 1;
 }
 
+#info-expand-button,
+#chat-expand-button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  padding: 4px !important;
+}
+
+#info-expand-button img,
+#info-expand-button svg,
+#chat-expand-button img,
+#chat-expand-button svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+
 #save-setting-btn {
   width: 150px;
   height: 30px;
