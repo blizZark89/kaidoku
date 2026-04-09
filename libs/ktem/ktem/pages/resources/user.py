@@ -242,8 +242,9 @@ class UserManagement(BasePage):
                 label="Sortieren nach",
                 choices=self.USER_LIST_COLUMNS,
                 value="username",
+                visible=False,
             )
-            self.user_sort_ascending = gr.Checkbox(label="Aufsteigend", value=True)
+            self.user_sort_ascending = gr.Checkbox(label="Aufsteigend", value=True, visible=False)
             self.user_list = gr.DataFrame(
                 headers=self.USER_LIST_COLUMNS,
                 interactive=False,
