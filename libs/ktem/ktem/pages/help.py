@@ -133,15 +133,34 @@ class HelpPage:
             )
 
     def _build_quick_guide(self, user_id=None):
+        guide_common = """### Anleitung
+
+1. **Anmelden:**
+   Melde dich mit deinem Benutzerkonto im System an. Stelle sicher, dass deine Zugangsdaten korrekt sind. Falls du dein Passwort vergessen hast oder keinen Zugriff erh\u00e4ltst, wende dich an den Support.
+
+2. **Daten hochladen:**
+   Wechsle in den Reiter `Dateien`. Dort kannst du Dokumente (z. B. PDFs, Word-Dateien) oder URLs hochladen.
+   Nach dem Upload m\u00fcssen die Inhalte indexiert werden, damit sie im Chat verwendet werden k\u00f6nnen. Achte darauf, dass die Daten vollst\u00e4ndig verarbeitet wurden, bevor du sie nutzt.
+
+3. **Chat verwenden:**
+   Im Reiter `Chat` kannst du Fragen stellen und mit den hochgeladenen bzw. freigegebenen Daten arbeiten.
+   Formuliere deine Fragen m\u00f6glichst klar und konkret, um bessere Ergebnisse zu erhalten. Du kannst auch Folgefragen stellen, um Antworten zu vertiefen.
+
+4. **Einstellungen pr\u00fcfen:**
+   Unter `Einstellungen` kannst du dein Profil verwalten, die Sprache anpassen und ggf. Modelloptionen konfigurieren.
+   Pr\u00fcfe regelm\u00e4\u00dfig, ob deine Einstellungen deinen Anforderungen entsprechen (z. B. bevorzugte Sprache oder Ausgabeformat).
+
+---
+
+#### Zus\u00e4tzliche Hinweise (f\u00fcr alle Rollen)
+
+* **Datenqualit\u00e4t beachten:** Hochgeladene Inhalte sollten strukturiert und gut lesbar sein, um optimale Ergebnisse zu erzielen.
+* **Zugriffsrechte:** Du siehst nur Daten, f\u00fcr die du freigeschaltet bist. Wenn etwas fehlt, k\u00f6nnte es an fehlenden Berechtigungen liegen.
+* **Support:** Falls dir Daten, Teams oder bestimmte Funktionen fehlen oder unklar sind, wende dich bitte an das KI-Kernteam. Sie unterst\u00fctzen dich gerne weiter und helfen dabei, offene Fragen zu kl\u00e4ren oder fehlende Zug\u00e4nge bereitzustellen.
+""".encode('utf-8').decode('unicode_escape')
+
         if not self._app.f_user_management:
-            return (
-                "### Allgemeiner Ablauf\n"
-                "1. **Daten hochladen:** Öffne den Reiter `Dateien` und lade Dokumente hoch oder füge Web-Links ein.\n"
-                "2. **Daten indexieren:** Nach dem Upload werden die Inhalte verarbeitet und für den Chat vorbereitet.\n"
-                "3. **Chat starten:** Wechsle in den Reiter `Chat` und stelle Fragen zu den hochgeladenen Inhalten.\n"
-                "4. **Einstellungen anpassen:** Unter `Einstellungen` kannst du Modell, Sprache und weitere Optionen setzen.\n"
-                "5. **Ergebnisse prüfen:** Nutze Quellenhinweise und Dateifilter, um Antworten schnell nachzuvollziehen."
-            )
+            return guide_common
 
         role = "user"
         with Session(engine) as session:
@@ -152,28 +171,41 @@ class HelpPage:
                 elif actor.is_key_user:
                     role = "key_user"
 
-        base = (
-            "### Kleine Anleitung\n"
-            "1. **Anmelden:** Melde dich mit deinem Benutzerkonto an.\n"
-            "2. **Daten hochladen:** Im Reiter `Dateien` Dokumente oder URLs hochladen und indexieren.\n"
-            "3. **Chat verwenden:** Im Reiter `Chat` Fragen stellen und mit den freigegebenen Daten arbeiten.\n"
-            "4. **Einstellungen prüfen:** Unter `Einstellungen` dein Profil, Sprache und Modelloptionen anpassen.\n"
-        )
         if role == "admin":
-            return (
-                base
-                + "5. **Benutzer und Teams verwalten:** Unter `Ressourcen -> Benutzer` neue Teams anlegen, "
-                "Benutzer erstellen und Rollen/Teams zuweisen.\n"
-                "6. **Zugriffe steuern:** Vergib Upload- und Leserechte passend zur Rolle."
-            )
+            return guide_common + """
+
+---
+
+#### F\u00fcr Admins
+
+5. **Benutzer und Teams verwalten:**
+   Unter `Ressourcen -> Benutzer` kannst du neue Benutzer anlegen, Teams erstellen und bestehende Strukturen verwalten.
+   Weise Benutzern passende Rollen und Teams zu, damit sie Zugriff auf die richtigen Daten haben.
+
+6. **Zugriffe steuern:**
+   Definiere Upload- und Leserechte entsprechend der jeweiligen Rolle.
+   Achte darauf, dass sensible Daten nur f\u00fcr berechtigte Personen zug\u00e4nglich sind.
+
+7. **System\u00fcbersicht behalten:**
+   \u00dcberpr\u00fcfe regelm\u00e4\u00dfig Benutzeraktivit\u00e4ten, Teamstrukturen und Datenzugriffe, um eine saubere Organisation sicherzustellen.
+""".encode('utf-8').decode('unicode_escape')
+
         if role == "key_user":
-            return (
-                base
-                + "5. **Team-Benutzer verwalten:** Unter `Ressourcen -> Benutzer` Benutzer im "
-                "eigenen Team verwalten und Teamzuordnungen prüfen."
-            )
-        return (
-            base
-            + "5. **Benutzerrechte:** Falls dir Daten, Teams oder Funktionen fehlen, "
-            "bitte das KI-Kernteam kontaktieren."
-        )
+            return guide_common + """
+
+---
+
+#### F\u00fcr Key User
+
+5. **Team-Benutzer verwalten:**
+   Unter `Ressourcen -> Benutzer` kannst du die Benutzer deines Teams verwalten.
+   Pr\u00fcfe Teamzuordnungen und stelle sicher, dass alle Mitglieder die richtigen Zugriffsrechte haben.
+
+6. **Daten im Team organisieren:**
+   Unterst\u00fctze dein Team dabei, Daten sinnvoll zu strukturieren und aktuell zu halten, damit alle effizient arbeiten k\u00f6nnen.
+
+7. **Ansprechpartner im Team:**
+   Sei erste Anlaufstelle f\u00fcr Fragen innerhalb deines Teams und koordiniere bei Bedarf die Abstimmung mit dem KI-Kernteam.
+""".encode('utf-8').decode('unicode_escape')
+
+        return guide_common
