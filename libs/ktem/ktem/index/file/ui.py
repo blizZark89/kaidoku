@@ -540,12 +540,13 @@ class FileIndexPage(BasePage):
             headers=[
                 "id",
                 "name",
+                "group",
                 "size",
                 "tokens",
                 "loader",
                 "date_created",
             ],
-            column_widths=[0, 50, 8, 7, 15, 20],
+            column_widths=[0, 34, 16, 8, 7, 15, 20],
             interactive=False,
             wrap=False,
             elem_id="file_list_view",
@@ -1872,6 +1873,7 @@ class FileIndexPage(BasePage):
                     {
                         "id": "-",
                         "name": "-",
+                        "group": "-",
                         "size": "-",
                         "tokens": "-",
                         "loader": "-",
@@ -1881,6 +1883,7 @@ class FileIndexPage(BasePage):
             )
 
         Source = self._index._resources["Source"]
+        FileGroup = self._index._resources["FileGroup"]
         with Session(engine) as session:
             statement = select(Source)
             actor = None
@@ -1893,6 +1896,7 @@ class FileIndexPage(BasePage):
                             {
                                 "id": "-",
                                 "name": "-",
+                                "group": "-",
                                 "size": "-",
                                 "tokens": "-",
                                 "loader": "-",
@@ -1907,6 +1911,7 @@ class FileIndexPage(BasePage):
                         {
                             "id": "-",
                             "name": "-",
+                            "group": "-",
                             "size": "-",
                             "tokens": "-",
                             "loader": "-",
@@ -1921,17 +1926,33 @@ class FileIndexPage(BasePage):
                     statement = statement.where(Source.user == user_id)
             if name_pattern:
                 statement = statement.where(Source.name.ilike(f"%{name_pattern}%"))
+
+            visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            file_id_to_groups: dict[str, list[str]] = {}
+            for row in session.execute(select(FileGroup)).all():
+                group = row[0]
+                if scope_ids is not None and getattr(group, "user", None) not in scope_ids:
+                    continue
+                if actor and not _group_visible_to_actor(
+                    group, actor, visible_global_team_ids, scope_ids
+                ):
+                    continue
+                for file_id in (group.data or {}).get("files", []):
+                    file_id_to_groups.setdefault(file_id, []).append(group.name)
+
             results = []
             for each in session.execute(statement).all():
                 source = each[0]
                 if self._app.f_user_management and not _source_visible_to_actor(
-                    source, actor, globally_visible_team_ids(session), scope_ids
+                    source, actor, visible_global_team_ids, scope_ids
                 ):
                     continue
+                group_names = sorted(file_id_to_groups.get(source.id, []))
                 results.append(
                     {
                         "id": source.id,
                         "name": source.name,
+                        "group": ", ".join(group_names) if group_names else "-",
                         "size": self.format_size_human_readable(source.size),
                         "tokens": self.format_size_human_readable(
                             (source.note or {}).get("tokens", "-"), suffix=""
@@ -1949,6 +1970,7 @@ class FileIndexPage(BasePage):
                     {
                         "id": "-",
                         "name": "-",
+                        "group": "-",
                         "size": "-",
                         "tokens": "-",
                         "loader": "-",
