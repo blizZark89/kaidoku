@@ -255,7 +255,13 @@ class FileIndexPage(BasePage):
                 return False
             return True
 
-    def _resolve_document_team_assignment(self, session: Session, user_id, selected_team_ids):
+    def _resolve_document_team_assignment(
+        self,
+        session: Session,
+        user_id,
+        selected_team_ids,
+        apply_default_if_empty: bool = True,
+    ):
         if not self._app.f_user_management:
             return [], None
 
@@ -277,8 +283,14 @@ class FileIndexPage(BasePage):
             default_team_ids = selected_team_ids
         else:
             allowed_team_ids = set(actor.team_ids)
-            # keyuser/user: if not explicitly chosen, default to own teams.
-            default_team_ids = selected_team_ids or list(actor.team_ids)
+            # During upload we default to the actor's teams, but when editing an
+            # existing document an empty selection must remain empty so teams can
+            # actually be removed.
+            default_team_ids = (
+                selected_team_ids or list(actor.team_ids)
+                if apply_default_if_empty
+                else selected_team_ids
+            )
 
         invalid_team_ids = [team_id for team_id in default_team_ids if team_id not in allowed_team_ids]
         if invalid_team_ids:
@@ -298,7 +310,7 @@ class FileIndexPage(BasePage):
         Source = self._index._resources["Source"]
         with Session(engine) as session:
             resolved_team_ids, error = self._resolve_document_team_assignment(
-                session, user_id, selected_team_ids
+                session, user_id, selected_team_ids, apply_default_if_empty=False
             )
             if error:
                 gr.Warning(error)
@@ -334,7 +346,7 @@ class FileIndexPage(BasePage):
                     for team_id in actor.team_ids
                     if team_id in team_map
                 ]
-                values = [team_id for _, team_id in choices]
+                values = []
 
         return gr.update(choices=choices, value=values, visible=True)
 
@@ -408,7 +420,7 @@ class FileIndexPage(BasePage):
                 return gr.update()
 
             resolved_team_ids, error = self._resolve_document_team_assignment(
-                session, user_id, selected_team_ids
+                session, user_id, selected_team_ids, apply_default_if_empty=False
             )
             if error:
                 gr.Warning(error)
