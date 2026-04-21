@@ -38,6 +38,7 @@ KH_SSO_ENABLED = getattr(flowsettings, "KH_SSO_ENABLED", False)
 DOWNLOAD_MESSAGE = "Download starten"
 MAX_FILENAME_LENGTH = 20
 MAX_FILE_COUNT = 200
+FILESYNC_GROUP_PREFIX = "FileSync / "
 
 chat_input_focus_js = """
 function() {
@@ -144,6 +145,16 @@ def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=N
         return getattr(group, "user", None) in set(scope_user_ids)
     actor_team_ids = set(actor.team_ids)
     return bool(actor_team_ids.intersection(group_team_ids))
+
+
+def _is_filesync_group_name(name: str) -> bool:
+    return bool(name) and str(name).startswith(FILESYNC_GROUP_PREFIX)
+
+
+def _display_group_name(name: str) -> str:
+    if _is_filesync_group_name(name):
+        return str(name)[len(FILESYNC_GROUP_PREFIX) :]
+    return name
 
 
 class File(gr.File):
@@ -1950,7 +1961,9 @@ class FileIndexPage(BasePage):
                 ):
                     continue
                 for file_id in (group.data or {}).get("files", []):
-                    file_id_to_groups.setdefault(file_id, []).append(group.name)
+                    file_id_to_groups.setdefault(file_id, []).append(
+                        _display_group_name(group.name)
+                    )
 
             results = []
             for each in session.execute(statement).all():
@@ -2475,6 +2488,8 @@ class FileSelector(BasePage):
         group_options: list = []
         available_ids = []
         available_group_values = []
+        filesync_file_ids = set()
+        group_available_ids = []
         team_filter_choices = [("Alle Teams", "")]
         resolved_mode = current_mode
         if user_id is None:
@@ -2528,10 +2543,14 @@ class FileSelector(BasePage):
 
             results = session.execute(statement).all()
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            visible_sources = []
             for result in results:
                 source = result[0]
                 if actor and not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids):
                     continue
+                visible_sources.append(source)
+
+            for source in visible_sources:
                 source_team_ids = _source_team_ids(source)
                 has_global_team = bool(set(source_team_ids).intersection(visible_global_team_ids))
                 if self._app.f_user_management:
@@ -2545,10 +2564,8 @@ class FileSelector(BasePage):
                         continue
                 elif team_filter and team_filter not in source_team_ids:
                     continue
-                available_ids.append(source.id)
-                options.append((source.name, source.id))
-
-            available_ids_set = set(available_ids)
+                group_available_ids.append(source.id)
+            group_available_ids_set = set(group_available_ids)
 
             FileGroup = self._index._resources["FileGroup"]
             statement = select(FileGroup)
@@ -2564,12 +2581,24 @@ class FileSelector(BasePage):
                     item, actor, visible_global_team_ids, scope_ids
                 ):
                     continue
-                group_files = [
-                    file_id for file_id in item.data.get("files", []) if file_id in available_ids_set
+                raw_group_files = [
+                    file_id
+                    for file_id in item.data.get("files", [])
+                    if file_id in group_available_ids_set
                 ]
-                group_value = json.dumps(group_files)
+                if _is_filesync_group_name(item.name):
+                    filesync_file_ids.update(raw_group_files)
+                group_value = json.dumps(raw_group_files)
                 available_group_values.append(group_value)
-                group_options.append((item.name, group_value))
+                group_options.append((_display_group_name(item.name), group_value))
+
+            for source in visible_sources:
+                if source.id not in group_available_ids_set:
+                    continue
+                if source.id in filesync_file_ids:
+                    continue
+                available_ids.append(source.id)
+                options.append((source.name, source.id))
 
         if selected_files:
             available_ids_set = set(available_ids)
