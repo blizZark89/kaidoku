@@ -429,11 +429,11 @@ class SettingsPage(BasePage):
             self.filesync_detected_folders = gr.State(value=[])
             self.filesync_folder_mapping_state = gr.State(value={})
             self.filesync_local_folder_path = gr.Textbox(
-                label="localFolderPath",
+                label="Lokaler Ordnerpfad",
                 placeholder="Absoluter Ordnerpfad auf dem Server",
             )
             self.filesync_scan_interval = gr.Number(
-                label="scanIntervalMinutes",
+                label="Scan-Intervall in Minuten",
                 value=5,
                 precision=0,
             )
@@ -443,38 +443,38 @@ class SettingsPage(BasePage):
                 else []
             )
             self.filesync_file_type_filter = gr.Dropdown(
-                label="fileTypeFilter",
+                label="Dateityp-Filter",
                 choices=supported_types,
                 value=supported_types,
                 multiselect=True,
             )
             with gr.Row():
-                self.filesync_save_btn = gr.Button("saveConfig")
-                self.filesync_test_path_btn = gr.Button("testPath")
-                self.filesync_run_now_btn = gr.Button("runSyncNow")
+                self.filesync_save_btn = gr.Button("Konfiguration speichern")
+                self.filesync_test_path_btn = gr.Button("Pfad testen")
+                self.filesync_run_now_btn = gr.Button("Jetzt synchronisieren")
             with gr.Row():
                 self.filesync_path_accessible = gr.Checkbox(
-                    label="pathAccessible",
+                    label="Pfad erreichbar",
                     value=False,
                     interactive=False,
                 )
                 self.filesync_processed_count = gr.Number(
-                    label="processedFilesCount",
+                    label="Verarbeitete Dateien",
                     value=0,
                     precision=0,
                     interactive=False,
                 )
             with gr.Row():
                 self.filesync_last_scan = gr.Textbox(
-                    label="lastScanTimestamp",
+                    label="Letzter Scan",
                     interactive=False,
                 )
                 self.filesync_last_success = gr.Textbox(
-                    label="lastSuccessfulSync",
+                    label="Letzte erfolgreiche Synchronisierung",
                     interactive=False,
                 )
             self.filesync_last_status = gr.Textbox(label="Status", interactive=False)
-            gr.Markdown("### Folder -> Teams")
+            gr.Markdown("### Ordner zu Teams")
             self.filesync_folder_selector = gr.Dropdown(
                 label="Erkannter Ordner",
                 choices=[],

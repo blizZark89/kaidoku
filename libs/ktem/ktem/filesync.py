@@ -29,6 +29,23 @@ def _iso_now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+FILESYNC_MESSAGES = {
+    "config_saved": "Konfiguration gespeichert",
+    "path_missing": "Ordnerpfad fehlt",
+    "local_paths_only": "Nur lokale absolute Ordnerpfade sind erlaubt",
+    "absolute_path_required": "Es wird ein absoluter Ordnerpfad benötigt",
+    "folder_not_found": "Ordner wurde nicht gefunden",
+    "path_not_folder": "Pfad ist kein Ordner",
+    "folder_not_readable": "Ordner ist nicht lesbar",
+    "folder_accessible": "Ordner erreichbar",
+    "path_unavailable": "Ordnerpfad nicht erreichbar",
+    "no_sync_admin": "Kein Admin mit Upload-Rechten für FileSync gefunden",
+    "sync_done": "Synchronisierung abgeschlossen",
+    "no_changes": "Keine Änderungen gefunden",
+    "sync_failed": "Synchronisierung fehlgeschlagen",
+}
+
+
 class FileSyncService:
     def __init__(self, app):
         self._app = app
@@ -181,7 +198,7 @@ class FileSyncService:
         state = self.load_runtime_state()
         status = state.setdefault("status", {})
         status["path_accessible"] = path_ok
-        status["last_status"] = "Konfiguration gespeichert"
+        status["last_status"] = FILESYNC_MESSAGES["config_saved"]
         self._save_json(FILESYNC_STATE_PATH, state)
         self.notify_config_changed()
         return self.load_ui_state(user_id)
@@ -236,7 +253,7 @@ class FileSyncService:
             )
             status["path_accessible"] = path_ok
             if not path_ok:
-                status["last_status"] = message or "Ordnerpfad nicht erreichbar"
+                status["last_status"] = message or FILESYNC_MESSAGES["path_unavailable"]
                 self._save_json(FILESYNC_STATE_PATH, state)
                 return
 
@@ -348,7 +365,7 @@ class FileSyncService:
             state = self.load_runtime_state()
             status = state.setdefault("status", {})
             status["last_scan_timestamp"] = _iso_now()
-            status["last_status"] = f"Synchronisierung fehlgeschlagen: {exc}"
+            status["last_status"] = f"{FILESYNC_MESSAGES['sync_failed']}: {exc}"
             self._save_json(FILESYNC_STATE_PATH, state)
         finally:
             self._lock.release()
@@ -425,21 +442,21 @@ class FileSyncService:
     def _validate_folder_path(self, folder_path):
         path_str = str(folder_path or "").strip()
         if not path_str:
-            return False, "Ordnerpfad fehlt", None
+            return False, FILESYNC_MESSAGES["path_missing"], None
         if path_str.startswith(("http://", "https://", "\\\\")):
-            return False, "Nur lokale absolute Ordnerpfade sind erlaubt", None
+            return False, FILESYNC_MESSAGES["local_paths_only"], None
         path = Path(path_str)
         if not path.is_absolute():
             return False, "Es wird ein absoluter Ordnerpfad benötigt", None
         try:
             resolved = path.resolve(strict=True)
         except Exception:
-            return False, "Ordner wurde nicht gefunden", None
+            return False, FILESYNC_MESSAGES["folder_not_found"], None
         if not resolved.is_dir():
-            return False, "Pfad ist kein Ordner", None
+            return False, FILESYNC_MESSAGES["path_not_folder"], None
         if not os.access(resolved, os.R_OK):
-            return False, "Ordner ist nicht lesbar", None
-        return True, "Ordner erreichbar", resolved
+            return False, FILESYNC_MESSAGES["folder_not_readable"], None
+        return True, FILESYNC_MESSAGES["folder_accessible"], resolved
 
     def _folder_entries(self, folder_path):
         path_ok, _, resolved = self._validate_folder_path(folder_path)
