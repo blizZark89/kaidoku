@@ -2,6 +2,7 @@ import gradio as gr
 from decouple import config
 from ktem.app import BaseApp
 from ktem.db.models import Settings, User, engine
+from ktem.filesync import FileSyncService
 from ktem.pages.chat import ChatPage
 from ktem.pages.help import HelpPage
 from ktem.pages.resources import ResourcesTab
@@ -45,6 +46,7 @@ class App(BaseApp):
         """Render the UI"""
         self._tabs = {}
         self._graph_index_tab_keys = []
+        self.file_sync_service = FileSyncService(self)
 
         with gr.Tabs() as self.tabs:
             if self.f_user_management:
@@ -248,6 +250,7 @@ class App(BaseApp):
 
     def _on_app_created(self):
         """Called when the app is created"""
+        self.file_sync_service.start()
 
         if self._graph_index_tab_keys:
             self.app.load(

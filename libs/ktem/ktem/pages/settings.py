@@ -69,6 +69,7 @@ class SettingsPage(BasePage):
     def __init__(self, app):
         """Initiate the page and render the UI"""
         self._app = app
+        self._filesync_service = getattr(app, "file_sync_service", None)
 
         self._settings_state = app.settings_state
         self._user_id = app.user_id
@@ -130,6 +131,7 @@ class SettingsPage(BasePage):
         self.app_tab()
         self.index_tab()
         self.reasoning_tab()
+        self.filesync_tab()
 
     def _user_can_manage_advanced_settings(self, user_id) -> bool:
         if not self._app.f_user_management:
@@ -149,6 +151,7 @@ class SettingsPage(BasePage):
             gr.update(
                 visible=self._render_reasoning_tab and can_manage_advanced_settings
             ),
+            gr.update(visible=can_manage_advanced_settings),
         ]
 
     def on_subscribe_public_events(self):
@@ -214,6 +217,7 @@ class SettingsPage(BasePage):
                         self.general_settings_tab,
                         self.retrieval_settings_tab,
                         self.reasoning_settings_tab,
+                        self.filesync_settings_tab,
                     ],
                     "show_progress": "hidden",
                 },
@@ -228,10 +232,30 @@ class SettingsPage(BasePage):
                         self.general_settings_tab,
                         self.retrieval_settings_tab,
                         self.reasoning_settings_tab,
+                        self.filesync_settings_tab,
                     ],
                     "show_progress": "hidden",
                 },
             )
+            if self._filesync_service:
+                self._app.subscribe_event(
+                    name="onSignIn",
+                    definition={
+                        "fn": self._filesync_service.load_ui_state,
+                        "inputs": [self._user_id],
+                        "outputs": self.filesync_outputs(),
+                        "show_progress": "hidden",
+                    },
+                )
+                self._app.subscribe_event(
+                    name="onSignOut",
+                    definition={
+                        "fn": self._filesync_service.load_ui_state,
+                        "inputs": [self._user_id],
+                        "outputs": self.filesync_outputs(),
+                        "show_progress": "hidden",
+                    },
+                )
 
     def _get_current_username_label(self, user_id):
         name = "Aktueller Benutzer: "
@@ -249,6 +273,17 @@ class SettingsPage(BasePage):
                 self._get_current_username_label,
                 inputs=[self._user_id],
                 outputs=[self.current_name],
+                show_progress="hidden",
+            )
+            self._app.user_id.change(
+                self._advanced_settings_tab_updates,
+                inputs=[self._user_id],
+                outputs=[
+                    self.general_settings_tab,
+                    self.retrieval_settings_tab,
+                    self.reasoning_settings_tab,
+                    self.filesync_settings_tab,
+                ],
                 show_progress="hidden",
             )
 
@@ -307,6 +342,69 @@ class SettingsPage(BasePage):
             for event in self._app.get_event("onSignOut"):
                 onSignOutClick = onSignOutClick.then(**event)
 
+        if self._filesync_service:
+            self.filesync_folder_selector.change(
+                self._filesync_service.load_folder_team_selection,
+                inputs=[
+                    self.filesync_folder_selector,
+                    self.filesync_folder_mapping_state,
+                    self._user_id,
+                ],
+                outputs=[self.filesync_folder_team_ids],
+                show_progress="hidden",
+            )
+            self.filesync_folder_team_ids.change(
+                self._filesync_service.update_folder_team_mapping,
+                inputs=[
+                    self.filesync_folder_selector,
+                    self.filesync_folder_team_ids,
+                    self.filesync_folder_mapping_state,
+                    self.filesync_detected_folders,
+                    self._user_id,
+                ],
+                outputs=[
+                    self.filesync_folder_mapping_state,
+                    self.filesync_mapping_preview,
+                ],
+                show_progress="hidden",
+            )
+            self.filesync_test_path_btn.click(
+                self._filesync_service.test_path_ui,
+                inputs=[
+                    self._user_id,
+                    self.filesync_local_folder_path,
+                    self.filesync_folder_mapping_state,
+                ],
+                outputs=[
+                    self.filesync_detected_folders,
+                    self.filesync_folder_mapping_state,
+                    self.filesync_folder_selector,
+                    self.filesync_folder_team_ids,
+                    self.filesync_mapping_preview,
+                    self.filesync_path_accessible,
+                    self.filesync_last_status,
+                ],
+                show_progress="hidden",
+            )
+            self.filesync_save_btn.click(
+                self._filesync_service.save_config_ui,
+                inputs=[
+                    self._user_id,
+                    self.filesync_local_folder_path,
+                    self.filesync_scan_interval,
+                    self.filesync_file_type_filter,
+                    self.filesync_folder_mapping_state,
+                ],
+                outputs=self.filesync_outputs(),
+                show_progress="hidden",
+            )
+            self.filesync_run_now_btn.click(
+                self._filesync_service.run_sync_now_ui,
+                inputs=[self._user_id],
+                outputs=self.filesync_outputs(),
+                show_progress="hidden",
+            )
+
     def user_tab(self):
         # user management
         self.current_name = gr.Markdown("Aktueller Benutzer: ___")
@@ -326,24 +424,89 @@ class SettingsPage(BasePage):
             )
             self.password_change_btn = gr.Button("Passwort ändern", interactive=True)
 
-    def _on_app_created(self):
-        if self._app.f_user_management:
-            self._app.app.load(
-                self._get_current_username_label,
-                inputs=[self._user_id],
-                outputs=[self.current_name],
-                show_progress="hidden",
+    def filesync_tab(self):
+        with gr.Tab("FileSync", visible=False) as self.filesync_settings_tab:
+            self.filesync_detected_folders = gr.State(value=[])
+            self.filesync_folder_mapping_state = gr.State(value={})
+            self.filesync_local_folder_path = gr.Textbox(
+                label="localFolderPath",
+                placeholder="Absoluter Ordnerpfad auf dem Server",
             )
-            self._app.app.load(
-                self._advanced_settings_tab_updates,
-                inputs=[self._user_id],
-                outputs=[
-                    self.general_settings_tab,
-                    self.retrieval_settings_tab,
-                    self.reasoning_settings_tab,
-                ],
-                show_progress="hidden",
+            self.filesync_scan_interval = gr.Number(
+                label="scanIntervalMinutes",
+                value=5,
+                precision=0,
             )
+            supported_types = (
+                self._filesync_service.supported_file_types()
+                if self._filesync_service
+                else []
+            )
+            self.filesync_file_type_filter = gr.Dropdown(
+                label="fileTypeFilter",
+                choices=supported_types,
+                value=supported_types,
+                multiselect=True,
+            )
+            with gr.Row():
+                self.filesync_save_btn = gr.Button("saveConfig")
+                self.filesync_test_path_btn = gr.Button("testPath")
+                self.filesync_run_now_btn = gr.Button("runSyncNow")
+            with gr.Row():
+                self.filesync_path_accessible = gr.Checkbox(
+                    label="pathAccessible",
+                    value=False,
+                    interactive=False,
+                )
+                self.filesync_processed_count = gr.Number(
+                    label="processedFilesCount",
+                    value=0,
+                    precision=0,
+                    interactive=False,
+                )
+            with gr.Row():
+                self.filesync_last_scan = gr.Textbox(
+                    label="lastScanTimestamp",
+                    interactive=False,
+                )
+                self.filesync_last_success = gr.Textbox(
+                    label="lastSuccessfulSync",
+                    interactive=False,
+                )
+            self.filesync_last_status = gr.Textbox(label="Status", interactive=False)
+            gr.Markdown("### Folder -> Teams")
+            self.filesync_folder_selector = gr.Dropdown(
+                label="Erkannter Ordner",
+                choices=[],
+                value=None,
+            )
+            self.filesync_folder_team_ids = gr.Dropdown(
+                label="Erlaubte Teams",
+                choices=[],
+                value=[],
+                multiselect=True,
+            )
+            self.filesync_mapping_preview = gr.DataFrame(
+                headers=["Ordner", "Teams"],
+                interactive=False,
+            )
+
+    def filesync_outputs(self):
+        return [
+            self.filesync_local_folder_path,
+            self.filesync_scan_interval,
+            self.filesync_file_type_filter,
+            self.filesync_folder_mapping_state,
+            self.filesync_detected_folders,
+            self.filesync_folder_selector,
+            self.filesync_folder_team_ids,
+            self.filesync_mapping_preview,
+            self.filesync_path_accessible,
+            self.filesync_last_scan,
+            self.filesync_last_success,
+            self.filesync_processed_count,
+            self.filesync_last_status,
+        ]
 
     def change_password(self, user_id, password, password_confirm):
         from ktem.pages.resources.user import validate_password
@@ -498,13 +661,45 @@ class SettingsPage(BasePage):
         return self._settings_keys
 
     def _on_app_created(self):
-        if not self._app.f_user_management:
+        if self._app.f_user_management:
+            self._app.app.load(
+                self._get_current_username_label,
+                inputs=[self._user_id],
+                outputs=[self.current_name],
+                show_progress="hidden",
+            )
+            self._app.app.load(
+                self._advanced_settings_tab_updates,
+                inputs=[self._user_id],
+                outputs=[
+                    self.general_settings_tab,
+                    self.retrieval_settings_tab,
+                    self.reasoning_settings_tab,
+                    self.filesync_settings_tab,
+                ],
+                show_progress="hidden",
+            )
+            if self._filesync_service:
+                self._app.app.load(
+                    self._filesync_service.load_ui_state,
+                    inputs=[self._user_id],
+                    outputs=self.filesync_outputs(),
+                    show_progress="hidden",
+                )
+        else:
             self._app.app.load(
                 self.load_setting,
                 inputs=self._user_id,
                 outputs=[self._settings_state] + self.components(),
                 show_progress="hidden",
             )
+            if self._filesync_service:
+                self._app.app.load(
+                    self._filesync_service.load_ui_state,
+                    inputs=[self._user_id],
+                    outputs=self.filesync_outputs(),
+                    show_progress="hidden",
+                )
 
         def update_llms():
             from ktem.llms.manager import llms
