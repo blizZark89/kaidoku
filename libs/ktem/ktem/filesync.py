@@ -10,6 +10,7 @@ from pathlib import Path
 import gradio as gr
 import pandas as pd
 from sqlmodel import Session, select
+from tzlocal import get_localzone
 
 import flowsettings
 from ktem.authz import get_access_context, has_upload_access, list_teams
@@ -28,7 +29,7 @@ FILESYNC_GROUP_KEY_FIELD = "filesync_group_key"
 
 
 def _iso_now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(get_localzone()).strftime("%Y-%m-%d %H:%M:%S")
 
 
 FILESYNC_MESSAGES = {
@@ -271,6 +272,7 @@ class FileSyncService:
             tracked_files = state.setdefault("files", {})
             current_paths = set()
             processed_files_count = 0
+            files_without_content = 0
             group_file_ids: dict[tuple[int, str], list[str]] = {}
             group_team_ids: dict[tuple[int, str], list[str]] = {}
             group_order: dict[tuple[int, str], str] = {}
@@ -314,7 +316,23 @@ class FileSyncService:
                         document_team_ids=folder_team_map.get(group_key, []),
                     )
                     if new_source_ids:
-                        source_ids = new_source_ids
+                        searchable_source_ids = self._searchable_source_ids(
+                            page, new_source_ids
+                        )
+                        missing_source_ids = [
+                            source_id
+                            for source_id in new_source_ids
+                            if source_id not in searchable_source_ids
+                        ]
+                        if missing_source_ids:
+                            files_without_content += len(missing_source_ids)
+                            self._delete_removed_files(
+                                page=page,
+                                settings=settings,
+                                user_id=sync_user_id,
+                                file_ids=missing_source_ids,
+                            )
+                        source_ids = searchable_source_ids
                     processed_files_count += 1
 
                 if not source_ids:
@@ -386,11 +404,17 @@ class FileSyncService:
                 )
 
             status["processed_files_count"] = processed_files_count
-            status["last_status"] = (
-                "Synchronisierung abgeschlossen"
-                if processed_files_count or manual
-                else "Keine Änderungen gefunden"
-            )
+            if files_without_content:
+                status["last_status"] = (
+                    f"Synchronisierung abgeschlossen, aber {files_without_content} Datei(en) "
+                    "haben keinen durchsuchbaren Inhalt geliefert"
+                )
+            else:
+                status["last_status"] = (
+                    "Synchronisierung abgeschlossen"
+                    if processed_files_count or manual
+                    else "Keine ?nderungen gefunden"
+                )
             status["last_successful_sync"] = _iso_now()
             self._save_json(FILESYNC_STATE_PATH, state)
         except Exception as exc:
@@ -662,6 +686,20 @@ class FileSyncService:
             )
         for file_id in list(dict.fromkeys(file_ids or [])):
             delete_fn(file_id)
+
+    def _searchable_source_ids(self, page, file_ids):
+        if not file_ids:
+            return []
+        Index = page._index._resources["Index"]
+        with Session(engine) as session:
+            rows = session.execute(
+                select(Index.source_id).where(
+                    Index.relation_type == "document",
+                    Index.source_id.in_(file_ids),
+                )
+            ).all()
+        searchable_ids = {row[0] for row in rows}
+        return [file_id for file_id in file_ids if file_id in searchable_ids]
 
     def _prune_filesync_groups(self, page, user_id, active_group_names, removed_file_ids):
         FileGroup = page._index._resources["FileGroup"]
