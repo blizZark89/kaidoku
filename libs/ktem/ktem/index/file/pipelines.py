@@ -777,6 +777,12 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
 
         return pipeline
 
+    def delete_file(self, file_id: str):
+        return IndexPipeline.delete_file(self, file_id)
+
+    def delette_file(self, file_id: str):
+        return self.delete_file(file_id)
+
     def run(
         self, file_paths: str | Path | list[str | Path], *args, **kwargs
     ) -> tuple[list[str | None], list[str | None]]:
