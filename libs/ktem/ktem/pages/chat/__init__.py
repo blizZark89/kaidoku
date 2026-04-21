@@ -623,7 +623,7 @@ class ChatPage(BasePage):
                 show_progress="hidden",
             ).then(
                 self.chat_control.select_conv,
-                inputs=[self.chat_control.conversation, self._app.user_id],
+                inputs=[self.chat_control.conversation_id, self._app.user_id],
                 outputs=[
                     self.chat_control.conversation_id,
                     self.chat_control.conversation,
@@ -667,7 +667,7 @@ class ChatPage(BasePage):
                 show_progress="hidden",
             ).then(
                 self.chat_control.select_conv,
-                inputs=[self.chat_control.conversation, self._app.user_id],
+                inputs=[self.chat_control.conversation_id, self._app.user_id],
                 outputs=[
                     self.chat_control.conversation_id,
                     self.chat_control.conversation,
