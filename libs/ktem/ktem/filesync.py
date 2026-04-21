@@ -22,7 +22,7 @@ FILESYNC_CONFIG_PATH = FILESYNC_DIR / "config.json"
 FILESYNC_STATE_PATH = FILESYNC_DIR / "state.json"
 DEFAULT_GROUP_KEY = "__default__"
 DEFAULT_GROUP_LABEL = "Standard"
-SYNC_GROUP_PREFIX = "FileSync / "
+LEGACY_SYNC_GROUP_PREFIX = "FileSync / "
 
 
 def _iso_now() -> str:
@@ -578,16 +578,38 @@ class FileSyncService:
         return DEFAULT_GROUP_LABEL if group_key == DEFAULT_GROUP_KEY else group_key
 
     def _sync_group_name(self, group_label):
-        return f"{SYNC_GROUP_PREFIX}{group_label}"
+        return group_label
 
     def _save_group_for_page(self, page, user_id, group_key, group_label, file_ids, team_ids):
         FileGroup = page._index._resources["FileGroup"]
         group_name = self._sync_group_name(group_label)
+        legacy_group_name = f"{LEGACY_SYNC_GROUP_PREFIX}{group_label}"
+        normalized_file_ids = list(dict.fromkeys(file_ids or []))
+        normalized_team_ids = self._normalize_team_ids(team_ids)
+        user_key = str(user_id)
         with Session(engine) as session:
             current_group = (
                 session.query(FileGroup)
-                .filter_by(name=group_name, user=user_id)
+                .filter(
+                    FileGroup.user == user_key,
+                    FileGroup.name.in_([group_name, legacy_group_name]),
+                )
                 .first()
             )
-            group_id = current_group.id if current_group else None
-        page.save_group(group_id, group_name, file_ids, team_ids, user_id)
+            if current_group:
+                current_group.name = group_name
+                group_data = dict(current_group.data or {})
+                group_data["files"] = normalized_file_ids
+                group_data["team_ids"] = normalized_team_ids
+                current_group.data = group_data
+            else:
+                current_group = FileGroup(
+                    name=group_name,
+                    data={
+                        "files": normalized_file_ids,
+                        "team_ids": normalized_team_ids,
+                    },
+                    user=user_key,
+                )
+            session.add(current_group)
+            session.commit()
