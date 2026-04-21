@@ -363,7 +363,7 @@ class RerankingManagement(BasePage):
             _ = rerank([Document(content="Hello")], "Hi")
 
             log_content += (
-                "<mark style='background: green; color: white'>- Connection success. "
+                "<mark style='background: #f97316; color: white'>- Connection success. "
                 "</mark><br>"
             )
             yield log_content

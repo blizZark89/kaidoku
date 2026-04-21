@@ -149,7 +149,7 @@ td {
 }
 
 mark {
-  background-color: #10b981;
+  background-color: #f97316;
 }
 
 /* clpse */
@@ -398,11 +398,11 @@ pdfjs-viewer-element {
   -webkit-transform: translate3d(100%, 0, 0);
   -moz-transform: translate3d(100%, 0, 0);
   transform: translate3d(100%, 0, 0);
-  background: #12df9a;
+  background: #fb923c;
 }
 
 .switch:has(> input:checked) {
-  background: #0c895f;
+  background: #ea580c;
 }
 
 /* Bot animation */
@@ -426,7 +426,7 @@ details.evidence {
 }
 
 .message a.citation {
-  color: #10b981;
+  color: #f97316;
   text-decoration: none;
 }
 
