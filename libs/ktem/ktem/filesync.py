@@ -48,6 +48,11 @@ FILESYNC_MESSAGES = {
     "sync_failed": "Synchronisierung fehlgeschlagen",
 }
 
+FILESYNC_FILE_STATUS_PENDING = "pending"
+FILESYNC_FILE_STATUS_INDEXED = "indexed"
+FILESYNC_FILE_STATUS_FAILED_UPLOAD = "failed_upload"
+FILESYNC_FILE_STATUS_FAILED_NO_CONTENT = "failed_no_content"
+
 
 class FileSyncService:
     def __init__(self, app):
@@ -217,6 +222,7 @@ class FileSyncService:
             FILESYNC_STATE_PATH,
             {
                 "files": {},
+                "file_status": {},
                 "status": {
                     "path_accessible": False,
                     "last_scan_timestamp": "",
@@ -270,9 +276,11 @@ class FileSyncService:
             filters = set(self._normalize_filters(config.get("file_type_filter")))
             folder_team_map = self._sanitize_folder_team_map(config.get("folder_team_map", {}))
             tracked_files = state.setdefault("files", {})
+            file_status = state.setdefault("file_status", {})
             current_paths = set()
             processed_files_count = 0
             files_without_content = 0
+            files_failed_upload = 0
             group_file_ids: dict[tuple[int, str], list[str]] = {}
             group_team_ids: dict[tuple[int, str], list[str]] = {}
             group_order: dict[tuple[int, str], str] = {}
@@ -305,6 +313,15 @@ class FileSyncService:
                     if current_hash == previous.get("hash") and source_ids:
                         changed = False
 
+                file_status[record_key] = self._build_file_status(
+                    file_path=file_path,
+                    group_key=group_key,
+                    index_id=page._index.id,
+                    status=FILESYNC_FILE_STATUS_PENDING,
+                    message="Wird synchronisiert",
+                    source_ids=source_ids,
+                )
+
                 if changed:
                     logger.info("FileSync processing %s", file_path)
                     new_source_ids = self._run_upload(
@@ -332,7 +349,25 @@ class FileSyncService:
                                 user_id=sync_user_id,
                                 file_ids=missing_source_ids,
                             )
+                            file_status[record_key] = self._build_file_status(
+                                file_path=file_path,
+                                group_key=group_key,
+                                index_id=page._index.id,
+                                status=FILESYNC_FILE_STATUS_FAILED_NO_CONTENT,
+                                message="Upload war erfolgreich, aber es wurde kein durchsuchbarer Inhalt erzeugt",
+                                source_ids=[],
+                            )
                         source_ids = searchable_source_ids
+                    else:
+                        files_failed_upload += 1
+                        file_status[record_key] = self._build_file_status(
+                            file_path=file_path,
+                            group_key=group_key,
+                            index_id=page._index.id,
+                            status=FILESYNC_FILE_STATUS_FAILED_UPLOAD,
+                            message="Upload oder Indexierung hat keine Datei-ID zurückgegeben",
+                            source_ids=[],
+                        )
                     processed_files_count += 1
 
                 if not source_ids:
@@ -343,6 +378,14 @@ class FileSyncService:
                     "hash": current_hash,
                     "source_ids": source_ids,
                 }
+                file_status[record_key] = self._build_file_status(
+                    file_path=file_path,
+                    group_key=group_key,
+                    index_id=page._index.id,
+                    status=FILESYNC_FILE_STATUS_INDEXED,
+                    message="Datei wurde erfolgreich synchronisiert und indexiert",
+                    source_ids=source_ids,
+                )
 
                 grouping_key = (page._index.id, group_key)
                 group_file_ids.setdefault(grouping_key, [])
@@ -356,6 +399,7 @@ class FileSyncService:
             removed_records = []
             for record_key in removed_paths:
                 removed_record = tracked_files.pop(record_key, None)
+                file_status.pop(record_key, None)
                 if removed_record:
                     removed_records.append(removed_record)
 
@@ -404,7 +448,12 @@ class FileSyncService:
                 )
 
             status["processed_files_count"] = processed_files_count
-            if files_without_content:
+            if files_failed_upload:
+                status["last_status"] = (
+                    f"Synchronisierung abgeschlossen, aber {files_failed_upload} Datei(en) "
+                    "konnten nicht hochgeladen oder indexiert werden"
+                )
+            elif files_without_content:
                 status["last_status"] = (
                     f"Synchronisierung abgeschlossen, aber {files_without_content} Datei(en) "
                     "haben keinen durchsuchbaren Inhalt geliefert"
@@ -413,7 +462,7 @@ class FileSyncService:
                 status["last_status"] = (
                     "Synchronisierung abgeschlossen"
                     if processed_files_count or manual
-                    else "Keine ?nderungen gefunden"
+                    else "Keine Änderungen gefunden"
                 )
             status["last_successful_sync"] = _iso_now()
             self._save_json(FILESYNC_STATE_PATH, state)
@@ -700,6 +749,17 @@ class FileSyncService:
             ).all()
         searchable_ids = {row[0] for row in rows}
         return [file_id for file_id in file_ids if file_id in searchable_ids]
+
+    def _build_file_status(self, file_path: Path, group_key, index_id, status, message, source_ids):
+        return {
+            "path": str(file_path),
+            "group_key": group_key,
+            "index_id": index_id,
+            "status": status,
+            "message": message,
+            "source_ids": list(dict.fromkeys(source_ids or [])),
+            "updated_at": _iso_now(),
+        }
 
     def _prune_filesync_groups(self, page, user_id, active_group_names, removed_file_ids):
         FileGroup = page._index._resources["FileGroup"]
