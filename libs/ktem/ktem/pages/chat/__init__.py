@@ -415,6 +415,18 @@ class ChatPage(BasePage):
             plot = gr.update(visible=False)
         return plot
 
+    def clear_chat_surface(self):
+        return (
+            {},
+            gr.update(value=[]),
+            gr.update(value=self.chat_suggestion.chat_samples),
+            gr.update(value=""),
+            None,
+            [],
+            [],
+            gr.update(visible=False),
+        )
+
     def on_register_events(self):
         # first index paper recommendation
         if KH_DEMO_MODE and len(self._indices_input) > 0:
@@ -644,6 +656,18 @@ class ChatPage(BasePage):
                 inputs=self.state_plot_panel,
                 outputs=self.plot_panel,
             ).then(
+                fn=self.clear_chat_surface,
+                outputs=[
+                    self.chat_panel.text_input,
+                    self.chat_panel.chatbot,
+                    self.followup_questions,
+                    self.info_panel,
+                    self.state_plot_panel,
+                    self.state_retrieval_history,
+                    self.state_plot_history,
+                    self.plot_panel,
+                ],
+            ).then(
                 fn=None,
                 inputs=None,
                 js=chat_input_focus_js,
@@ -687,6 +711,18 @@ class ChatPage(BasePage):
                 fn=self._json_to_plot,
                 inputs=self.state_plot_panel,
                 outputs=self.plot_panel,
+            ).then(
+                fn=self.clear_chat_surface,
+                outputs=[
+                    self.chat_panel.text_input,
+                    self.chat_panel.chatbot,
+                    self.followup_questions,
+                    self.info_panel,
+                    self.state_plot_panel,
+                    self.state_retrieval_history,
+                    self.state_plot_history,
+                    self.plot_panel,
+                ],
             ).then(
                 lambda: self.toggle_delete(""),
                 outputs=[
