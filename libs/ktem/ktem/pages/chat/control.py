@@ -340,7 +340,7 @@ class ConversationControl(BasePage):
                 id_ = ""
                 name = ""
                 selected = {}
-                chats = []
+                chats = gr.update(value=[])
                 chat_suggestions = default_chat_suggestions
                 retrieval_history = []
                 plot_history = []
