@@ -675,7 +675,7 @@ class ChatPage(BasePage):
 
             self.chat_control.btn_del.click(
                 lambda id: self.toggle_delete(id),
-                inputs=[self.chat_control.conversation_id],
+                inputs=[self.chat_control.conversation],
                 outputs=[
                     self.chat_control._new_delete,
                     self.chat_control._delete_confirm,
@@ -683,7 +683,7 @@ class ChatPage(BasePage):
             )
             self.chat_control.btn_del_conf.click(
                 self.chat_control.delete_conv,
-                inputs=[self.chat_control.conversation_id, self._app.user_id],
+                inputs=[self.chat_control.conversation, self._app.user_id],
                 outputs=[
                     self.chat_control.conversation_id,
                     self.chat_control.conversation,
