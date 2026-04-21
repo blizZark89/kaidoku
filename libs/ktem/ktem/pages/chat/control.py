@@ -327,10 +327,15 @@ class ConversationControl(BasePage):
                 # Ensure len of retrieval and messages are equal
                 retrieval_history = sync_retrieval_n_message(chats, retrieval_history)
 
+                if chats:
+                    chats = gr.update(value=chats)
+                else:
+                    chats = gr.update(value=[])
+
                 info_panel = (
-                    retrieval_history[-1]
+                    gr.update(value=retrieval_history[-1])
                     if retrieval_history
-                    else "<h5><b>Keine Belege gefunden.</b></h5>"
+                    else gr.update(value="")
                 )
                 plot_data = plot_history[-1] if plot_history else None
                 state = result.data_source.get("state", STATE)
@@ -344,7 +349,7 @@ class ConversationControl(BasePage):
                 chat_suggestions = default_chat_suggestions
                 retrieval_history = []
                 plot_history = []
-                info_panel = ""
+                info_panel = gr.update(value="")
                 plot_data = None
                 state = STATE
                 is_conv_public = False
