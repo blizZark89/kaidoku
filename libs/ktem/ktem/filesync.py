@@ -23,6 +23,8 @@ FILESYNC_STATE_PATH = FILESYNC_DIR / "state.json"
 DEFAULT_GROUP_KEY = "__default__"
 DEFAULT_GROUP_LABEL = "Standard"
 LEGACY_SYNC_GROUP_PREFIX = "FileSync / "
+FILESYNC_GROUP_FLAG = "filesync_managed"
+FILESYNC_GROUP_KEY_FIELD = "filesync_group_key"
 
 
 def _iso_now() -> str:
@@ -333,15 +335,40 @@ class FileSyncService:
                 group_order[grouping_key] = self._group_label(group_key)
 
             removed_paths = set(tracked_files.keys()) - {self._record_key(path) for path in current_paths}
+            removed_records = []
             for record_key in removed_paths:
-                tracked_files.pop(record_key, None)
+                removed_record = tracked_files.pop(record_key, None)
+                if removed_record:
+                    removed_records.append(removed_record)
+
+            removed_file_ids_by_index: dict[int, list[str]] = {}
+            for record in removed_records:
+                index_id = record.get("index_id")
+                if index_id is None:
+                    continue
+                file_ids = removed_file_ids_by_index.setdefault(index_id, [])
+                for source_id in record.get("source_ids", []) or []:
+                    if source_id and source_id not in file_ids:
+                        file_ids.append(source_id)
 
             for page in self._file_index_pages():
+                removed_file_ids = removed_file_ids_by_index.get(page._index.id, [])
+                if removed_file_ids:
+                    self._delete_removed_files(
+                        page=page,
+                        settings=settings,
+                        user_id=sync_user_id,
+                        file_ids=removed_file_ids,
+                    )
+
+            for page in self._file_index_pages():
+                active_group_names = []
                 for grouping_key, file_ids in group_file_ids.items():
                     if grouping_key[0] != page._index.id:
                         continue
                     group_key = grouping_key[1]
                     team_ids = group_team_ids.get(grouping_key, [])
+                    active_group_names.append(self._sync_group_name(group_order[grouping_key]))
                     page._apply_document_teams(file_ids, sync_user_id, team_ids)
                     self._save_group_for_page(
                         page=page,
@@ -351,6 +378,12 @@ class FileSyncService:
                         file_ids=file_ids,
                         team_ids=team_ids,
                     )
+                self._prune_filesync_groups(
+                    page=page,
+                    user_id=sync_user_id,
+                    active_group_names=active_group_names,
+                    removed_file_ids=removed_file_ids_by_index.get(page._index.id, []),
+                )
 
             status["processed_files_count"] = processed_files_count
             status["last_status"] = (
@@ -601,6 +634,8 @@ class FileSyncService:
                 group_data = dict(current_group.data or {})
                 group_data["files"] = normalized_file_ids
                 group_data["team_ids"] = normalized_team_ids
+                group_data[FILESYNC_GROUP_FLAG] = True
+                group_data[FILESYNC_GROUP_KEY_FIELD] = group_key
                 current_group.data = group_data
             else:
                 current_group = FileGroup(
@@ -608,8 +643,51 @@ class FileSyncService:
                     data={
                         "files": normalized_file_ids,
                         "team_ids": normalized_team_ids,
+                        FILESYNC_GROUP_FLAG: True,
+                        FILESYNC_GROUP_KEY_FIELD: group_key,
                     },
                     user=user_key,
                 )
             session.add(current_group)
+            session.commit()
+
+    def _delete_removed_files(self, page, settings, user_id, file_ids):
+        pipeline = page._index.get_indexing_pipeline(deepcopy(settings), user_id)
+        for file_id in list(dict.fromkeys(file_ids or [])):
+            pipeline.delete_file(file_id)
+
+    def _prune_filesync_groups(self, page, user_id, active_group_names, removed_file_ids):
+        FileGroup = page._index._resources["FileGroup"]
+        active_group_names = set(active_group_names or [])
+        removed_file_ids = set(removed_file_ids or [])
+        user_key = str(user_id)
+
+        with Session(engine) as session:
+            groups = session.query(FileGroup).filter(FileGroup.user == user_key).all()
+            for group in groups:
+                group_data = dict(group.data or {})
+                group_name = str(getattr(group, "name", "") or "")
+                is_filesync_group = bool(group_data.get(FILESYNC_GROUP_FLAG)) or group_name.startswith(
+                    LEGACY_SYNC_GROUP_PREFIX
+                )
+                if not is_filesync_group:
+                    continue
+
+                group_files = [
+                    file_id
+                    for file_id in group_data.get("files", [])
+                    if file_id not in removed_file_ids
+                ]
+                if group_name.startswith(LEGACY_SYNC_GROUP_PREFIX):
+                    group_name = group_name[len(LEGACY_SYNC_GROUP_PREFIX) :]
+
+                if group_name not in active_group_names or not group_files:
+                    session.delete(group)
+                    continue
+
+                group.name = group_name
+                group_data["files"] = group_files
+                group_data[FILESYNC_GROUP_FLAG] = True
+                group.data = group_data
+                session.add(group)
             session.commit()
