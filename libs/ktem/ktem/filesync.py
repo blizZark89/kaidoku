@@ -653,8 +653,15 @@ class FileSyncService:
 
     def _delete_removed_files(self, page, settings, user_id, file_ids):
         pipeline = page._index.get_indexing_pipeline(deepcopy(settings), user_id)
+        delete_fn = getattr(pipeline, "delete_file", None) or getattr(
+            pipeline, "delette_file", None
+        )
+        if not callable(delete_fn):
+            raise AttributeError(
+                f"{pipeline.__class__.__name__} bietet keine delete_file-Methode an"
+            )
         for file_id in list(dict.fromkeys(file_ids or [])):
-            pipeline.delete_file(file_id)
+            delete_fn(file_id)
 
     def _prune_filesync_groups(self, page, user_id, active_group_names, removed_file_ids):
         FileGroup = page._index._resources["FileGroup"]

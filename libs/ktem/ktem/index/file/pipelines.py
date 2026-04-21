@@ -594,6 +594,10 @@ class IndexPipeline(BaseComponent):
         if ds_ids:
             self.DS.delete(ds_ids)
 
+    def delette_file(self, file_id: str):
+        """Backward-compatible alias for older typoed callers."""
+        return self.delete_file(file_id)
+
     def run(
         self, file_path: str | Path, reindex: bool, **kwargs
     ) -> tuple[str, list[Document]]:
