@@ -290,11 +290,9 @@ class ConversationControl(BasePage):
             session.commit()
 
         history = self.load_chat_history(user_id)
-        if history:
-            id_ = history[0][1]
-            return id_, gr.update(value=id_, choices=history)
-        else:
-            return None, gr.update(value=None, choices=[])
+        # Do not auto-open another conversation after deletion.
+        # Returning an empty selection lets the UI fall back to its landing state.
+        return None, gr.update(value=None, choices=history)
 
     def select_conv(self, conversation_id, user_id):
         """Select the conversation"""

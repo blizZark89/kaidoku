@@ -2359,6 +2359,23 @@ class FileSelector(BasePage):
             ),
             inputs=[self.mode, self._app.user_id],
             outputs=[self.selector, self.group_selector, self.team_filter, self.selector_user_id],
+        ).then(
+            self.load_files,
+            inputs=[
+                self.selector,
+                self.group_selector,
+                self._app.user_id,
+                self.team_filter,
+                self.mode,
+            ],
+            outputs=[
+                self.selector,
+                self.selector_choices,
+                self.group_selector,
+                self.team_filter,
+                self.mode,
+            ],
+            show_progress="hidden",
         )
         self.team_filter.change(
             self.load_files,
@@ -2577,11 +2594,30 @@ class FileSelector(BasePage):
             outputs=[self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
         )
 
+    def refresh_after_index(self, selected_files, selected_groups, user_id, team_filter="", current_mode="disabled"):
+        selector, selector_choices, group_selector, team_filter_update, mode_update = self.load_files(
+            selected_files,
+            selected_groups,
+            user_id,
+            team_filter,
+            current_mode,
+        )
+        next_mode = getattr(mode_update, "value", current_mode)
+        if next_mode == "disabled" and selector_choices:
+            mode_update = gr.update(value="select")
+        return (
+            selector,
+            selector_choices,
+            group_selector,
+            team_filter_update,
+            mode_update,
+        )
+
     def on_subscribe_public_events(self):
         self._app.subscribe_event(
             name=f"onFileIndex{self._index.id}Changed",
             definition={
-                "fn": self.load_files,
+                "fn": self.refresh_after_index,
                 "inputs": [self.selector, self.group_selector, self._app.user_id, self.team_filter, self.mode],
                 "outputs": [self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
                 "show_progress": "hidden",
