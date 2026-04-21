@@ -373,6 +373,13 @@ KH_INDEX_TYPES = [
     *GRAPHRAG_INDEX_TYPES,
 ]
 
+# Use stable local readers for Office files that otherwise may hit the
+# unstructured API path and fail in containerized setups.
+FILE_INDEX_PIPELINE_FILE_EXTRACTORS = {
+    ".docx": "kotaemon.loaders.DocxReader",
+    ".pptx": "kotaemon.loaders.DoclingReader",
+}
+
 GRAPHRAG_INDICES = [
     {
         "name": graph_type.split(".")[-1].replace("Index", "")
