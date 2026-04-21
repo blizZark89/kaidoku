@@ -41,6 +41,18 @@ def is_conv_name_valid(name):
     return "; ".join(errors)
 
 
+def localize_conversation_name(name: str) -> str:
+    if name.startswith("Untitled - "):
+        return name.replace("Untitled - ", "Unbenannt - ", 1)
+    if name == "Untitled":
+        return "Unbenannt"
+    if name.startswith("Summary of "):
+        return name.replace("Summary of ", "Zusammenfassung von ", 1)
+    if name.startswith("Summary: "):
+        return name.replace("Summary: ", "Zusammenfassung: ", 1)
+    return name
+
+
 class ConversationControl(BasePage):
     """Manage conversation"""
 
@@ -245,7 +257,7 @@ class ConversationControl(BasePage):
 
             results = session.exec(statement).all()
             for result in results:
-                options.append((result.name, result.id))
+                options.append((localize_conversation_name(result.name), result.id))
 
         return options
 

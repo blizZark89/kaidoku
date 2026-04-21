@@ -25,7 +25,7 @@ class BaseConversation(SQLModel):
         default_factory=lambda: uuid.uuid4().hex, primary_key=True, index=True
     )
     name: str = Field(
-        default_factory=lambda: "Untitled - {}".format(
+        default_factory=lambda: "Unbenannt - {}".format(
             datetime.datetime.now(get_localzone()).strftime("%Y-%m-%d %H:%M:%S")
         )
     )

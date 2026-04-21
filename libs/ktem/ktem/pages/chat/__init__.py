@@ -760,7 +760,7 @@ class ChatPage(BasePage):
             )
 
         onConvSelect = (
-            self.chat_control.conversation.select(
+            self.chat_control.conversation.change(
                 self.chat_control.select_conv,
                 inputs=[self.chat_control.conversation, self._app.user_id],
                 outputs=[
