@@ -25,9 +25,6 @@ services:
       # Falls es im Repo ein spezielles Dockerfile für "Full" gibt, hier den Pfad angeben:
       dockerfile: Dockerfile 
     container_name: kaidoku
-    volumes:
-      # Links Host-Pfad - Rechts Container-Pfad
-      - /app/sync-data:/app/sync-data
     restart: unless-stopped
     environment:
       - GRADIO_SERVER_NAME=0.0.0.0
@@ -38,6 +35,8 @@ services:
       - KH_FEATURE_USER_MANAGEMENT=True
     volumes:
       - ./kaidoku_app_data:/app/ktem_app_data
+      # für FileSync Links Host-Pfad - Rechts Container-Pfad
+      - /app/sync-data:/app/sync-data
     ports:
       - "7860:7860"
 ```
