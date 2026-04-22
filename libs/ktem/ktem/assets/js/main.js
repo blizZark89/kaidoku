@@ -11,14 +11,6 @@ function run() {
   version_node.style = "position: fixed; top: 10px; right: 10px;";
   main_parent.appendChild(version_node);
 
-  // add favicon
-  const favicon = document.createElement("link");
-  // set favicon attributes
-  favicon.rel = "icon";
-  favicon.type = "image/svg+xml";
-  favicon.href = "/favicon.ico";
-  document.head.appendChild(favicon);
-
   // setup conversation dropdown placeholder
   let conv_dropdown = document.querySelector("#conversation-dropdown input");
   conv_dropdown.placeholder = "Browse conversation";
