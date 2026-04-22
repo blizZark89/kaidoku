@@ -33,6 +33,7 @@ services:
       - GRADIO_SAMESITE="none"
       - KH_LOCALE=de
       - KH_FEATURE_USER_MANAGEMENT=True
+      - TZ=Europe/Berlin
     volumes:
       - ./kaidoku_app_data:/app/ktem_app_data
       # für FileSync Links Host-Pfad - Rechts Container-Pfad
