@@ -1,5 +1,8 @@
 from importlib.metadata import version
+import os
 from pathlib import Path
+import re
+from urllib.parse import quote
 
 import gradio as gr
 import requests
@@ -11,6 +14,7 @@ from theflow.settings import settings
 
 KH_DEMO_MODE = getattr(settings, "KH_DEMO_MODE", False)
 HF_SPACE_URL = config("HF_SPACE_URL", default="")
+BASE_PATH = os.environ.get("GR_FILE_ROOT_PATH", "")
 
 
 def get_remote_doc(url: str) -> str:
@@ -141,7 +145,27 @@ class HelpPage:
         if not path.exists():
             return ""
         with path.open(encoding="utf-8") as fi:
-            return fi.read()
+            content = fi.read()
+        return self._rewrite_local_image_paths(content)
+
+    def _rewrite_local_image_paths(self, content: str) -> str:
+        def resolve_doc_image(rel_path: str) -> str:
+            rel_path = rel_path.replace("\\", "/").strip()
+            abs_path = (self.doc_dir / rel_path).resolve()
+            quoted_path = quote(str(abs_path).replace("\\", "/"), safe="/:")
+            return f"{BASE_PATH}/file={quoted_path}"
+
+        content = re.sub(
+            r'(<img\b[^>]*\bsrc=")(images/[^"]+)(")',
+            lambda match: f'{match.group(1)}{resolve_doc_image(match.group(2))}{match.group(3)}',
+            content,
+        )
+        content = re.sub(
+            r'(!\[[^\]]*\]\()(images/[^)]+)(\))',
+            lambda match: f'{match.group(1)}{resolve_doc_image(match.group(2))}{match.group(3)}',
+            content,
+        )
+        return content
 
     def _build_quick_guide(self, user_id=None):
         guide_general = self.general_guide_md

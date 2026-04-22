@@ -20,6 +20,7 @@ demo.queue().launch(
     inbrowser=True,
     allowed_paths=[
         "libs/ktem/ktem/assets",
+        "docs/images",
         GRADIO_TEMP_DIR,
     ],
     share=KH_GRADIO_SHARE,
