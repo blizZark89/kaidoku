@@ -22,6 +22,35 @@ Die Anwendung laeuft lokal und kann ohne Cloud-Abhaengigkeit betrieben werden.
 - Antworten koennen auf eigenen Dokumenten basieren
 - Mehrere Reasoning-Ansaetze stehen zur Verfuegung, z. B. einfache QA oder Agentenlogik
 
+#### 1.1 Dateisammlung
+
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/1.1 Dateisammlung.PNG" alt="1.1 Dateisammlung" />
+    </td>
+    <td valign="top">
+
+- **"Alle durchsuchen"**
+  - durchsucht automatisch **alle verfuegbaren Dokumente** im aktuellen Suchbereich
+  - keine manuelle Auswahl von Dateien oder Gruppen noetig
+
+- **"In Dateien suchen"**
+  - durchsucht **nur die explizit ausgewaehlten einzelnen Dokumente**
+  - geeignet fuer gezielte Abfragen in bestimmten Dateien
+
+- **"In Dateigruppen suchen"**
+  - durchsucht **alle Dokumente innerhalb der ausgewaehlten Gruppen**
+  - sinnvoll fuer strukturierte, thematische Suchen
+
+- **Teamfilter ("Teams")**
+  - "Alle Teams" -> Suche ueber **alle fuer dich sichtbaren Inhalte**
+  - einzelnes Team -> Suche **nur innerhalb dieses Teams**
+
+    </td>
+  </tr>
+</table>
+
 Typischer Ablauf:
 1. Chat starten
 2. Dokumente oder Gruppen auswaehlen
