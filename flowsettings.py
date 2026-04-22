@@ -326,8 +326,13 @@ KH_VLM_ENDPOINT = "{0}/openai/deployments/{1}/chat/completions?api-version={2}".
 
 
 SETTINGS_APP: dict[str, dict] = {
-    "show_graphrag_collections": {
-        "name": "GraphRAG-Sammlungen im Dateien-Reiter anzeigen",
+    "show_graphrag_collection": {
+        "name": "GraphRAG Sammlung im Dateien-Reiter anzeigen",
+        "value": False,
+        "component": "checkbox",
+    },
+    "show_lightrag_collection": {
+        "name": "LightRAG Sammlung im Dateien-Reiter anzeigen",
         "value": False,
         "component": "checkbox",
     },
