@@ -1109,6 +1109,23 @@ class ChatPage(BasePage):
                     "show_progress": "hidden",
                 },
             )
+            self._app.subscribe_event(
+                name="onSignOut",
+                definition={
+                    "fn": self.clear_chat_surface,
+                    "outputs": [
+                        self.chat_panel.text_input,
+                        self.chat_panel.chatbot,
+                        self.followup_questions,
+                        self.info_panel,
+                        self.state_plot_panel,
+                        self.state_retrieval_history,
+                        self.state_plot_history,
+                        self.plot_panel,
+                    ],
+                    "show_progress": "hidden",
+                },
+            )
 
     def _on_app_created(self):
         if KH_DEMO_MODE:
