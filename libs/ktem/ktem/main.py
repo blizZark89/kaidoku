@@ -1,6 +1,7 @@
 import gradio as gr
 from decouple import config
 from ktem.app import BaseApp
+from ktem.authz import get_access_context
 from ktem.db.models import Settings, engine
 from ktem.filesync import FileSyncService
 from ktem.pages.chat import ChatPage
@@ -91,10 +92,17 @@ class App(BaseApp):
                     for index in self.index_manager.indices:
                         index_name_lower = index.name.lower()
                         graph_setting_key = None
+                        graph_roles_setting_key = None
                         if index_name_lower == "graphrag sammlung":
                             graph_setting_key = "application.show_graphrag_collection"
+                            graph_roles_setting_key = (
+                                "application.show_graphrag_collection_roles"
+                            )
                         elif index_name_lower == "lightrag sammlung":
                             graph_setting_key = "application.show_lightrag_collection"
+                            graph_roles_setting_key = (
+                                "application.show_lightrag_collection_roles"
+                            )
                         with gr.Tab(
                             index.name,
                             elem_id=f"{index.id}-tab",
@@ -107,6 +115,7 @@ class App(BaseApp):
                                 {
                                     "tab_key": f"{index.id}-tab",
                                     "setting_key": graph_setting_key,
+                                    "roles_setting_key": graph_roles_setting_key,
                                 }
                             )
 
@@ -154,14 +163,53 @@ class App(BaseApp):
                 if result:
                     settings_state = result.setting
 
+        actor_role = None
+        if self.f_user_management and user_id:
+            with Session(engine) as session:
+                actor = get_access_context(session, user_id)
+                if actor:
+                    if actor.is_admin:
+                        actor_role = "admin"
+                    elif actor.is_key_user:
+                        actor_role = "key_user"
+                    elif actor.is_user:
+                        actor_role = "user"
+
         return [
-            gr.update(visible=bool(settings_state.get(item["setting_key"], False)))
+            gr.update(
+                visible=self._is_graph_tab_visible(
+                    settings_state=settings_state,
+                    enabled_setting_key=item["setting_key"],
+                    roles_setting_key=item["roles_setting_key"],
+                    actor_role=actor_role,
+                )
+            )
             for item in self._graph_index_tabs
         ]
 
+    def _is_graph_tab_visible(
+        self,
+        settings_state,
+        enabled_setting_key: str,
+        roles_setting_key: str | None,
+        actor_role: str | None,
+    ) -> bool:
+        if not bool(settings_state.get(enabled_setting_key, False)):
+            return False
+
+        if not self.f_user_management:
+            return True
+
+        if not actor_role:
+            return False
+
+        allowed_roles = settings_state.get(roles_setting_key, []) if roles_setting_key else []
+        if not isinstance(allowed_roles, list):
+            return False
+        return actor_role in allowed_roles
+
     def on_subscribe_public_events(self):
         if self.f_user_management:
-            from ktem.authz import get_access_context
             from ktem.db.engine import engine
             from sqlmodel import Session
 

@@ -331,10 +331,30 @@ SETTINGS_APP: dict[str, dict] = {
         "value": False,
         "component": "checkbox",
     },
+    "show_graphrag_collection_roles": {
+        "name": "GraphRAG Sammlung fuer Rollen anzeigen",
+        "value": ["admin", "key_user", "user"],
+        "choices": [
+            ("Admin", "admin"),
+            ("Key User", "key_user"),
+            ("User", "user"),
+        ],
+        "component": "checkboxgroup",
+    },
     "show_lightrag_collection": {
         "name": "LightRAG Sammlung im Dateien-Reiter anzeigen",
         "value": False,
         "component": "checkbox",
+    },
+    "show_lightrag_collection_roles": {
+        "name": "LightRAG Sammlung fuer Rollen anzeigen",
+        "value": ["admin", "key_user", "user"],
+        "choices": [
+            ("Admin", "admin"),
+            ("Key User", "key_user"),
+            ("User", "user"),
+        ],
+        "component": "checkboxgroup",
     },
 }
 
