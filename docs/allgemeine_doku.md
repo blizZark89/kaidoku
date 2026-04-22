@@ -161,7 +161,18 @@ Die App bietet mehrere Hauptbereiche:
 - **Dateien** -> Dokumente und Gruppen verwalten
 - **Ressourcen** -> Modelle und Systeme konfigurieren
 - **Einstellungen** -> App- und Benutzerkonfiguration
-- **Hilfe** -> Unterstuetzung
+- **Hilfe** -> Unterstuetzung, Rollenhinweise und Admin-Informationen
+
+Im Bereich **Hilfe** gibt es aktuell drei aufklappbare Bereiche:
+
+- **Anleitung**
+  - zeigt die allgemeine Hilfe und zusaetzlich rollenspezifische Inhalte passend zum angemeldeten Benutzer
+- **Rollen**
+  - zeigt die Rollenbeschreibungen fuer `user`, `key_user` und `admin` gesammelt in einem eigenen Block
+- **Versionsverlauf**
+  - ist nur fuer `admin` sichtbar
+  - verweist auf die Release-Uebersicht auf GitHub:
+    `https://github.com/blizZark89/kaidoku/releases`
 
 ---
 
