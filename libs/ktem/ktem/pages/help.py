@@ -1,4 +1,3 @@
-from importlib.metadata import version
 import os
 from pathlib import Path
 import re
@@ -24,16 +23,6 @@ def get_remote_doc(url: str) -> str:
         return res.text
     except Exception as e:
         print(f"Failed to fetch document from {url}: {e}")
-        return ""
-
-
-def download_changelogs(release_url: str) -> str:
-    try:
-        res = requests.get(release_url).json()
-        changelogs = res.get("body", "")
-        return changelogs
-    except Exception as e:
-        print(f"Failed to fetch changelogs from {release_url}: {e}")
         return ""
 
 
@@ -86,6 +75,9 @@ class HelpPage:
         with gr.Accordion("Anleitung", open=True):
             self.quick_guide = gr.Markdown()
 
+        with gr.Accordion("Rollen", open=False):
+            self.roles_guide = gr.Markdown()
+
         if KH_DEMO_MODE:
             with gr.Accordion("Eigenen Space erstellen"):
                 gr.Markdown(
@@ -100,43 +92,45 @@ class HelpPage:
                     size="lg",
                 )
 
-        if self.app_version:
-            changelogs = ""
-            if (self.changelogs_cache_dir / f"{version}.md").exists():
-                with open(self.changelogs_cache_dir / f"{version}.md", "r") as fi:
-                    changelogs = fi.read()
-            else:
-                release_url_base = "https://api.github.com/repos/Cinnamon/kotaemon/releases"
-                changelogs = download_changelogs(
-                    release_url=f"{release_url_base}/tags/v{self.app_version}"
-                )
-                if not self.changelogs_cache_dir.exists():
-                    self.changelogs_cache_dir.mkdir(parents=True, exist_ok=True)
-                with open(self.changelogs_cache_dir / f"{self.app_version}.md", "w") as fi:
-                    fi.write(changelogs)
-
-            if changelogs:
-                with gr.Accordion(f"Änderungsprotokoll (v{self.app_version})"):
-                    gr.Markdown(changelogs)
+        with gr.Accordion(
+            "Versionsverlauf", open=False, visible=False
+        ) as self.version_history_accordion:
+            gr.Markdown(
+                "Detallierte Informationen zu den einzelnen Updates und "
+                "Änderungen sin auf GIthub dokumentiert. "
+                "Link dazu: https://github.com/blizZark89/kaidoku/releases"
+            )
 
         if self._app.f_user_management:
             self._app.app.load(
-                self._build_quick_guide,
+                self._build_help_content,
                 inputs=[self._app.user_id],
-                outputs=[self.quick_guide],
+                outputs=[
+                    self.quick_guide,
+                    self.roles_guide,
+                    self.version_history_accordion,
+                ],
                 show_progress="hidden",
             )
             self._app.user_id.change(
-                self._build_quick_guide,
+                self._build_help_content,
                 inputs=[self._app.user_id],
-                outputs=[self.quick_guide],
+                outputs=[
+                    self.quick_guide,
+                    self.roles_guide,
+                    self.version_history_accordion,
+                ],
                 show_progress="hidden",
             )
         else:
             self._app.app.load(
-                self._build_quick_guide,
+                self._build_help_content,
                 inputs=[],
-                outputs=[self.quick_guide],
+                outputs=[
+                    self.quick_guide,
+                    self.roles_guide,
+                    self.version_history_accordion,
+                ],
                 show_progress="hidden",
             )
 
@@ -167,16 +161,20 @@ class HelpPage:
         )
         return content
 
-    def _build_quick_guide(self, user_id=None):
+    def _build_help_content(self, user_id=None):
         guide_general = self.general_guide_md
         guide_user = self.user_guide_md
         guide_key_user = self.key_user_guide_md
         guide_admin = self.admin_guide_md
+        roles_guide = "\n\n---\n\n".join(
+            section for section in [guide_user, guide_key_user, guide_admin] if section
+        )
 
         if not self._app.f_user_management:
-            return "\n\n---\n\n".join(
+            quick_guide = "\n\n---\n\n".join(
                 section for section in [guide_general, guide_user] if section
             )
+            return quick_guide, roles_guide, gr.update(visible=False)
 
         role = "user"
         with Session(engine) as session:
@@ -188,7 +186,7 @@ class HelpPage:
                     role = "key_user"
 
         if role == "admin":
-            return "\n\n---\n\n".join(
+            quick_guide = "\n\n---\n\n".join(
                 section
                 for section in [
                     guide_general,
@@ -198,12 +196,15 @@ class HelpPage:
                 ]
                 if section
             )
+            return quick_guide, roles_guide, gr.update(visible=True)
 
         if role == "key_user":
-            return "\n\n---\n\n".join(
+            quick_guide = "\n\n---\n\n".join(
                 section for section in [guide_general, guide_user, guide_key_user] if section
             )
+            return quick_guide, roles_guide, gr.update(visible=False)
 
-        return "\n\n---\n\n".join(
+        quick_guide = "\n\n---\n\n".join(
             section for section in [guide_general, guide_user] if section
         )
+        return quick_guide, roles_guide, gr.update(visible=False)
