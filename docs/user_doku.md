@@ -1,7 +1,4 @@
-# Anleitung: Rolle User
-
-## Überblick
-Als `user` nutzt du die Plattform für deine tägliche Arbeit, ohne Verwaltungsaufgaben.
+# Anleitung: Allgemeiner Ueberblick
 
 ## Was ist Kaidoku?
 
@@ -23,7 +20,7 @@ Die Anwendung laeuft lokal und kann ohne Cloud-Abhaengigkeit betrieben werden.
 
 - Nutzer koennen normale Chats mit KI fuehren
 - Antworten koennen auf eigenen Dokumenten basieren
-- Mehrere Reasoning-Ansaetze stehen zur Verfuegung (z. B. einfache QA, Agentenlogik)
+- Mehrere Reasoning-Ansaetze stehen zur Verfuegung, z. B. einfache QA oder Agentenlogik
 
 Typischer Ablauf:
 1. Chat starten
@@ -74,18 +71,18 @@ Im Chat kann gezielt gesucht werden:
   - Generierung (LLM-Antwort)
 
 Zusaetzlich moeglich:
-- Reranking (bessere Trefferreihenfolge)
+- Reranking fuer bessere Trefferreihenfolge
 - verschiedene Embedding-Modelle
 
 ---
 
-### 5. Reasoning & KI-Pipelines
+### 5. Reasoning und KI-Pipelines
 
 Mehrere Verarbeitungsstrategien sind integriert:
 
 - klassische Frage-Antwort
 - zerlegte Fragen (Decomposition)
-- Agenten-basierte Ansaetze (z. B. ReAct, ReWOO)
+- agenten-basierte Ansaetze, z. B. ReAct oder ReWOO
 
 Dadurch koennen:
 - komplexe Fragen beantwortet werden
@@ -97,7 +94,7 @@ Dadurch koennen:
 
 Die App kann verschiedene KI-Komponenten verwalten:
 
-- LLMs (z. B. OpenAI, Ollama, Gemini, Claude)
+- LLMs, z. B. OpenAI, Ollama, Gemini, Claude
 - Embedding-Modelle
 - Reranking-Modelle
 - MCP-Server
@@ -139,7 +136,7 @@ Die App bietet mehrere Hauptbereiche:
 
 ---
 
-### 9. Teams & Sichtbarkeit (konzeptionell)
+### 9. Teams und Sichtbarkeit (konzeptionell)
 
 - Inhalte koennen bestimmten Gruppen zugeordnet werden
 - Sichtbarkeit von Dokumenten wird darueber gesteuert
@@ -150,7 +147,7 @@ Zusaetzlich:
 
 ---
 
-### 10. Speicherung & Betrieb
+### 10. Speicherung und Betrieb
 
 - lokale Datenhaltung (SQLite)
 - Vektor-Datenbanken (Chroma)
@@ -168,7 +165,7 @@ Alle Daten liegen im lokalen App-Verzeichnis:
 - deutsche Oberflaeche
 - modular erweiterbar
 - unterstuetzt viele KI-Anbieter
-- robuste Dokumentverarbeitung (auch Office-Dateien)
+- robuste Dokumentverarbeitung, auch fuer Office-Dateien
 
 ---
 
@@ -183,35 +180,50 @@ Kaidoku ist eine lokale Wissensplattform mit KI-Unterstuetzung:
 
 -> Ziel: internes Wissen effizient nutzbar machen
 
+---
+
+## Rolle User
+
+## Ueberblick
+
+Als `user` nutzt du die Plattform fuer deine taegliche Arbeit, ohne Verwaltungsaufgaben.
+
 ## Was du typischerweise tust
 
 ### Arbeiten mit der Anwendung
-- Führe Chats
+
+- Fuehre Chats
 - Nutze vorhandene Dokumente
 - Suche in Dateien und Dateigruppen
 
 ### Dokumente nutzen
+
 - Greife auf Inhalte deines Teams zu
 - Verwende dein Standardteam als Filter im Chat
 
 ### Optional: Dokumente hochladen
-- Nur möglich, wenn dir Upload-Rechte gegeben wurden
+
+- Nur moeglich, wenn dir Upload-Rechte gegeben wurden
 
 ### Eigene Einstellungen
-- Ändere dein Passwort
-- Wähle dein Standardteam
+
+- Aendere dein Passwort
+- Waehle dein Standardteam
 
 ## Was du NICHT tun kannst
+
 - Keine Benutzer verwalten
 - Keine Teams verwalten
-- Keine Systemeinstellungen ändern
+- Keine Systemeinstellungen aendern
 - Kein FileSync
 
 ## Wichtige Hinweise
-- Du musst mindestens einem Team angehören
+
+- Du musst mindestens einem Team angehoeren
 - Ohne Upload-Recht kannst du nur lesen
 
 ## Best Practice
+
 - Nutze dein Standardteam sinnvoll
 - Lade nur relevante Dokumente hoch
-- Halte deine Inhalte übersichtlich
+- Halte deine Inhalte uebersichtlich
