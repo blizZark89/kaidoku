@@ -49,6 +49,7 @@ class HelpPage:
         self.app_version = app_version
         self.changelogs_cache_dir = Path(changelogs_cache_dir)
         self.changelogs_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.general_guide_md = self._load_local_doc("allgemeine_doku.md")
         self.user_guide_md = self._load_local_doc("user_doku.md")
         self.key_user_guide_md = self._load_local_doc("keyuser_doku.md")
         self.admin_guide_md = self._load_local_doc("admin_doku.md")
@@ -143,12 +144,15 @@ class HelpPage:
             return fi.read()
 
     def _build_quick_guide(self, user_id=None):
+        guide_general = self.general_guide_md
         guide_user = self.user_guide_md
         guide_key_user = self.key_user_guide_md
         guide_admin = self.admin_guide_md
 
         if not self._app.f_user_management:
-            return guide_user
+            return "\n\n---\n\n".join(
+                section for section in [guide_general, guide_user] if section
+            )
 
         role = "user"
         with Session(engine) as session:
@@ -161,12 +165,21 @@ class HelpPage:
 
         if role == "admin":
             return "\n\n---\n\n".join(
-                section for section in [guide_user, guide_key_user, guide_admin] if section
+                section
+                for section in [
+                    guide_general,
+                    guide_user,
+                    guide_key_user,
+                    guide_admin,
+                ]
+                if section
             )
 
         if role == "key_user":
             return "\n\n---\n\n".join(
-                section for section in [guide_user, guide_key_user] if section
+                section for section in [guide_general, guide_user, guide_key_user] if section
             )
 
-        return guide_user
+        return "\n\n---\n\n".join(
+            section for section in [guide_general, guide_user] if section
+        )
