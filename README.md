@@ -27,13 +27,13 @@ services:
     container_name: kaidoku
     restart: unless-stopped
     environment:
+      - TZ=Europe/Berlin
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860
       - GRADIO_ALLOW_CORS=true
       - GRADIO_SAMESITE="none"
       - KH_LOCALE=de
       - KH_FEATURE_USER_MANAGEMENT=True
-      - TZ=Europe/Berlin
     volumes:
       - ./kaidoku_app_data:/app/ktem_app_data
       # für FileSync Links Host-Pfad - Rechts Container-Pfad
