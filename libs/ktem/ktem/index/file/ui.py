@@ -2132,10 +2132,10 @@ class FileIndexPage(BasePage):
                         }
                     ]
                 )
-            if scope_ids is not None:
+            if scope_ids is not None and not self._app.f_user_management:
                 statement = statement.where(FileGroup.user.in_(scope_ids))
             if self._index.config.get("private", False):
-                if scope_ids is None:
+                if scope_ids is None and not self._app.f_user_management:
                     statement = statement.where(FileGroup.user == user_id)
 
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
@@ -2218,7 +2218,11 @@ class FileIndexPage(BasePage):
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
             team_ref_map = _team_ref_map(session)
-            if scope_ids is not None and current_group.user not in scope_ids:
+            if (
+                scope_ids is not None
+                and not self._app.f_user_management
+                and current_group.user not in scope_ids
+            ):
                 raise gr.Error("Keine Berechtigung für diese Gruppe")
             if actor and not _group_visible_to_actor(
                 current_group, actor, visible_global_team_ids, scope_ids, team_ref_map
@@ -2641,10 +2645,10 @@ class FileSelector(BasePage):
 
             FileGroup = self._index._resources["FileGroup"]
             statement = select(FileGroup)
-            if scope_ids is not None:
+            if scope_ids is not None and not self._app.f_user_management:
                 statement = statement.where(FileGroup.user.in_(scope_ids))
             if self._index.config.get("private", False):
-                if scope_ids is None:
+                if scope_ids is None and not self._app.f_user_management:
                     statement = statement.where(FileGroup.user == user_id)
             results = session.execute(statement).all()
             for result in results:
