@@ -138,18 +138,34 @@ Das erlaubt flexible Anpassung an:
 
 ### 7. FileSync (automatischer Import)
 
-- Ueberwacht einen lokalen Ordner
-- Importiert neue oder geaenderte Dateien automatisch
-- Entfernt geloeschte Dateien auch aus dem System
+- Ueberwacht definierte Ordner und sorgt dafuer, dass alle Dateien automatisch aktuell im System sind
 
-Funktionen:
-- regelmaessiges Scannen
-- automatische Zuordnung
-- automatische Gruppenbildung
-- Fehlererkennung bei defekten Dateien
+Wie Dateiunterschiede erkannt werden:
+- Jede Datei wird beim Einlesen analysiert und mit einem Hashwert versehen
+- Bei jedem weiteren Scan wird dieser Hash erneut berechnet
+- Vergleich der Hashwerte: Gleich -> Datei ist unveraendert -> keine Aktion
+- Vergleich der Hashwerte: Unterschiedlich -> Inhalt hat sich geaendert -> Datei wird neu importiert und aktualisiert
+- Dadurch werden echte Inhaltsaenderungen erkannt, nicht nur z. B. ein geaendertes Aenderungsdatum
 
-Ziel:
--> Dokumente ohne manuelles Hochladen aktuell halten
+Was passiert bei Aenderungen konkret:
+- Geaenderte Dateien werden neu indexiert, damit Such- und Chatfunktionen den aktuellen Stand nutzen
+- Alte Versionen werden ersetzt oder intern aktualisiert, je nach Systemlogik
+- Zugehoerige Metadaten wie `source_ids` bleiben konsistent oder werden aktualisiert
+
+Weitere Faelle:
+- Neue Datei: wird erkannt, importiert und einer Gruppe zugeordnet
+- Geloeschte Datei: wird auch im System entfernt
+- Defekte Datei: wird erkannt und gemeldet, kein Import
+
+Zusaetzliche Logik im Hintergrund:
+- FileSync merkt sich den zuletzt bekannten Hash pro Datei
+- FileSync merkt sich, ob eine Datei bereits importiert wurde
+- FileSync merkt sich die Zuordnung Ordner -> Dateigruppe
+- Dadurch werden unnoetige Neuimporte vermieden und nur echte Aenderungen verarbeitet
+
+Kurz gesagt:
+- FileSync erkennt praezise Inhaltsaenderungen auf Byte-Ebene
+- Aktualisiert wird nur das, was sich wirklich geaendert hat
 
 ---
 
