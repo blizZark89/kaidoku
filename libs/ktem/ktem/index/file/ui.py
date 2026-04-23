@@ -86,37 +86,58 @@ function(file_list) {
 )
 
 
-def _normalize_source_team_ids(raw_value) -> list[str]:
+def _team_ref_map(session: Session) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for team in list_teams(session):
+        team_id = str(getattr(team, "id", "") or "").strip()
+        team_name = str(getattr(team, "name", "") or "").strip()
+        if team_id:
+            mapping[team_id] = team_id
+        if team_name:
+            mapping[team_name] = team_id or team_name
+    return mapping
+
+
+def _normalize_source_team_ids(raw_value, team_ref_map=None) -> list[str]:
     if raw_value is None:
         return []
+    normalized_ids: list[str] = []
+
+    def append_value(value):
+        value = str(value).strip()
+        if not value:
+            return
+        canonical_value = team_ref_map.get(value, value) if team_ref_map else value
+        if canonical_value and canonical_value not in normalized_ids:
+            normalized_ids.append(canonical_value)
+
     if isinstance(raw_value, str):
-        return parse_team_ids(raw_value)
+        for team_id in parse_team_ids(raw_value):
+            append_value(team_id)
+        return normalized_ids
     if isinstance(raw_value, (list, tuple, set)):
-        team_ids: list[str] = []
         for team_id in raw_value:
-            value = str(team_id).strip()
-            if value and value not in team_ids:
-                team_ids.append(value)
-        return team_ids
+            append_value(team_id)
+        return normalized_ids
     return []
 
 
-def _source_team_ids(source) -> list[str]:
+def _source_team_ids(source, team_ref_map=None) -> list[str]:
     note = getattr(source, "note", None) or {}
-    return _normalize_source_team_ids(note.get("team_ids"))
+    return _normalize_source_team_ids(note.get("team_ids"), team_ref_map)
 
 
-def _group_team_ids(group) -> list[str]:
+def _group_team_ids(group, team_ref_map=None) -> list[str]:
     data = getattr(group, "data", None) or {}
-    return _normalize_source_team_ids(data.get("team_ids"))
+    return _normalize_source_team_ids(data.get("team_ids"), team_ref_map)
 
 
-def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None) -> bool:
+def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None) -> bool:
     if actor is None:
         return True
     if actor.is_admin:
         return True
-    source_team_ids = set(_source_team_ids(source))
+    source_team_ids = set(_source_team_ids(source, team_ref_map))
     global_team_ids = set(global_team_ids or [])
     if source_team_ids and source_team_ids.intersection(global_team_ids):
         return True
@@ -130,12 +151,12 @@ def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids
     return bool(actor_team_ids.intersection(source_team_ids))
 
 
-def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=None) -> bool:
+def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None) -> bool:
     if actor is None:
         return True
     if actor.is_admin:
         return True
-    group_team_ids = set(_group_team_ids(group))
+    group_team_ids = set(_group_team_ids(group, team_ref_map))
     global_team_ids = set(global_team_ids or [])
     if group_team_ids and group_team_ids.intersection(global_team_ids):
         return True
@@ -158,11 +179,11 @@ def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
     return {team_id for team_id in actor.team_ids if str(team_id).strip()}
 
 
-def _source_matches_search_team(source, actor, effective_team_ids) -> bool:
+def _source_matches_search_team(source, actor, effective_team_ids, team_ref_map=None) -> bool:
     if effective_team_ids is None:
         return True
 
-    source_team_ids = set(_source_team_ids(source))
+    source_team_ids = set(_source_team_ids(source, team_ref_map))
     if not source_team_ids:
         return False
 
@@ -441,7 +462,8 @@ class FileIndexPage(BasePage):
                 )
 
             scope_ids = self._scope_user_ids(session, user_id)
-            if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids):
+            team_ref_map = _team_ref_map(session)
+            if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids, team_ref_map):
                 return (
                     gr.update(choices=[], value=[], visible=False),
                     gr.update(visible=False),
@@ -458,7 +480,7 @@ class FileIndexPage(BasePage):
                     if team_id in team_map
                 ]
             selected = [
-                team_id for team_id in _source_team_ids(source) if any(team_id == tid for _, tid in choices)
+                team_id for team_id in _source_team_ids(source, team_ref_map) if any(team_id == tid for _, tid in choices)
             ]
             return (
                 gr.update(choices=choices, value=selected, visible=True),
@@ -482,7 +504,8 @@ class FileIndexPage(BasePage):
                 return gr.update()
 
             scope_ids = self._scope_user_ids(session, user_id)
-            if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids):
+            team_ref_map = _team_ref_map(session)
+            if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids, team_ref_map):
                 gr.Warning("Keine Berechtigung für diese Datei")
                 return gr.update()
 
@@ -553,10 +576,11 @@ class FileIndexPage(BasePage):
             statement = statement.where(Source.user == user_id)
 
         global_team_ids = globally_visible_team_ids(session) if actor else set()
+        team_ref_map = _team_ref_map(session)
         for row in session.execute(statement).all():
             source = row[0]
             if actor and not _source_visible_to_actor(
-                source, actor, global_team_ids, scope_ids
+                source, actor, global_team_ids, scope_ids, team_ref_map
             ):
                 continue
             visible_source_ids.add(source.id)
@@ -962,7 +986,7 @@ class FileIndexPage(BasePage):
                 if scope_ids is not None and source[0].user not in scope_ids:
                     gr.Warning("Keine Berechtigung für diese Datei")
                     return None, self.selected_panel_false
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids, _team_ref_map(session)):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return None, self.selected_panel_false
                 file_name = source[0].name
@@ -1011,7 +1035,7 @@ class FileIndexPage(BasePage):
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids, _team_ref_map(session)):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
@@ -1060,7 +1084,7 @@ class FileIndexPage(BasePage):
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
                     )
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids):
+                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids, _team_ref_map(session)):
                     gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
                     return is_zipped_state, gr.DownloadButton(
                         label="Download", value=None
@@ -2007,13 +2031,14 @@ class FileIndexPage(BasePage):
                 statement = statement.where(Source.name.ilike(f"%{name_pattern}%"))
 
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            team_ref_map = _team_ref_map(session)
             file_id_to_groups: dict[str, list[str]] = {}
             for row in session.execute(select(FileGroup)).all():
                 group = row[0]
                 if scope_ids is not None and getattr(group, "user", None) not in scope_ids:
                     continue
                 if actor and not _group_visible_to_actor(
-                    group, actor, visible_global_team_ids, scope_ids
+                    group, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     continue
                 for file_id in (group.data or {}).get("files", []):
@@ -2025,7 +2050,7 @@ class FileIndexPage(BasePage):
             for each in session.execute(statement).all():
                 source = each[0]
                 if self._app.f_user_management and not _source_visible_to_actor(
-                    source, actor, visible_global_team_ids, scope_ids
+                    source, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     continue
                 group_names = sorted(file_id_to_groups.get(source.id, []))
@@ -2115,6 +2140,7 @@ class FileIndexPage(BasePage):
 
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            team_ref_map = _team_ref_map(session)
             team_map = {team.id: team.name for team in list_teams(session)} if self._app.f_user_management else {}
             visible_source_ids = None
             if self._app.f_user_management:
@@ -2124,7 +2150,7 @@ class FileIndexPage(BasePage):
             for each in session.execute(statement).all():
                 group = each[0]
                 if actor and not _group_visible_to_actor(
-                    group, actor, visible_global_team_ids, scope_ids
+                    group, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     continue
                 group_files = [
@@ -2132,7 +2158,7 @@ class FileIndexPage(BasePage):
                     for file_id in group.data.get("files", [])
                     if visible_source_ids is None or file_id in visible_source_ids
                 ]
-                group_team_ids = _group_team_ids(group)
+                group_team_ids = _group_team_ids(group, team_ref_map)
                 results.append(
                     {
                         "id": group.id,
@@ -2191,10 +2217,11 @@ class FileIndexPage(BasePage):
             scope_ids = self._scope_user_ids(session, user_id)
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            team_ref_map = _team_ref_map(session)
             if scope_ids is not None and current_group.user not in scope_ids:
                 raise gr.Error("Keine Berechtigung für diese Gruppe")
             if actor and not _group_visible_to_actor(
-                current_group, actor, visible_global_team_ids, scope_ids
+                current_group, actor, visible_global_team_ids, scope_ids, team_ref_map
             ):
                 raise gr.Error("Keine Berechtigung für diese Gruppe")
             visible_source_ids, _, _ = self._visible_source_ids_for_actor(session, user_id)
@@ -2220,6 +2247,7 @@ class FileIndexPage(BasePage):
                 raise gr.Error("Keine Berechtigung")
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            team_ref_map = _team_ref_map(session)
             visible_source_ids, _, _ = self._visible_source_ids_for_actor(session, user_id)
             sanitized_group_files = [
                 file_id
@@ -2244,7 +2272,7 @@ class FileIndexPage(BasePage):
                 ):
                     raise gr.Error("Keine Berechtigung")
                 if actor and not _group_visible_to_actor(
-                    current_group, actor, visible_global_team_ids, scope_ids
+                    current_group, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     raise gr.Error("Keine Berechtigung")
                 current_group.name = group_name
@@ -2290,10 +2318,11 @@ class FileIndexPage(BasePage):
                 scope_ids = self._scope_user_ids(session, user_id)
                 actor = get_access_context(session, user_id) if self._app.f_user_management else None
                 visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+                team_ref_map = _team_ref_map(session)
                 if scope_ids is not None and item.user not in scope_ids:
                     raise gr.Error("Keine Berechtigung")
                 if actor and not _group_visible_to_actor(
-                    item, actor, visible_global_team_ids, scope_ids
+                    item, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     raise gr.Error("Keine Berechtigung")
                 group_name = item.name
@@ -2516,11 +2545,12 @@ class FileSelector(BasePage):
             if self._app.f_user_management:
                 effective_team_ids = _effective_search_team_ids(actor, team_filter)
                 visible_global_team_ids = globally_visible_team_ids(session)
+                team_ref_map = _team_ref_map(session)
                 for result in results:
                     source = result[0]
-                    if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids):
+                    if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map):
                         continue
-                    if not _source_matches_search_team(source, actor, effective_team_ids):
+                    if not _source_matches_search_team(source, actor, effective_team_ids, team_ref_map):
                         continue
                     file_ids.append(source.id)
             else:
@@ -2590,19 +2620,20 @@ class FileSelector(BasePage):
             results = session.execute(statement).all()
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
             effective_team_ids = _effective_search_team_ids(actor, team_filter)
+            team_ref_map = _team_ref_map(session)
             visible_sources = []
             for result in results:
                 source = result[0]
-                if actor and not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids):
+                if actor and not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map):
                     continue
                 visible_sources.append(source)
 
             for source in visible_sources:
                 if self._app.f_user_management:
-                    if not _source_matches_search_team(source, actor, effective_team_ids):
+                    if not _source_matches_search_team(source, actor, effective_team_ids, team_ref_map):
                         continue
                 else:
-                    source_team_ids = _source_team_ids(source)
+                    source_team_ids = _source_team_ids(source, team_ref_map)
                     if team_filter and team_filter not in source_team_ids:
                         continue
                 group_available_ids.append(source.id)
@@ -2619,7 +2650,7 @@ class FileSelector(BasePage):
             for result in results:
                 item = result[0]
                 if actor and not _group_visible_to_actor(
-                    item, actor, visible_global_team_ids, scope_ids
+                    item, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     continue
                 raw_group_files = [
