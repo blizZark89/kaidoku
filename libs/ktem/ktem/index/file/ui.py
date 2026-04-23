@@ -147,6 +147,28 @@ def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=N
     return bool(actor_team_ids.intersection(group_team_ids))
 
 
+def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
+    if actor is None or actor.is_admin:
+        return None
+
+    normalized_team_filter = str(team_filter or "").strip()
+    if normalized_team_filter:
+        return {normalized_team_filter}
+
+    return {team_id for team_id in actor.team_ids if str(team_id).strip()}
+
+
+def _source_matches_search_team(source, actor, effective_team_ids) -> bool:
+    if actor is None or actor.is_admin or effective_team_ids is None:
+        return True
+
+    source_team_ids = set(_source_team_ids(source))
+    if not source_team_ids:
+        return False
+
+    return bool(source_team_ids.intersection(effective_team_ids))
+
+
 def _is_filesync_group_name(name: str) -> bool:
     return bool(name) and str(name).startswith(FILESYNC_GROUP_PREFIX)
 
@@ -2461,20 +2483,13 @@ class FileSelector(BasePage):
                     )
             results = session.execute(statement).all()
             if self._app.f_user_management:
+                effective_team_ids = _effective_search_team_ids(actor, team_filter)
                 visible_global_team_ids = globally_visible_team_ids(session)
                 for result in results:
                     source = result[0]
                     if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids):
                         continue
-                    source_team_ids = _source_team_ids(source)
-                    has_global_team = bool(set(source_team_ids).intersection(visible_global_team_ids))
-                    if source_team_ids:
-                        if team_filter:
-                            if team_filter not in source_team_ids:
-                                continue
-                        elif not has_global_team:
-                            continue
-                    elif team_filter:
+                    if not _source_matches_search_team(source, actor, effective_team_ids):
                         continue
                     file_ids.append(source.id)
             else:
@@ -2526,9 +2541,7 @@ class FileSelector(BasePage):
                 if actor.is_admin:
                     visible_team_ids = [team.id for team in visible_teams]
                 else:
-                    visible_team_ids = list(dict.fromkeys(list(actor.team_ids) + [
-                        team.id for team in visible_teams if bool(getattr(team, "is_global", False))
-                    ]))
+                    visible_team_ids = list(dict.fromkeys(list(actor.team_ids)))
                 for team_id in visible_team_ids:
                     team_filter_choices.append((visible_team_map.get(team_id, team_id), team_id))
             if self._index.config.get("private", False):
@@ -2543,6 +2556,7 @@ class FileSelector(BasePage):
 
             results = session.execute(statement).all()
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
+            effective_team_ids = _effective_search_team_ids(actor, team_filter)
             visible_sources = []
             for result in results:
                 source = result[0]
@@ -2551,19 +2565,13 @@ class FileSelector(BasePage):
                 visible_sources.append(source)
 
             for source in visible_sources:
-                source_team_ids = _source_team_ids(source)
-                has_global_team = bool(set(source_team_ids).intersection(visible_global_team_ids))
                 if self._app.f_user_management:
-                    if source_team_ids:
-                        if team_filter:
-                            if team_filter not in source_team_ids:
-                                continue
-                        elif not has_global_team:
-                            continue
-                    elif team_filter:
+                    if not _source_matches_search_team(source, actor, effective_team_ids):
                         continue
-                elif team_filter and team_filter not in source_team_ids:
-                    continue
+                else:
+                    source_team_ids = _source_team_ids(source)
+                    if team_filter and team_filter not in source_team_ids:
+                        continue
                 group_available_ids.append(source.id)
             group_available_ids_set = set(group_available_ids)
 
@@ -2614,12 +2622,6 @@ class FileSelector(BasePage):
 
         valid_team_ids = {value for _, value in team_filter_choices}
         current_team = team_filter if team_filter in valid_team_ids else ""
-        if not current_team and actor and self._app.f_user_management:
-            default_team_id = getattr(actor.access, "default_team_id", None)
-            if default_team_id in valid_team_ids:
-                current_team = default_team_id
-                if resolved_mode == "disabled":
-                    resolved_mode = "all"
         return (
             gr.update(value=selected_files, choices=options),
             options,
