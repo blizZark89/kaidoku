@@ -166,14 +166,12 @@ class HelpPage:
         guide_user = self.user_guide_md
         guide_key_user = self.key_user_guide_md
         guide_admin = self.admin_guide_md
+        quick_guide = guide_general
         roles_guide = "\n\n---\n\n".join(
             section for section in [guide_user, guide_key_user, guide_admin] if section
         )
 
         if not self._app.f_user_management:
-            quick_guide = "\n\n---\n\n".join(
-                section for section in [guide_general, guide_user] if section
-            )
             return quick_guide, roles_guide, gr.update(visible=False)
 
         role = "user"
@@ -186,25 +184,9 @@ class HelpPage:
                     role = "key_user"
 
         if role == "admin":
-            quick_guide = "\n\n---\n\n".join(
-                section
-                for section in [
-                    guide_general,
-                    guide_user,
-                    guide_key_user,
-                    guide_admin,
-                ]
-                if section
-            )
             return quick_guide, roles_guide, gr.update(visible=True)
 
         if role == "key_user":
-            quick_guide = "\n\n---\n\n".join(
-                section for section in [guide_general, guide_user, guide_key_user] if section
-            )
             return quick_guide, roles_guide, gr.update(visible=False)
 
-        quick_guide = "\n\n---\n\n".join(
-            section for section in [guide_general, guide_user] if section
-        )
         return quick_guide, roles_guide, gr.update(visible=False)
