@@ -4,7 +4,7 @@ import gradio as gr
 from ktem.app import BasePage
 from ktem.components import reasonings
 from ktem.authz import get_access_context
-from ktem.db.models import Settings, User, engine
+from ktem.db.models import Settings, Team, User, engine
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -211,6 +211,16 @@ class SettingsPage(BasePage):
             self._app.subscribe_event(
                 name="onSignIn",
                 definition={
+                    "fn": self._get_current_team_label,
+                    "inputs": self._user_id,
+                    "outputs": [self.current_team],
+                    "show_progress": "hidden",
+                },
+            )
+
+            self._app.subscribe_event(
+                name="onSignIn",
+                definition={
                     "fn": self._advanced_settings_tab_updates,
                     "inputs": self._user_id,
                     "outputs": [
@@ -267,12 +277,37 @@ class SettingsPage(BasePage):
                     return name + result[0].username
         return name + "___"
 
+    def _get_current_team_label(self, user_id):
+        name = "Aktuelles Team: "
+        if not user_id:
+            return name + "___"
+
+        with Session(engine) as session:
+            access = get_access_context(session, user_id)
+            if not access:
+                return name + "___"
+
+            assigned_team_ids = access.team_ids
+            if not assigned_team_ids:
+                return name + "-"
+
+            teams = session.exec(select(Team).where(Team.id.in_(assigned_team_ids))).all()
+            team_name_map = {team.id: team.name for team in teams}
+            team_names = [team_name_map.get(team_id, team_id) for team_id in assigned_team_ids]
+            return name + ", ".join(team_names)
+
     def on_register_events(self):
         if self._app.f_user_management:
             self._app.user_id.change(
                 self._get_current_username_label,
                 inputs=[self._user_id],
                 outputs=[self.current_name],
+                show_progress="hidden",
+            )
+            self._app.user_id.change(
+                self._get_current_team_label,
+                inputs=[self._user_id],
+                outputs=[self.current_team],
                 show_progress="hidden",
             )
             self._app.user_id.change(
@@ -310,7 +345,7 @@ class SettingsPage(BasePage):
             inputs=[self._components["reasoning.use"]],
             outputs=list(self._reasoning_mode.values()),
             show_progress="hidden",
-        )
+            )
         if self._app.f_user_management and not KH_SSO_ENABLED:
             self.password_change_btn.click(
                 self.change_password,
@@ -323,11 +358,12 @@ class SettingsPage(BasePage):
                 show_progress="hidden",
             )
             onSignOutClick = self.signout.click(
-                lambda: (None, "Aktueller Benutzer: ___", "", ""),
+                lambda: (None, "Aktueller Benutzer: ___", "Aktuelles Team: ___", "", ""),
                 inputs=[],
                 outputs=[
                     self._user_id,
                     self.current_name,
+                    self.current_team,
                     self.password_change,
                     self.password_change_confirm,
                 ],
@@ -408,6 +444,7 @@ class SettingsPage(BasePage):
     def user_tab(self):
         # user management
         self.current_name = gr.Markdown("Aktueller Benutzer: ___")
+        self.current_team = gr.Markdown("Aktuelles Team: ___")
 
         if KH_SSO_ENABLED:
             import gradiologin as grlogin
