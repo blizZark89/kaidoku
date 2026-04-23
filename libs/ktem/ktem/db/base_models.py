@@ -112,6 +112,7 @@ class BaseTeam(SQLModel):
     )
     name: str = Field(unique=True)
     is_global: bool = Field(default=False)
+    owner_user_id: Optional[str] = Field(default=None, index=True)
 
 
 class BaseUserAccess(SQLModel):

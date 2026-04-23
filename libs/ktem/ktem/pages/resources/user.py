@@ -672,17 +672,24 @@ class UserManagement(BasePage):
             if _team_table_has_name_lower(session):
                 session.exec(
                     text(
-                        "INSERT INTO team (id, name, name_lower, is_global) VALUES (:id, :name, :name_lower, :is_global)"
+                        "INSERT INTO team (id, name, name_lower, is_global, owner_user_id) VALUES (:id, :name, :name_lower, :is_global, :owner_user_id)"
                     ).bindparams(
                         id=uuid.uuid4().hex,
                         name=team_name,
                         name_lower=team_name.lower(),
                         is_global=False,
+                        owner_user_id=actor.user.id,
                     )
                 )
                 session.commit()
             else:
-                session.add(Team(name=team_name, is_global=False))
+                session.add(
+                    Team(
+                        name=team_name,
+                        is_global=False,
+                        owner_user_id=actor.user.id,
+                    )
+                )
                 session.commit()
             gr.Info(f'Team "{team_name}" erstellt')
             return ""
@@ -718,6 +725,14 @@ class UserManagement(BasePage):
                 gr.Warning("Nur Admin darf Teams löschen")
                 return team_id
 
+            team = session.exec(select(Team).where(Team.id == team_id)).first()
+            if not team:
+                gr.Warning("Team nicht gefunden")
+                return None
+            if team.owner_user_id and team.owner_user_id != actor.user.id:
+                gr.Warning("Nur der Ersteller darf dieses Team löschen")
+                return team_id
+
             accesses = session.exec(select(UserAccess)).all()
             in_membership_use = any(team_id in parse_team_ids(access.team_id) for access in accesses)
             in_default_use = any(access.default_team_id == team_id for access in accesses)
@@ -725,10 +740,6 @@ class UserManagement(BasePage):
                 gr.Warning("Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind oder es als Standardteam verwendet wird")
                 return team_id
 
-            team = session.exec(select(Team).where(Team.id == team_id)).first()
-            if not team:
-                gr.Warning("Team nicht gefunden")
-                return None
             session.delete(team)
             session.commit()
             gr.Info(f'Team "{team.name}" gelöscht')

@@ -168,6 +168,18 @@ def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=N
     return bool(actor_team_ids.intersection(group_team_ids))
 
 
+def _source_deletable_by_user(source, user_id) -> bool:
+    if not user_id or source is None:
+        return False
+    return getattr(source, "user", None) == user_id
+
+
+def _group_deletable_by_user(group, user_id) -> bool:
+    if not user_id or group is None:
+        return False
+    return getattr(group, "user", None) == user_id
+
+
 def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
     normalized_team_filter = str(team_filter or "").strip()
     if normalized_team_filter:
@@ -920,13 +932,21 @@ class FileIndexPage(BasePage):
                 },
             )
 
-    def file_selected(self, file_id):
+    def file_selected(self, file_id, user_id):
         chunks = []
+        can_delete = False
         if file_id is not None:
             # get the chunks
 
             Index = self._index._resources["Index"]
             with Session(engine) as session:
+                source = session.execute(
+                    select(self._index._resources["Source"]).where(
+                        self._index._resources["Source"].id == file_id
+                    )
+                ).first()
+                if source:
+                    can_delete = _source_deletable_by_user(source[0], user_id)
                 matches = session.execute(
                     select(Index).where(
                         Index.source_id == file_id,
@@ -967,7 +987,7 @@ class FileIndexPage(BasePage):
         return (
             gr.update(value="".join(chunks), visible=file_id is not None),
             gr.update(visible=file_id is not None),
-            gr.update(visible=file_id is not None),
+            gr.update(visible=file_id is not None and can_delete),
             gr.update(visible=file_id is not None),
             gr.update(visible=file_id is not None),
         )
@@ -975,19 +995,14 @@ class FileIndexPage(BasePage):
     def delete_event(self, file_id, user_id):
         file_name = ""
         with Session(engine) as session:
-            actor = get_access_context(session, user_id) if self._app.f_user_management else None
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
                 )
             ).first()
             if source:
-                scope_ids = self._scope_user_ids(session, user_id)
-                if scope_ids is not None and source[0].user not in scope_ids:
-                    gr.Warning("Keine Berechtigung für diese Datei")
-                    return None, self.selected_panel_false
-                if self._app.f_user_management and not _source_visible_to_actor(source[0], actor, globally_visible_team_ids(session), scope_ids, _team_ref_map(session)):
-                    gr.Warning("Keine Berechtigung fÃ¼r diese Datei")
+                if not _source_deletable_by_user(source[0], user_id):
+                    gr.Warning("Nur der Uploader darf diese Datei löschen")
                     return None, self.selected_panel_false
                 file_name = source[0].name
                 session.delete(source[0])
@@ -1129,8 +1144,29 @@ class FileIndexPage(BasePage):
         return gr.DownloadButton(label=DOWNLOAD_MESSAGE, value=f"{zip_file_path}.zip")
 
     def delete_all_files(self, file_list, user_id):
-        for file_id in file_list.id.values:
-            self.delete_event(file_id, user_id)
+        file_ids = [file_id for file_id in file_list.id.values if file_id != "-"]
+        if not file_ids:
+            return
+
+        with Session(engine) as session:
+            sources = session.execute(
+                select(self._index._resources["Source"]).where(
+                    self._index._resources["Source"].id.in_(file_ids)
+                )
+            ).all()
+            deletable_ids = {
+                source.id
+                for (source,) in sources
+                if _source_deletable_by_user(source, user_id)
+            }
+
+        if not deletable_ids:
+            gr.Warning("Es gibt keine eigenen Dateien zum Löschen")
+            return
+
+        for file_id in file_ids:
+            if file_id in deletable_ids:
+                self.delete_event(file_id, user_id)
 
     def set_file_id_selector(self, selected_file_id):
         return [selected_file_id, "select", gr.Tabs(selected="chat-tab")]
@@ -1311,7 +1347,7 @@ class FileIndexPage(BasePage):
             )
             .then(
                 fn=self.file_selected,
-                inputs=[self.selected_file_id],
+                inputs=[self.selected_file_id, self._app.user_id],
                 outputs=[
                     self.chunks,
                     self.deselect_button,
@@ -1332,7 +1368,7 @@ class FileIndexPage(BasePage):
             show_progress="hidden",
         ).then(
             fn=self.file_selected,
-            inputs=[self.selected_file_id],
+            inputs=[self.selected_file_id, self._app.user_id],
             outputs=[
                 self.chunks,
                 self.deselect_button,
@@ -1519,6 +1555,7 @@ class FileIndexPage(BasePage):
                 self.group_name,
                 self.group_files,
                 self.group_team_ids,
+                self.group_delete_button,
             ],
             show_progress="hidden",
         ).then(
@@ -1527,13 +1564,11 @@ class FileIndexPage(BasePage):
                 gr.update(visible=False),
                 gr.update(visible=True),
                 gr.update(visible=True),
-                gr.update(visible=True),
             ),
             outputs=[
                 self._group_info_panel,
                 self.group_add_button,
                 self.group_close_button,
-                self.group_delete_button,
                 self.group_chat_button,
             ],
         )
@@ -2163,6 +2198,7 @@ class FileIndexPage(BasePage):
                     {
                         "id": group.id,
                         "name": group.name,
+                        "user": group.user,
                         "teams": [team_map.get(team_id, team_id) for team_id in group_team_ids],
                         "team_ids": group_team_ids,
                         "files": group_files,
@@ -2175,6 +2211,7 @@ class FileIndexPage(BasePage):
             for item in formated_results:
                 team_names = item.pop("teams", [])
                 item.pop("team_ids", None)
+                item.pop("user", None)
                 item["teams"] = ", ".join(team_names) if team_names else "-"
                 file_names = [
                     file_id_to_name.get(file_id, "-") for file_id in item["files"]
@@ -2319,16 +2356,8 @@ class FileIndexPage(BasePage):
             ).first()
             if group:
                 item = group[0]
-                scope_ids = self._scope_user_ids(session, user_id)
-                actor = get_access_context(session, user_id) if self._app.f_user_management else None
-                visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
-                team_ref_map = _team_ref_map(session)
-                if scope_ids is not None and item.user not in scope_ids:
-                    raise gr.Error("Keine Berechtigung")
-                if actor and not _group_visible_to_actor(
-                    item, actor, visible_global_team_ids, scope_ids, team_ref_map
-                ):
-                    raise gr.Error("Keine Berechtigung")
+                if not _group_deletable_by_user(item, user_id):
+                    raise gr.Error("Nur der Ersteller darf diese Gruppe löschen")
                 group_name = item.name
                 session.delete(item)
                 session.commit()
@@ -2357,12 +2386,16 @@ class FileIndexPage(BasePage):
 
         selected_item = list_groups[selected_id]
         selected_group_id = selected_item["id"]
+        delete_button_update = gr.update(
+            visible=_group_deletable_by_user(selected_item, user_id)
+        )
         return (
             "### Group Information",
             selected_group_id,
             selected_item["name"],
             selected_item["files"],
             self.list_group_team_choices(user_id, selected_item.get("team_ids", [])),
+            delete_button_update,
         )
 
     def validate_files(self, files: list[str]):
