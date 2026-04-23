@@ -179,8 +179,6 @@ Die App bietet mehrere Hauptbereiche:
 - **Einstellungen** -> App- und Benutzerkonfiguration
 - **Hilfe** -> Unterstuetzung, Rollenhinweise und Admin-Informationen
 
-Im Bereich **Hilfe** gibt es aktuell drei aufklappbare Bereiche:
-
 ---
 
 ### 9. Teams und Sichtbarkeit (konzeptionell)
