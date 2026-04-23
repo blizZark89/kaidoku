@@ -179,6 +179,40 @@ def _display_group_name(name: str) -> str:
     return name
 
 
+def _encode_group_selector_value(group_id: str, file_ids: list[str]) -> str:
+    return json.dumps({"group_id": group_id, "files": file_ids})
+
+
+def _decode_group_selector_value(group_value) -> tuple[str | None, list[str]]:
+    try:
+        parsed = json.loads(group_value)
+    except (TypeError, json.JSONDecodeError):
+        return None, []
+
+    if isinstance(parsed, dict):
+        raw_group_id = parsed.get("group_id")
+        group_id = str(raw_group_id).strip() if raw_group_id else None
+        raw_files = parsed.get("files", [])
+        if not isinstance(raw_files, list):
+            raw_files = []
+        file_ids = []
+        for file_id in raw_files:
+            value = str(file_id).strip()
+            if value and value not in file_ids:
+                file_ids.append(value)
+        return group_id, file_ids
+
+    if isinstance(parsed, list):
+        file_ids = []
+        for file_id in parsed:
+            value = str(file_id).strip()
+            if value and value not in file_ids:
+                file_ids.append(value)
+        return None, file_ids
+
+    return None, []
+
+
 class File(gr.File):
     """Subclass from gr.File to maintain the original filename
 
@@ -2456,10 +2490,7 @@ class FileSelector(BasePage):
         elif mode == "group_select":
             file_ids = []
             for group_value in selected_groups or []:
-                try:
-                    group_file_ids = json.loads(group_value)
-                except (TypeError, json.JSONDecodeError):
-                    continue
+                _, group_file_ids = _decode_group_selector_value(group_value)
                 for file_id in group_file_ids:
                     if file_id not in file_ids:
                         file_ids.append(file_id)
@@ -2503,6 +2534,8 @@ class FileSelector(BasePage):
         group_options: list = []
         available_ids = []
         available_group_values = []
+        available_group_values_by_id = {}
+        available_group_values_by_files = {}
         filesync_file_ids = set()
         group_available_ids = []
         team_filter_choices = [("Alle Teams", "")]
@@ -2596,8 +2629,10 @@ class FileSelector(BasePage):
                 ]
                 if _is_filesync_group_name(item.name):
                     filesync_file_ids.update(raw_group_files)
-                group_value = json.dumps(raw_group_files)
+                group_value = _encode_group_selector_value(item.id, raw_group_files)
                 available_group_values.append(group_value)
+                available_group_values_by_id[item.id] = group_value
+                available_group_values_by_files[tuple(raw_group_files)] = group_value
                 group_options.append((_display_group_name(item.name), group_value))
 
             for source in visible_sources:
@@ -2615,10 +2650,25 @@ class FileSelector(BasePage):
             ]
 
         if selected_groups:
+            normalized_selected_groups = []
             available_group_values_set = set(available_group_values)
-            selected_groups = [
-                each for each in selected_groups if each in available_group_values_set
-            ]
+            for selected_group in selected_groups:
+                if selected_group in available_group_values_set:
+                    normalized_selected_groups.append(selected_group)
+                    continue
+
+                selected_group_id, selected_group_files = _decode_group_selector_value(selected_group)
+                normalized_group_value = None
+                if selected_group_id:
+                    normalized_group_value = available_group_values_by_id.get(selected_group_id)
+                if normalized_group_value is None and selected_group_files:
+                    normalized_group_value = available_group_values_by_files.get(tuple(selected_group_files))
+                if (
+                    normalized_group_value
+                    and normalized_group_value not in normalized_selected_groups
+                ):
+                    normalized_selected_groups.append(normalized_group_value)
+            selected_groups = normalized_selected_groups
 
         valid_team_ids = {value for _, value in team_filter_choices}
         current_team = team_filter if team_filter in valid_team_ids else ""
