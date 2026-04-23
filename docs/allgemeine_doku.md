@@ -181,15 +181,6 @@ Die App bietet mehrere Hauptbereiche:
 
 Im Bereich **Hilfe** gibt es aktuell drei aufklappbare Bereiche:
 
-- **Anleitung**
-  - zeigt die allgemeine Hilfe und zusaetzlich rollenspezifische Inhalte passend zum angemeldeten Benutzer
-- **Rollen**
-  - zeigt die Rollenbeschreibungen fuer `user`, `key_user` und `admin` gesammelt in einem eigenen Block
-- **Versionsverlauf**
-  - ist nur fuer `admin` sichtbar
-  - verweist auf die Release-Uebersicht auf GitHub:
-    `https://github.com/blizZark89/kaidoku/releases`
-
 ---
 
 ### 9. Teams und Sichtbarkeit (konzeptionell)
