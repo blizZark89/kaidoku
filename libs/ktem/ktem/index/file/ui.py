@@ -148,18 +148,18 @@ def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=N
 
 
 def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
-    if actor is None or actor.is_admin:
-        return None
-
     normalized_team_filter = str(team_filter or "").strip()
     if normalized_team_filter:
         return {normalized_team_filter}
+
+    if actor is None or actor.is_admin:
+        return None
 
     return {team_id for team_id in actor.team_ids if str(team_id).strip()}
 
 
 def _source_matches_search_team(source, actor, effective_team_ids) -> bool:
-    if actor is None or actor.is_admin or effective_team_ids is None:
+    if effective_team_ids is None:
         return True
 
     source_team_ids = set(_source_team_ids(source))
