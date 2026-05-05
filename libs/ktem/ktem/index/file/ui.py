@@ -177,7 +177,17 @@ def _source_deletable_by_user(source, user_id) -> bool:
 def _group_deletable_by_user(group, user_id) -> bool:
     if not user_id or group is None:
         return False
+    if isinstance(group, dict):
+        return group.get("user") == user_id
     return getattr(group, "user", None) == user_id
+
+
+def _group_deletable_by_actor(group, user_id, actor=None) -> bool:
+    if group is None:
+        return False
+    if actor and actor.is_admin:
+        return True
+    return _group_deletable_by_user(group, user_id)
 
 
 def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
@@ -2351,13 +2361,20 @@ class FileIndexPage(BasePage):
 
         FileGroup = self._index._resources["FileGroup"]
         with Session(engine) as session:
+            actor = (
+                get_access_context(session, user_id)
+                if self._app.f_user_management
+                else None
+            )
             group = session.execute(
                 select(FileGroup).where(FileGroup.id == group_id)
             ).first()
             if group:
                 item = group[0]
-                if not _group_deletable_by_user(item, user_id):
-                    raise gr.Error("Nur der Ersteller darf diese Gruppe löschen")
+                if not _group_deletable_by_actor(item, user_id, actor):
+                    raise gr.Error(
+                        "Nur Admins oder der Ersteller dürfen diese Gruppe löschen"
+                    )
                 group_name = item.name
                 session.delete(item)
                 session.commit()
@@ -2386,8 +2403,12 @@ class FileIndexPage(BasePage):
 
         selected_item = list_groups[selected_id]
         selected_group_id = selected_item["id"]
+        actor = None
+        if self._app.f_user_management:
+            with Session(engine) as session:
+                actor = get_access_context(session, user_id)
         delete_button_update = gr.update(
-            visible=_group_deletable_by_user(selected_item, user_id)
+            visible=_group_deletable_by_actor(selected_item, user_id, actor)
         )
         return (
             "### Group Information",
