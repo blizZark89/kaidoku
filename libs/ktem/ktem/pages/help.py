@@ -96,8 +96,8 @@ class HelpPage:
             "Versionsverlauf", open=False, visible=False
         ) as self.version_history_accordion:
             gr.Markdown(
-                "Detallierte Informationen zu den einzelnen Updates und "
-                "Änderungen sin auf GIthub dokumentiert. "
+                "Detaillierte Informationen zu den einzelnen Updates und "
+                "Änderungen sind auf GitHub dokumentiert. "
                 "Link dazu: https://github.com/blizZark89/kaidoku/releases"
             )
 

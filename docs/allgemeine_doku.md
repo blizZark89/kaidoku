@@ -1,4 +1,4 @@
-# Anleitung: Allgemeiner Ueberblick
+# Anleitung: Allgemeiner Überblick
 
 ## Was ist Kaidoku?
 
@@ -10,7 +10,7 @@ Sie kombiniert:
 - Wissensaufbereitung aus eigenen Dateien
 - Verwaltung von Inhalten und Datenquellen
 
-Die Anwendung laeuft lokal und kann ohne Cloud-Abhaengigkeit betrieben werden.
+Die Anwendung läuft lokal und kann ohne Cloud-Abhängigkeit betrieben werden.
 
 ---
 
@@ -18,9 +18,9 @@ Die Anwendung laeuft lokal und kann ohne Cloud-Abhaengigkeit betrieben werden.
 
 ### 1. Chat mit Dokumentbezug
 
-- Nutzer koennen normale Chats mit KI fuehren
-- Antworten koennen auf eigenen Dokumenten basieren
-- Mehrere Reasoning-Ansaetze stehen zur Verfuegung, z. B. einfache QA oder Agentenlogik
+- Nutzer können normale Chats mit KI führen
+- Antworten können auf eigenen Dokumenten basieren
+- Mehrere Reasoning-Ansätze stehen zur Verfügung, z. B. einfache QA oder Agentenlogik
 
 #### 1.1 Dateisammlung
 
@@ -32,19 +32,19 @@ Die Anwendung laeuft lokal und kann ohne Cloud-Abhaengigkeit betrieben werden.
     <td valign="top">
 
 - **"Alle durchsuchen"**
-  - durchsucht automatisch **alle verfuegbaren Dokumente** im aktuellen Suchbereich
-  - keine manuelle Auswahl von Dateien oder Gruppen noetig
+  - durchsucht automatisch **alle verfügbaren Dokumente** im aktuellen Suchbereich
+  - keine manuelle Auswahl von Dateien oder Gruppen nötig
 
 - **"In Dateien suchen"**
-  - durchsucht **nur die explizit ausgewaehlten einzelnen Dokumente**
-  - geeignet fuer gezielte Abfragen in bestimmten Dateien
+  - durchsucht **nur die explizit ausgewählten einzelnen Dokumente**
+  - geeignet für gezielte Abfragen in bestimmten Dateien
 
 - **"In Dateigruppen suchen"**
-  - durchsucht **alle Dokumente innerhalb der ausgewaehlten Gruppen**
-  - sinnvoll fuer strukturierte, thematische Suchen
+  - durchsucht **alle Dokumente innerhalb der ausgewählten Gruppen**
+  - sinnvoll für strukturierte, thematische Suchen
 
 - **Teamfilter ("Teams")**
-  - "Alle Teams" -> Suche ueber **alle fuer dich sichtbaren Inhalte**
+  - "Alle Teams" -> Suche über **alle für dich sichtbaren Inhalte**
   - einzelnes Team -> Suche **nur innerhalb dieses Teams**
 
     </td>
@@ -53,7 +53,7 @@ Die Anwendung laeuft lokal und kann ohne Cloud-Abhaengigkeit betrieben werden.
 
 Typischer Ablauf:
 1. Chat starten
-2. Dokumente oder Gruppen auswaehlen
+2. Dokumente oder Gruppen auswählen
 3. Frage stellen
 4. System sucht relevante Inhalte
 5. KI generiert eine Antwort auf Basis dieser Inhalte
@@ -62,9 +62,9 @@ Typischer Ablauf:
 
 ### 2. Dokumentenverwaltung
 
-- Dateien koennen hochgeladen und indexiert werden
+- Dateien können hochgeladen und indexiert werden
 - Inhalte werden durchsuchbar gemacht
-- Unterstuetzung fuer viele Formate:
+- Unterstützung für viele Formate:
   - PDF, DOCX, PPTX
   - Excel, CSV
   - Bilder
@@ -73,16 +73,16 @@ Typischer Ablauf:
 
 Nach dem Upload:
 - Dokumente werden analysiert
-- Inhalte werden in Suchindizes ueberfuehrt
-- Dokumente stehen fuer den Chat zur Verfuegung
+- Inhalte werden in Suchindizes überführt
+- Dokumente stehen für den Chat zur Verfügung
 
 ---
 
 ### 3. Dateigruppen
 
-- Dokumente koennen in Gruppen organisiert werden
+- Dokumente können in Gruppen organisiert werden
 - Gruppen erleichtern die strukturierte Suche
-- Gruppen koennen automatisch oder manuell gepflegt werden
+- Gruppen können automatisch oder manuell gepflegt werden
 
 Im Chat kann gezielt gesucht werden:
 - in einzelnen Dateien
@@ -99,8 +99,8 @@ Im Chat kann gezielt gesucht werden:
   - Retrieval (Suche)
   - Generierung (LLM-Antwort)
 
-Zusaetzlich moeglich:
-- Reranking fuer bessere Trefferreihenfolge
+Zusätzlich möglich:
+- Reranking für bessere Trefferreihenfolge
 - verschiedene Embedding-Modelle
 
 ---
@@ -111,11 +111,11 @@ Mehrere Verarbeitungsstrategien sind integriert:
 
 - klassische Frage-Antwort
 - zerlegte Fragen (Decomposition)
-- agenten-basierte Ansaetze, z. B. ReAct oder ReWOO
+- agenten-basierte Ansätze, z. B. ReAct oder ReWOO
 
-Dadurch koennen:
+Dadurch können:
 - komplexe Fragen beantwortet werden
-- mehrstufige Probleme geloest werden
+- mehrstufige Probleme gelöst werden
 
 ---
 
@@ -132,44 +132,44 @@ Die App kann verschiedene KI-Komponenten verwalten:
 Das erlaubt flexible Anpassung an:
 - lokale Modelle
 - externe APIs
-- unterschiedliche Anwendungsfaelle
+- unterschiedliche Anwendungsfälle
 
 ---
 
 ### 7. FileSync (automatischer Import)
 
-- Ueberwacht definierte Ordner und sorgt dafuer, dass alle Dateien automatisch aktuell im System sind
+- Überwacht definierte Ordner und sorgt dafür, dass alle Dateien automatisch aktuell im System sind
 
 Wie Dateiunterschiede erkannt werden:
 - Jede Datei wird beim Einlesen analysiert und mit einem Hashwert versehen
 - Bei jedem weiteren Scan wird dieser Hash erneut berechnet
-- Vergleich der Hashwerte: Gleich -> Datei ist unveraendert -> keine Aktion
-- Vergleich der Hashwerte: Unterschiedlich -> Inhalt hat sich geaendert -> Datei wird neu importiert und aktualisiert
-- Dadurch werden echte Inhaltsaenderungen erkannt, nicht nur z. B. ein geaendertes Aenderungsdatum
+- Vergleich der Hashwerte: Gleich -> Datei ist unverändert -> keine Aktion
+- Vergleich der Hashwerte: Unterschiedlich -> Inhalt hat sich geändert -> Datei wird neu importiert und aktualisiert
+- Dadurch werden echte Inhaltsänderungen erkannt, nicht nur z. B. ein geändertes Änderungsdatum
 
-Was passiert bei Aenderungen konkret:
-- Geaenderte Dateien werden neu indexiert, damit Such- und Chatfunktionen den aktuellen Stand nutzen
+Was passiert bei Änderungen konkret:
+- Geänderte Dateien werden neu indexiert, damit Such- und Chatfunktionen den aktuellen Stand nutzen
 - Alte Versionen werden ersetzt oder intern aktualisiert, je nach Systemlogik
-- Zugehoerige Metadaten wie `source_ids` bleiben konsistent oder werden aktualisiert
+- Zugehörige Metadaten wie `source_ids` bleiben konsistent oder werden aktualisiert
 
-Weitere Faelle:
+Weitere Fälle:
 - Neue Datei: wird erkannt, importiert und einer Gruppe zugeordnet
-- Geloeschte Datei: wird auch im System entfernt
+- Gelöschte Datei: wird auch im System entfernt
 - Defekte Datei: wird erkannt und gemeldet, kein Import
 
-Zusaetzliche Logik im Hintergrund:
+Zusätzliche Logik im Hintergrund:
 - FileSync merkt sich den zuletzt bekannten Hash pro Datei
 - FileSync merkt sich, ob eine Datei bereits importiert wurde
 - FileSync merkt sich die Zuordnung Ordner -> Dateigruppe
-- Dadurch werden unnoetige Neuimporte vermieden und nur echte Aenderungen verarbeitet
+- Dadurch werden unnötige Neuimporte vermieden und nur echte Änderungen verarbeitet
 
 Kurz gesagt:
-- FileSync erkennt praezise Inhaltsaenderungen auf Byte-Ebene
-- Aktualisiert wird nur das, was sich wirklich geaendert hat
+- FileSync erkennt präzise Inhaltsänderungen auf Byte-Ebene
+- Aktualisiert wird nur das, was sich wirklich geändert hat
 
 ---
 
-### 8. Benutzeroberflaeche
+### 8. Benutzeroberfläche
 
 Die App bietet mehrere Hauptbereiche:
 
@@ -177,18 +177,18 @@ Die App bietet mehrere Hauptbereiche:
 - **Dateien** -> Dokumente und Gruppen verwalten
 - **Ressourcen** -> Modelle und Systeme konfigurieren
 - **Einstellungen** -> App- und Benutzerkonfiguration
-- **Hilfe** -> Unterstuetzung, Rollenhinweise und Admin-Informationen
+- **Hilfe** -> Unterstützung, Rollenhinweise und Admin-Informationen
 
 ---
 
 ### 9. Teams und Sichtbarkeit (konzeptionell)
 
-- Inhalte koennen bestimmten Gruppen zugeordnet werden
-- Sichtbarkeit von Dokumenten wird darueber gesteuert
-- globale Inhalte sind fuer alle sichtbar
+- Inhalte können bestimmten Gruppen zugeordnet werden
+- Sichtbarkeit von Dokumenten wird darüber gesteuert
+- globale Inhalte sind für alle sichtbar
 
-Zusaetzlich:
-- Standardkontext kann fuer Suchen genutzt werden
+Zusätzlich:
+- Standardkontext kann für Suchen genutzt werden
 
 ---
 
@@ -199,24 +199,24 @@ Zusaetzlich:
 - Dokumentenspeicher (LanceDB)
 
 Alle Daten liegen im lokalen App-Verzeichnis:
-- keine zwingende externe Abhaengigkeit
+- keine zwingende externe Abhängigkeit
 
 ---
 
 ## Technische Highlights
 
-- vollstaendig lokal betreibbar
-- Docker-faehig
-- deutsche Oberflaeche
+- vollständig lokal betreibbar
+- Docker-fähig
+- deutsche Oberfläche
 - modular erweiterbar
-- unterstuetzt viele KI-Anbieter
-- robuste Dokumentverarbeitung, auch fuer Office-Dateien
+- unterstützt viele KI-Anbieter
+- robuste Dokumentverarbeitung, auch für Office-Dateien
 
 ---
 
 ## Kurz gesagt
 
-Kaidoku ist eine lokale Wissensplattform mit KI-Unterstuetzung:
+Kaidoku ist eine lokale Wissensplattform mit KI-Unterstützung:
 
 - Dokumente hochladen oder automatisch synchronisieren
 - Inhalte durchsuchen

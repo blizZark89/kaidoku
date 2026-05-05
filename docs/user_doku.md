@@ -1,14 +1,14 @@
 # Anleitung: Rolle User
 
-## Ueberblick
+## Überblick
 
-Als `user` nutzt du die Plattform fuer deine taegliche Arbeit, ohne Verwaltungsaufgaben.
+Als `user` nutzt du die Plattform für deine tägliche Arbeit, ohne Verwaltungsaufgaben.
 
 ## Was du typischerweise tust
 
 ### Arbeiten mit der Anwendung
 
-- Fuehre Chats
+- Führe Chats
 - Nutze vorhandene Dokumente
 - Suche in Dateien und Dateigruppen
 
@@ -19,27 +19,27 @@ Als `user` nutzt du die Plattform fuer deine taegliche Arbeit, ohne Verwaltungsa
 
 ### Optional: Dokumente hochladen
 
-- Nur moeglich, wenn dir Upload-Rechte gegeben wurden
+- Nur möglich, wenn dir Upload-Rechte gegeben wurden
 
 ### Eigene Einstellungen
 
-- Aendere dein Passwort
-- Waehle dein Standardteam
+- Ändere dein Passwort
+- Wähle dein Standardteam
 
 ## Was du NICHT tun kannst
 
 - Keine Benutzer verwalten
 - Keine Teams verwalten
-- Keine Systemeinstellungen aendern
+- Keine Systemeinstellungen ändern
 - Kein FileSync
 
 ## Wichtige Hinweise
 
-- Du musst mindestens einem Team angehoeren
+- Du musst mindestens einem Team angehören
 - Ohne Upload-Recht kannst du nur lesen
 
 ## Best Practice
 
 - Nutze dein Standardteam sinnvoll
 - Lade nur relevante Dokumente hoch
-- Halte deine Inhalte uebersichtlich
+- Halte deine Inhalte übersichtlich
