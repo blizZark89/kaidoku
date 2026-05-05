@@ -60,12 +60,12 @@ Typischer Ablauf:
 
 ---
 
-### 2. Sprachausgabe
+### 2. Textsprache
 
 <table>
   <tr>
     <td valign="top" width="42%">
-      <img src="images/2. Sprachausgabe.PNG" alt="2. Sprachausgabe" />
+      <img src="images/2. Textsprache.PNG" alt="2. Textsprache" />
     </td>
     <td valign="top">
 
