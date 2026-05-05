@@ -65,7 +65,7 @@ Typischer Ablauf:
 <table>
   <tr>
     <td valign="top" width="42%">
-      <img src="images/2. Sprachausgabe.png" alt="2. Sprachausgabe" />
+      <img src="images/2. Sprachausgabe.PNG" alt="2. Sprachausgabe" />
     </td>
     <td valign="top">
 
