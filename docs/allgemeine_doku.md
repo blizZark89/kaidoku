@@ -60,7 +60,27 @@ Typischer Ablauf:
 
 ---
 
-### 2. Dokumentenverwaltung
+### 2. Sprachausgabe
+
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/2. Sprachausgabe.png" alt="2. Sprachausgabe" />
+    </td>
+    <td valign="top">
+
+- **Sprache**
+  - Über das Dropdown **Sprache** kann die Ausgabesprache verändert werden
+  - Geschrieben werden kann in jeder Sprache
+  - Nach der Eingabe wird die Antwort in der ausgewählten Sprache ausgegeben
+
+    </td>
+  </tr>
+</table>
+
+---
+
+### 3. Dokumentenverwaltung
 
 - Dateien können hochgeladen und indexiert werden
 - Inhalte werden durchsuchbar gemacht
@@ -78,7 +98,7 @@ Nach dem Upload:
 
 ---
 
-### 3. Dateigruppen
+### 4. Dateigruppen
 
 - Dokumente können in Gruppen organisiert werden
 - Gruppen erleichtern die strukturierte Suche
@@ -91,7 +111,7 @@ Im Chat kann gezielt gesucht werden:
 
 ---
 
-### 4. Intelligente Suche (RAG)
+### 5. Intelligente Suche (RAG)
 
 - Inhalte werden in Vektor-Datenbanken gespeichert
 - Relevante Textstellen werden automatisch gefunden
@@ -105,7 +125,7 @@ Zusätzlich möglich:
 
 ---
 
-### 5. Reasoning und KI-Pipelines
+### 6. Reasoning und KI-Pipelines
 
 Mehrere Verarbeitungsstrategien sind integriert:
 
@@ -119,7 +139,7 @@ Dadurch können:
 
 ---
 
-### 6. Ressourcenverwaltung
+### 7. Ressourcenverwaltung
 
 Die App kann verschiedene KI-Komponenten verwalten:
 
@@ -136,7 +156,7 @@ Das erlaubt flexible Anpassung an:
 
 ---
 
-### 7. FileSync (automatischer Import)
+### 8. FileSync (automatischer Import)
 
 - Überwacht definierte Ordner und sorgt dafür, dass alle Dateien automatisch aktuell im System sind
 
@@ -169,7 +189,7 @@ Kurz gesagt:
 
 ---
 
-### 8. Benutzeroberfläche
+### 9. Benutzeroberfläche
 
 Die App bietet mehrere Hauptbereiche:
 
@@ -181,7 +201,7 @@ Die App bietet mehrere Hauptbereiche:
 
 ---
 
-### 9. Teams und Sichtbarkeit (konzeptionell)
+### 10. Teams und Sichtbarkeit (konzeptionell)
 
 - Inhalte können bestimmten Gruppen zugeordnet werden
 - Sichtbarkeit von Dokumenten wird darüber gesteuert
@@ -192,7 +212,7 @@ Zusätzlich:
 
 ---
 
-### 10. Speicherung und Betrieb
+### 11. Speicherung und Betrieb
 
 - lokale Datenhaltung (SQLite)
 - Vektor-Datenbanken (Chroma)
