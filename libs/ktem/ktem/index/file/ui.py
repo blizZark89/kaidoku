@@ -20,6 +20,7 @@ from ktem.authz import (
     has_read_access,
     has_upload_access,
     list_teams,
+    managed_team_ids,
     parse_team_ids,
 )
 from ktem.app import BasePage
@@ -172,6 +173,33 @@ def _source_deletable_by_user(source, user_id) -> bool:
     if not user_id or source is None:
         return False
     return getattr(source, "user", None) == user_id
+
+
+def _source_deletable_by_actor(
+    source,
+    user_id,
+    actor=None,
+    scope_user_ids=None,
+    team_ref_map=None,
+    actor_managed_team_ids=None,
+) -> bool:
+    if source is None:
+        return False
+    if actor and actor.is_admin:
+        return True
+    if _source_deletable_by_user(source, user_id):
+        return True
+    if not actor or not actor.is_key_user:
+        return False
+
+    managed_ids = set(actor_managed_team_ids or [])
+    source_team_ids = set(_source_team_ids(source, team_ref_map))
+    if source_team_ids:
+        return bool(managed_ids.intersection(source_team_ids))
+
+    if scope_user_ids is None:
+        return False
+    return getattr(source, "user", None) in set(scope_user_ids)
 
 
 def _group_deletable_by_user(group, user_id) -> bool:
@@ -351,6 +379,23 @@ class FileIndexPage(BasePage):
         if not actor or not has_read_access(actor):
             return []
         return allowed_user_ids_for_scope(session, actor)
+
+    def _source_delete_context(self, session: Session, user_id):
+        actor = (
+            get_access_context(session, user_id)
+            if self._app.f_user_management
+            else None
+        )
+        scope_ids = (
+            allowed_user_ids_for_scope(session, actor)
+            if actor and not actor.is_admin
+            else None
+        )
+        team_ref_map = _team_ref_map(session) if actor else None
+        actor_managed_team_ids = (
+            managed_team_ids(session, actor) if actor and actor.is_key_user else None
+        )
+        return actor, scope_ids, team_ref_map, actor_managed_team_ids
 
     def _check_upload_permission(self, user_id) -> bool:
         if not self._app.f_user_management:
@@ -950,13 +995,23 @@ class FileIndexPage(BasePage):
 
             Index = self._index._resources["Index"]
             with Session(engine) as session:
+                actor, scope_ids, team_ref_map, actor_managed_team_ids = (
+                    self._source_delete_context(session, user_id)
+                )
                 source = session.execute(
                     select(self._index._resources["Source"]).where(
                         self._index._resources["Source"].id == file_id
                     )
                 ).first()
                 if source:
-                    can_delete = _source_deletable_by_user(source[0], user_id)
+                    can_delete = _source_deletable_by_actor(
+                        source[0],
+                        user_id,
+                        actor,
+                        scope_ids,
+                        team_ref_map,
+                        actor_managed_team_ids,
+                    )
                 matches = session.execute(
                     select(Index).where(
                         Index.source_id == file_id,
@@ -1005,14 +1060,27 @@ class FileIndexPage(BasePage):
     def delete_event(self, file_id, user_id):
         file_name = ""
         with Session(engine) as session:
+            actor, scope_ids, team_ref_map, actor_managed_team_ids = (
+                self._source_delete_context(session, user_id)
+            )
             source = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id == file_id
                 )
             ).first()
             if source:
-                if not _source_deletable_by_user(source[0], user_id):
-                    gr.Warning("Nur der Uploader darf diese Datei löschen")
+                if not _source_deletable_by_actor(
+                    source[0],
+                    user_id,
+                    actor,
+                    scope_ids,
+                    team_ref_map,
+                    actor_managed_team_ids,
+                ):
+                    gr.Warning(
+                        "Nur Admins, zuständige Key User oder der Uploader dürfen "
+                        "diese Datei löschen"
+                    )
                     return None, self.selected_panel_false
                 file_name = source[0].name
                 session.delete(source[0])
@@ -1159,6 +1227,9 @@ class FileIndexPage(BasePage):
             return
 
         with Session(engine) as session:
+            actor, scope_ids, team_ref_map, actor_managed_team_ids = (
+                self._source_delete_context(session, user_id)
+            )
             sources = session.execute(
                 select(self._index._resources["Source"]).where(
                     self._index._resources["Source"].id.in_(file_ids)
@@ -1167,11 +1238,18 @@ class FileIndexPage(BasePage):
             deletable_ids = {
                 source.id
                 for (source,) in sources
-                if _source_deletable_by_user(source, user_id)
+                if _source_deletable_by_actor(
+                    source,
+                    user_id,
+                    actor,
+                    scope_ids,
+                    team_ref_map,
+                    actor_managed_team_ids,
+                )
             }
 
         if not deletable_ids:
-            gr.Warning("Es gibt keine eigenen Dateien zum Löschen")
+            gr.Warning("Es gibt keine für deine Rolle löschbaren Dateien")
             return
 
         for file_id in file_ids:
@@ -1525,7 +1603,7 @@ class FileIndexPage(BasePage):
             show_progress="hidden",
         ).then(
             fn=self.file_selected,
-            inputs=[self.selected_file_id],
+            inputs=[self.selected_file_id, self._app.user_id],
             outputs=[
                 self.chunks,
                 self.deselect_button,
