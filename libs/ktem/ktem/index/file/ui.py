@@ -240,6 +240,17 @@ def _source_matches_search_team(source, actor, effective_team_ids, team_ref_map=
     return bool(source_team_ids.intersection(effective_team_ids))
 
 
+def _group_matches_search_team(group, actor, effective_team_ids, team_ref_map=None) -> bool:
+    if effective_team_ids is None:
+        return True
+
+    group_team_ids = set(_group_team_ids(group, team_ref_map))
+    if not group_team_ids:
+        return False
+
+    return bool(group_team_ids.intersection(effective_team_ids))
+
+
 def _is_filesync_group_name(name: str) -> bool:
     return bool(name) and str(name).startswith(FILESYNC_GROUP_PREFIX)
 
@@ -2765,13 +2776,14 @@ class FileSelector(BasePage):
                 visible_sources.append(source)
 
             for source in visible_sources:
-                if self._app.f_user_management:
-                    if not _source_matches_search_team(source, actor, effective_team_ids, team_ref_map):
-                        continue
-                else:
-                    source_team_ids = _source_team_ids(source, team_ref_map)
-                    if team_filter and team_filter not in source_team_ids:
-                        continue
+                if current_mode != "group_select":
+                    if self._app.f_user_management:
+                        if not _source_matches_search_team(source, actor, effective_team_ids, team_ref_map):
+                            continue
+                    else:
+                        source_team_ids = _source_team_ids(source, team_ref_map)
+                        if team_filter and team_filter not in source_team_ids:
+                            continue
                 group_available_ids.append(source.id)
             group_available_ids_set = set(group_available_ids)
 
@@ -2789,6 +2801,13 @@ class FileSelector(BasePage):
                     item, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
                     continue
+                if current_mode == "group_select":
+                    if self._app.f_user_management:
+                        if not _group_matches_search_team(item, actor, effective_team_ids, team_ref_map):
+                            continue
+                    else:
+                        if team_filter and team_filter not in _group_team_ids(item, team_ref_map):
+                            continue
                 raw_group_files = [
                     file_id
                     for file_id in item.data.get("files", [])
