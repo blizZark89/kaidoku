@@ -1,5 +1,6 @@
 import html
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -1216,7 +1217,7 @@ class FileIndexPage(BasePage):
 
     def download_all_files(self):
         if self._index.config.get("private", False):
-            raise gr.Error("This feature is not available for private collection.")
+            raise gr.Error("Diese Funktion ist nicht verfügbar für private Sammlungen.")
 
         zip_files = []
         for file_name in os.listdir(flowsettings.KH_CHUNKS_OUTPUT_DIR):
@@ -1293,7 +1294,7 @@ class FileIndexPage(BasePage):
             # quick file upload event registration of first Index only
             if self._index.id == 1:
                 self.quick_upload_state = gr.State(value=[])
-                print("Setting up quick upload event")
+                logging.debug("Setting up quick upload event")
 
                 # override indexing function from chat page
                 self._app.chat_page.first_indexing_url_fn = (
@@ -1417,8 +1418,8 @@ class FileIndexPage(BasePage):
                     js=chat_input_focus_js_with_submit,
                 )
 
-        except Exception as e:
-            print(e)
+        except Exception:
+            logging.exception("Fehler beim Registrieren der Quick-Upload-Events")
 
     def on_register_events(self):
         """Register all events to the app"""
@@ -1967,7 +1968,7 @@ class FileIndexPage(BasePage):
         if KH_DEMO_MODE:
             urls_splitted = urls.split("\n")
             if not all(is_arxiv_url(url) for url in urls_splitted):
-                raise ValueError("All URLs must be valid arXiv URLs")
+                raise ValueError("Alle URLs müssen gültige arXiv-URLs sein")
 
             output_files = [
                 download_arxiv_pdf(
@@ -2058,7 +2059,7 @@ class FileIndexPage(BasePage):
         include_patterns: list[str] = []
         exclude_patterns: list[str] = ["*.png", "*.gif", "*/.*"]
         if include_patterns and exclude_patterns:
-            raise ValueError("Cannot have both include and exclude patterns")
+            raise ValueError("Es können nicht sowohl Include- als auch Exclude-Muster angegeben werden")
 
         # clean up the include patterns
         for idx in range(len(include_patterns)):
@@ -2349,7 +2350,7 @@ class FileIndexPage(BasePage):
                 session.query(FileGroup).filter_by(id=selected_group_id).first()
             )
             if current_group is None:
-                raise gr.Error("No group found")
+                raise gr.Error("Keine Gruppe gefunden")
             scope_ids = self._scope_user_ids(session, user_id)
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
@@ -2429,7 +2430,7 @@ class FileIndexPage(BasePage):
                     .first()
                 )
                 if current_group:
-                    raise gr.Error(f"Group {group_name} already exists")
+                    raise gr.Error(f"Gruppe {group_name} existiert bereits")
 
                 current_group = FileGroup(
                     name=group_name,
@@ -2446,7 +2447,7 @@ class FileIndexPage(BasePage):
 
     def delete_group(self, group_id, user_id):
         if not group_id:
-            raise gr.Error("No group is selected")
+            raise gr.Error("Keine Gruppe ausgewählt")
 
         FileGroup = self._index._resources["FileGroup"]
         with Session(engine) as session:
@@ -2469,7 +2470,7 @@ class FileIndexPage(BasePage):
                 session.commit()
                 gr.Info(f"Group {group_name} has been deleted")
             else:
-                raise gr.Error("No group found")
+                raise gr.Error("Keine Gruppe gefunden")
 
         return None
 
@@ -2488,7 +2489,7 @@ class FileIndexPage(BasePage):
     def interact_group_list(self, list_groups, user_id, ev: gr.SelectData):
         selected_id = ev.index[0]
         if (not ev.value or ev.value == "-") and selected_id == 0:
-            raise gr.Error("No group is selected")
+            raise gr.Error("Keine Gruppe ausgewählt")
 
         selected_item = list_groups[selected_id]
         selected_group_id = selected_item["id"]

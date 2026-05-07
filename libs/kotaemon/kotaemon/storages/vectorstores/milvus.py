@@ -100,7 +100,7 @@ class MilvusVectorStore(LlamaIndexVectorStore):
     def count(self) -> int:
         try:
             self._lazy_init()
-        except:  # noqa: E722
+        except Exception:  # noqa: E722
             return 0
         return self._client.client.query(
             collection_name=self._collection_name, output_fields=["count(*)"]
