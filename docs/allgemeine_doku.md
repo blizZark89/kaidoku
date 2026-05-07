@@ -132,13 +132,6 @@ Wichtige Unterscheidung je nach Such-Modus:
 
 ### 4. Dokumentenverwaltung
 
-<table>
-  <tr>
-    <td valign="top" width="42%">
-      <img src="images/4. Dokumentenverwaltung.PNG" alt="4. Dokumentenverwaltung" />
-    </td>
-    <td valign="top">
-
 - **4.1 Dateien hochladen**
   - einzelne oder mehrere Dateien gleichzeitig hochladen
   - unterstützte Formate:
@@ -163,10 +156,6 @@ Wichtige Unterscheidung je nach Such-Modus:
   - Dateien koennen direkt einem oder mehreren Teams zugewiesen werden
   - ohne Zuordnung bleibt die Datei nur fuer den Ersteller sichtbar
   - spaetere Aenderungen sind in der Dateiverwaltung moeglich
-
-    </td>
-  </tr>
-</table>
 
 ---
 
