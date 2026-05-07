@@ -139,7 +139,7 @@ Wichtige Unterscheidung je nach Such-Modus:
     </td>
     <td valign="top">
 
-- **Dateien hochladen**
+- **4.1 Dateien hochladen**
   - einzelne oder mehrere Dateien gleichzeitig hochladen
   - unterstützte Formate:
     - PDF, DOCX, PPTX
@@ -148,18 +148,18 @@ Wichtige Unterscheidung je nach Such-Modus:
     - Markdown, Text, HTML
     - ZIP-Dateien
 
-- **Indexierung**
+- **4.2 Indexierung**
   - Dokumente werden automatisch analysiert
   - Inhalte werden in Suchindizes ueberfuehrt
   - Status wird in der Datei-Liste angezeigt -> z. B. "fertig" oder "in Bearbeitung"
   - Bereits indexierte Dateien stehen sofort im Chat zur Verfuegung
 
-- **Quellen statt Dateien**
+- **4.3 Quellen statt Dateien**
   - jede indexierte Datei erscheint als **Quelle** in der Uebersicht
   - selbst wenn die Originaldatei geloescht wird, bleibt die Quelle erhalten
   - erst das **Loeschen der Quelle** entfernt den Inhalt endgueltig aus dem System
 
-- **Team-Zuordnung beim Upload**
+- **4.4 Team-Zuordnung beim Upload**
   - Dateien koennen direkt einem oder mehreren Teams zugewiesen werden
   - ohne Zuordnung bleibt die Datei nur fuer den Ersteller sichtbar
   - spaetere Aenderungen sind in der Dateiverwaltung moeglich
