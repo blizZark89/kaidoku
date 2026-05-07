@@ -132,27 +132,50 @@ Wichtige Unterscheidung je nach Such-Modus:
 
 ### 4. Dokumentenverwaltung
 
-- Dateien können hochgeladen und indexiert werden
-- Inhalte werden durchsuchbar gemacht
-- Unterstützung für viele Formate:
-  - PDF, DOCX, PPTX
-  - Excel, CSV
-  - Bilder
-  - Markdown, Text, HTML
-  - ZIP-Dateien
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/4. Dokumentenverwaltung.PNG" alt="4. Dokumentenverwaltung" />
+    </td>
+    <td valign="top">
 
-Nach dem Upload:
-- Dokumente werden analysiert
-- Inhalte werden in Suchindizes überführt
-- Dokumente stehen für den Chat zur Verfügung
+- **Dateien hochladen**
+  - einzelne oder mehrere Dateien gleichzeitig hochladen
+  - unterstützte Formate:
+    - PDF, DOCX, PPTX
+    - Excel, CSV
+    - Bilder
+    - Markdown, Text, HTML
+    - ZIP-Dateien
+
+- **Indexierung**
+  - Dokumente werden automatisch analysiert
+  - Inhalte werden in Suchindizes ueberfuehrt
+  - Status wird in der Datei-Liste angezeigt -> z. B. "fertig" oder "in Bearbeitung"
+  - Bereits indexierte Dateien stehen sofort im Chat zur Verfuegung
+
+- **Quellen statt Dateien**
+  - jede indexierte Datei erscheint als **Quelle** in der Uebersicht
+  - selbst wenn die Originaldatei geloescht wird, bleibt die Quelle erhalten
+  - erst das **Loeschen der Quelle** entfernt den Inhalt endgueltig aus dem System
+
+- **Team-Zuordnung beim Upload**
+  - Dateien koennen direkt einem oder mehreren Teams zugewiesen werden
+  - ohne Zuordnung bleibt die Datei nur fuer den Ersteller sichtbar
+  - spaetere Aenderungen sind in der Dateiverwaltung moeglich
+
+    </td>
+  </tr>
+</table>
 
 ---
 
 ### 5. Dateigruppen
 
-- Dokumente können in Gruppen organisiert werden
-- Gruppen erleichtern die strukturierte Suche
-- Gruppen können automatisch oder manuell gepflegt werden
+- Dokumente koennen in Gruppen organisiert werden
+- Gruppen erleichtern die strukturierte Suche im Chat
+- Gruppen koennen automatisch oder manuell gepflegt werden
+- jede Gruppe kann eigenen Teams zugeordnet werden -> unabhaengig von den Dateien darin
 
 Im Chat kann gezielt gesucht werden:
 - in einzelnen Dateien
