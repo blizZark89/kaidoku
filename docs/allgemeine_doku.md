@@ -203,12 +203,51 @@ Die App bietet mehrere Hauptbereiche:
 
 ### 10. Teams und Sichtbarkeit (konzeptionell)
 
-- Inhalte können bestimmten Gruppen zugeordnet werden
-- Sichtbarkeit von Dokumenten wird darüber gesteuert
-- globale Inhalte sind für alle sichtbar
+Es gibt zwei Ebenen, auf denen Teams zugeordnet werden koennen:
 
-Zusätzlich:
-- Standardkontext kann für Suchen genutzt werden
+**(A) Dateiebene**
+- Jede hochgeladene Datei kann einem oder mehreren Teams zugeordnet werden.
+- Diese Zuordnung wird beim Upload oder in der Dateiverwaltung gesetzt.
+- Wird bei der Suche nach einzelnen Dateien beruecksichtigt.
+
+**(B) Gruppenebene**
+- Jede Dateigruppe kann einem oder mehreren Teams zugeordnet werden.
+- Diese Zuordnung wird in der Dateiverwaltung unter "Dateisammlung" gesetzt.
+- Wird bei der Suche nach Dateigruppen beruecksichtigt.
+
+Wichtig: Die beiden Ebenen sind unabhaengig voneinander. Eine Dateigruppe kann
+Team A zugeordnet sein, waehrend die enthaltenen Dateien selbst keinem Team
+zugeordnet sind (oder einem anderen).
+
+**Sichtbarkeit – Wer sieht was?**
+
+Die Sichtbarkeit wird bei jedem Zugriff berechnet. Es gibt folgende Regeln:
+
+- **Admins** -> Sehen alle Dateien und Gruppen, unabhaengig von Team-Zuordnung.
+- **Globale Teams** -> Dateien/Gruppen, die einem als "global sichtbar" markierten
+  Team zugeordnet sind, werden fuer alle Nutzer angezeigt.
+- **Ohne Team-Zuordnung** -> Dateien/Gruppen ohne Team-Zuordnung sind nur fuer den
+  Nutzer sichtbar, der sie hochgeladen/erstellt hat.
+- **Mit Team-Zuordnung** -> Dateien/Gruppen mit Team-Zuordnung sind nur fuer
+  Mitglieder dieser Teams sichtbar.
+
+**Team-Filter auf der Chat-Seite**
+
+Das "Team"-Dropdown auf der Chat-Seite dient dem Filtern der Suchergebnisse.
+
+- "Alle Teams" (kein Filter) -> Admin sieht alles, normaler Nutzer nur Inhalte
+  aus eigenen Teams.
+- Konkretes Team -> Es werden nur Dateien/Gruppen angezeigt, die diesem Team
+  zugeordnet sind.
+
+Wichtige Unterscheidung je nach Such-Modus:
+
+- **"In Datei(en) suchen"** -> Der Filter wird auf Dateiebene angewendet. Nur
+  Dateien des gewaehlten Teams erscheinen in der Dropdown-Liste.
+- **"In Dateigruppe(n) suchen"** -> Der Filter wird auf Gruppenebene angewendet.
+  Nur Gruppen des gewaehlten Teams erscheinen. Alle Dateien innerhalb dieser
+  Gruppen stehen dann zur Verfuegung, auch wenn die einzelnen Dateien keinem
+  Team zugeordnet sind.
 
 ---
 
