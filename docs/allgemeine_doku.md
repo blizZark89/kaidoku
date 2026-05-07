@@ -82,32 +82,32 @@ Typischer Ablauf:
 
 ### 3. Teams und Sichtbarkeit (konzeptionell)
 
-Es gibt zwei Ebenen, auf denen Teams zugeordnet werden koennen:
+Es gibt zwei Ebenen, auf denen Teams zugeordnet werden können:
 
 **(A) Dateiebene**
 - Jede hochgeladene Datei kann einem oder mehreren Teams zugeordnet werden.
 - Diese Zuordnung wird beim Upload oder in der Dateiverwaltung gesetzt.
-- Wird bei der Suche nach einzelnen Dateien beruecksichtigt.
+- Wird bei der Suche nach einzelnen Dateien berücksichtigt.
 
 **(B) Gruppenebene**
 - Jede Dateigruppe kann einem oder mehreren Teams zugeordnet werden.
 - Diese Zuordnung wird in der Dateiverwaltung unter "Dateisammlung" gesetzt.
-- Wird bei der Suche nach Dateigruppen beruecksichtigt.
+- Wird bei der Suche nach Dateigruppen berücksichtigt.
 
-Wichtig: Die beiden Ebenen sind unabhaengig voneinander. Eine Dateigruppe kann
-Team A zugeordnet sein, waehrend die enthaltenen Dateien selbst keinem Team
+Wichtig: Die beiden Ebenen sind unabhängig voneinander. Eine Dateigruppe kann
+Team A zugeordnet sein, während die enthaltenen Dateien selbst keinem Team
 zugeordnet sind (oder einem anderen).
 
 **Sichtbarkeit – Wer sieht was?**
 
 Die Sichtbarkeit wird bei jedem Zugriff berechnet. Es gibt folgende Regeln:
 
-- **Admins** -> Sehen alle Dateien und Gruppen, unabhaengig von Team-Zuordnung.
+- **Admins** -> Sehen alle Dateien und Gruppen, unabhängig von Team-Zuordnung.
 - **Globale Teams** -> Dateien/Gruppen, die einem als "global sichtbar" markierten
-  Team zugeordnet sind, werden fuer alle Nutzer angezeigt.
-- **Ohne Team-Zuordnung** -> Dateien/Gruppen ohne Team-Zuordnung sind nur fuer den
+  Team zugeordnet sind, werden für alle Nutzer angezeigt.
+- **Ohne Team-Zuordnung** -> Dateien/Gruppen ohne Team-Zuordnung sind nur für den
   Nutzer sichtbar, der sie hochgeladen/erstellt hat.
-- **Mit Team-Zuordnung** -> Dateien/Gruppen mit Team-Zuordnung sind nur fuer
+- **Mit Team-Zuordnung** -> Dateien/Gruppen mit Team-Zuordnung sind nur für
   Mitglieder dieser Teams sichtbar.
 
 **Team-Filter auf der Chat-Seite**
@@ -122,10 +122,10 @@ Das "Team"-Dropdown auf der Chat-Seite dient dem Filtern der Suchergebnisse.
 Wichtige Unterscheidung je nach Such-Modus:
 
 - **"In Datei(en) suchen"** -> Der Filter wird auf Dateiebene angewendet. Nur
-  Dateien des gewaehlten Teams erscheinen in der Dropdown-Liste.
+  Dateien des gewählten Teams erscheinen in der Dropdown-Liste.
 - **"In Dateigruppe(n) suchen"** -> Der Filter wird auf Gruppenebene angewendet.
-  Nur Gruppen des gewaehlten Teams erscheinen. Alle Dateien innerhalb dieser
-  Gruppen stehen dann zur Verfuegung, auch wenn die einzelnen Dateien keinem
+  Nur Gruppen des gewählten Teams erscheinen. Alle Dateien innerhalb dieser
+  Gruppen stehen dann zur Verfügung, auch wenn die einzelnen Dateien keinem
   Team zugeordnet sind.
 
 ---
@@ -143,28 +143,28 @@ Wichtige Unterscheidung je nach Such-Modus:
 
 **4.2 Indexierung**
 - Dokumente werden automatisch analysiert
-- Inhalte werden in Suchindizes ueberfuehrt
+- Inhalte werden in Suchindizes überführt
 - Status wird in der Datei-Liste angezeigt -> z. B. "fertig" oder "in Bearbeitung"
-- Bereits indexierte Dateien stehen sofort im Chat zur Verfuegung
+- Bereits indexierte Dateien stehen sofort im Chat zur Verfügung
 
 **4.3 Quellen statt Dateien**
 - jede indexierte Datei erscheint als **Quelle** in der Uebersicht
-- selbst wenn die Originaldatei geloescht wird, bleibt die Quelle erhalten
-- erst das **Loeschen der Quelle** entfernt den Inhalt endgueltig aus dem System
+- selbst wenn die Originaldatei gelöscht wird, bleibt die Quelle erhalten
+- erst das **Loeschen der Quelle** entfernt den Inhalt endgültig aus dem System
 
 **4.4 Team-Zuordnung beim Upload**
-- Dateien koennen direkt einem oder mehreren Teams zugewiesen werden
-- ohne Zuordnung bleibt die Datei nur fuer den Ersteller sichtbar
-- spaetere Aenderungen sind in der Dateiverwaltung moeglich
+- Dateien können direkt einem oder mehreren Teams zugewiesen werden
+- ohne Zuordnung bleibt die Datei nur für den Ersteller sichtbar
+- spätere Änderungen sind in der Dateiverwaltung möglich
 
 ---
 
 ### 5. Dateigruppen
 
-- Dokumente koennen in Gruppen organisiert werden
+- Dokumente können in Gruppen organisiert werden
 - Gruppen erleichtern die strukturierte Suche im Chat
-- Gruppen koennen automatisch oder manuell gepflegt werden
-- jede Gruppe kann eigenen Teams zugeordnet werden -> unabhaengig von den Dateien darin
+- Gruppen können automatisch oder manuell gepflegt werden
+- jede Gruppe kann eigenen Teams zugeordnet werden -> unabhängig von den Dateien darin
 
 Im Chat kann gezielt gesucht werden:
 - in einzelnen Dateien
