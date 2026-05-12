@@ -234,13 +234,24 @@ def _effective_search_team_ids(actor, team_filter="", global_team_ids=None) -> s
     return actor_team_ids.union(visible_global_team_ids)
 
 
-def _source_matches_search_team(source, actor, effective_team_ids, team_ref_map=None) -> bool:
+def _source_matches_search_team(
+    source,
+    actor,
+    effective_team_ids,
+    team_ref_map=None,
+    team_filter="",
+) -> bool:
     if effective_team_ids is None:
         return True
 
     source_team_ids = set(_source_team_ids(source, team_ref_map))
     if not source_team_ids:
-        return False
+        # Ohne Team-Zuordnung sollen eigene Uploads weiterhin auffindbar sein,
+        # solange kein expliziter Team-Filter gesetzt ist.
+        if str(team_filter or "").strip():
+            return False
+        actor_user_id = getattr(getattr(actor, "user", None), "id", None)
+        return bool(actor_user_id and getattr(source, "user", None) == actor_user_id)
 
     return bool(source_team_ids.intersection(effective_team_ids))
 
@@ -2171,6 +2182,16 @@ class FileIndexPage(BasePage):
 
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
             team_ref_map = _team_ref_map(session)
+            visible_sources = []
+            for each in session.execute(statement).all():
+                source = each[0]
+                if self._app.f_user_management and not _source_visible_to_actor(
+                    source, actor, visible_global_team_ids, scope_ids, team_ref_map
+                ):
+                    continue
+                visible_sources.append(source)
+
+            visible_source_ids = {source.id for source in visible_sources}
             file_id_to_groups: dict[str, list[str]] = {}
             for row in session.execute(select(FileGroup)).all():
                 group = row[0]
@@ -2183,19 +2204,19 @@ class FileIndexPage(BasePage):
                 if actor and not _group_visible_to_actor(
                     group, actor, visible_global_team_ids, scope_ids, team_ref_map
                 ):
-                    continue
+                    # Fallback: Wenn eine Gruppe sichtbare Dateien enthält,
+                    # soll der Gruppenname in der Dateiliste angezeigt werden,
+                    # auch wenn die Gruppe selbst nicht direkt auswählbar ist.
+                    group_file_ids = (group.data or {}).get("files", [])
+                    if not any(file_id in visible_source_ids for file_id in group_file_ids):
+                        continue
                 for file_id in (group.data or {}).get("files", []):
                     file_id_to_groups.setdefault(file_id, []).append(
                         _display_group_name(group.name)
                     )
 
             results = []
-            for each in session.execute(statement).all():
-                source = each[0]
-                if self._app.f_user_management and not _source_visible_to_actor(
-                    source, actor, visible_global_team_ids, scope_ids, team_ref_map
-                ):
-                    continue
+            for source in visible_sources:
                 group_names = sorted(file_id_to_groups.get(source.id, []))
                 results.append(
                     {
@@ -2708,7 +2729,13 @@ class FileSelector(BasePage):
                     source = result[0]
                     if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map):
                         continue
-                    if not _source_matches_search_team(source, actor, effective_team_ids, team_ref_map):
+                    if not _source_matches_search_team(
+                        source,
+                        actor,
+                        effective_team_ids,
+                        team_ref_map,
+                        team_filter,
+                    ):
                         continue
                     file_ids.append(source.id)
             else:
@@ -2794,7 +2821,13 @@ class FileSelector(BasePage):
             for source in visible_sources:
                 if current_mode != "group_select":
                     if self._app.f_user_management:
-                        if not _source_matches_search_team(source, actor, effective_team_ids, team_ref_map):
+                        if not _source_matches_search_team(
+                            source,
+                            actor,
+                            effective_team_ids,
+                            team_ref_map,
+                            team_filter,
+                        ):
                             continue
                     else:
                         source_team_ids = _source_team_ids(source, team_ref_map)
