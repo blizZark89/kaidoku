@@ -2174,7 +2174,11 @@ class FileIndexPage(BasePage):
             file_id_to_groups: dict[str, list[str]] = {}
             for row in session.execute(select(FileGroup)).all():
                 group = row[0]
-                if scope_ids is not None and getattr(group, "user", None) not in scope_ids:
+                if (
+                    scope_ids is not None
+                    and not self._app.f_user_management
+                    and getattr(group, "user", None) not in scope_ids
+                ):
                     continue
                 if actor and not _group_visible_to_actor(
                     group, actor, visible_global_team_ids, scope_ids, team_ref_map
