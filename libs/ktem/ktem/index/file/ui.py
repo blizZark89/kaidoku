@@ -219,7 +219,7 @@ def _group_deletable_by_actor(group, user_id, actor=None) -> bool:
     return _group_deletable_by_user(group, user_id)
 
 
-def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
+def _effective_search_team_ids(actor, team_filter="", global_team_ids=None) -> set[str] | None:
     normalized_team_filter = str(team_filter or "").strip()
     if normalized_team_filter:
         return {normalized_team_filter}
@@ -227,7 +227,11 @@ def _effective_search_team_ids(actor, team_filter="") -> set[str] | None:
     if actor is None or actor.is_admin:
         return None
 
-    return {team_id for team_id in actor.team_ids if str(team_id).strip()}
+    actor_team_ids = {team_id for team_id in actor.team_ids if str(team_id).strip()}
+    visible_global_team_ids = {
+        team_id for team_id in (global_team_ids or []) if str(team_id).strip()
+    }
+    return actor_team_ids.union(visible_global_team_ids)
 
 
 def _source_matches_search_team(source, actor, effective_team_ids, team_ref_map=None) -> bool:
@@ -2691,8 +2695,10 @@ class FileSelector(BasePage):
                     )
             results = session.execute(statement).all()
             if self._app.f_user_management:
-                effective_team_ids = _effective_search_team_ids(actor, team_filter)
                 visible_global_team_ids = globally_visible_team_ids(session)
+                effective_team_ids = _effective_search_team_ids(
+                    actor, team_filter, visible_global_team_ids
+                )
                 team_ref_map = _team_ref_map(session)
                 for result in results:
                     source = result[0]
@@ -2749,10 +2755,13 @@ class FileSelector(BasePage):
                 visible_teams = list_teams(session)
                 visible_team_map = {t.id: t.name for t in visible_teams}
                 visible_team_ids = []
+                visible_global_team_ids = globally_visible_team_ids(session)
                 if actor.is_admin:
                     visible_team_ids = [team.id for team in visible_teams]
                 else:
-                    visible_team_ids = list(dict.fromkeys(list(actor.team_ids)))
+                    visible_team_ids = list(
+                        dict.fromkeys(list(actor.team_ids) + list(visible_global_team_ids))
+                    )
                 for team_id in visible_team_ids:
                     team_filter_choices.append((visible_team_map.get(team_id, team_id), team_id))
             if self._index.config.get("private", False):
@@ -2767,7 +2776,9 @@ class FileSelector(BasePage):
 
             results = session.execute(statement).all()
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
-            effective_team_ids = _effective_search_team_ids(actor, team_filter)
+            effective_team_ids = _effective_search_team_ids(
+                actor, team_filter, visible_global_team_ids
+            )
             team_ref_map = _team_ref_map(session)
             visible_sources = []
             for result in results:
