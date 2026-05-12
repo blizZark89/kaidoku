@@ -80,53 +80,102 @@ Typischer Ablauf:
 
 ---
 
-### 3. Teams und Sichtbarkeit (konzeptionell)
+### 3. Benutzer
+
+Sichtbar für: Admin + Key User (Key User sieht nur eingeschränkte Ansicht)
+
+Dieser Tab hat drei Untertabs:
+
+**3.1 Benutzerliste**
+
+- Tabelle mit Spalten: id, username, role, team, standardteam, can_read, can_upload
+  - Sortierbar nach jeder Spalte (Dropdown "Sortieren nach" + aufsteigend/absteigend)
+- Beim Klick auf einen Benutzer öffnet sich der Bearbeitungsbereich:
+  - Benutzername — editierbar (3-32 Zeichen, nur Buchstaben/Zahlen/Unterstriche)
+  - Passwort ändern + Passwort bestätigen (beide Passwort-Felder, nur ausfüllen wenn geändert werden soll)
+  - Rolle — Dropdown, je nach Berechtigung des eingeloggten Users:
+    - Wenn du Admin bist: du siehst alle 3 Rollen -> admin, key_user, user
+    - Wenn du Key User bist: du siehst nur user
+    - Ein normaler User sieht nur sich selbst und kann das Standardteam ändern
+  - Teams — Mehrfachauswahl (Dropdown)
+    - Admin sieht ALLE Teams
+    - Key User sieht nur die Teams, die er selbst managt (seine eigenen Teams ohne globale Teams)
+  - Standardteam — Dropdown (einfach)
+    - Admin: alle Teams wählbar
+    - Key User: eigene Teams + globale Teams
+  - Leserechte (Checkbox) — für Rolle "user" manuell setzbar; Admin/Key User haben automatisch true
+  - Upload-Rechte (Checkbox) — für Rolle "user" manuell setzbar; Admin/Key User haben automatisch true
+  - Buttons: Speichern | Löschen (mit Bestätigungsdialog "Löschen bestätigen" / "Abbrechen") | Schließen
+
+Rollen-Detail:
+
+| Rolle | Berechtigungen |
+|---|---|
+| admin | Vollzugriff auf alle Ressourcen-Tabs, kann alle Rollen vergeben, sieht alle Benutzer, kein Team-Zwang |
+| key_user | Sieht nur den Benutzer-Tab, darf nur user-Rolle anlegen/bearbeiten (innerhalb seiner Teams), kann keine Admins/Key User managen. Automatisch Lese- und Upload-Rechte. |
+| user | Basis-Rolle, sieht keine Ressourcen-Tabs. Lese-/Upload-Rechte sind einzeln konfigurierbar. Default: Lesen=ja, Upload=nein. |
+
+Einschränkungen beim Bearbeiten:
+- Ein User kann sich nicht selbst löschen
+- Ein User (nicht Admin) darf für sich selbst nur das Standardteam ändern
+- Ein Key User darf nur User in seinen eigenen Teams bearbeiten/löschen
+- Admin darf keine Team-Zuordnung haben (wird zurückgewiesen)
+- Key User und User müssen mindestens einem Team zugeordnet sein
+
+**3.2 Benutzer anlegen**
+
+- Benutzername (Textfeld)
+- Passwort + Passwort bestätigen (beide versteckt)
+- Rolle — Dropdown (angepasst an Berechtigung des Erstellers)
+  - Admin: user, key_user, admin
+  - Key User: nur user
+- Teams — Mehrfachauswahl
+- Standardteam — Dropdown
+- Leserechte (Checkbox, default: true)
+- Upload-Rechte (Checkbox, default: false)
+- Regeln-Übersicht (zwei Markdown-Blöcke):
+  - Benutzername-Regeln: 3-32 Zeichen, keine Groß-/Kleinschreibung, nur Buchstaben/Zahlen/Unterstriche
+  - Passwort-Regeln: mind. 8 Zeichen, 1 Großbuchstabe, 1 Kleinbuchstabe, 1 Ziffer, 1 Sonderzeichen
+- "Benutzer anlegen" Button
+
+**3.3 Teams**
 
 Es gibt zwei Ebenen, auf denen Teams zugeordnet werden können:
 
 **(A) Dateiebene**
+
 - Jede hochgeladene Datei kann einem oder mehreren Teams zugeordnet werden.
 - Diese Zuordnung wird beim Upload oder in der Dateiverwaltung gesetzt.
 - Wird bei der Suche nach einzelnen Dateien berücksichtigt.
 
 **(B) Gruppenebene**
+
 - Jede Dateigruppe kann einem oder mehreren Teams zugeordnet werden.
 - Diese Zuordnung wird in der Dateiverwaltung unter "Dateisammlung" gesetzt.
 - Wird bei der Suche nach Dateigruppen berücksichtigt.
 
-Wichtig: Die beiden Ebenen sind unabhängig voneinander. Eine Dateigruppe kann
-Team A zugeordnet sein, während die enthaltenen Dateien selbst keinem Team
-zugeordnet sind (oder einem anderen).
+Wichtig: Die beiden Ebenen sind unabhängig voneinander. Eine Dateigruppe kann Team A zugeordnet sein, während die enthaltenen Dateien selbst keinem Team zugeordnet sind (oder einem anderen).
 
-**Sichtbarkeit – Wer sieht was?**
+Sichtbarkeit – Wer sieht was?
 
 Die Sichtbarkeit wird bei jedem Zugriff berechnet. Es gibt folgende Regeln:
 
 - **Admins** -> Sehen alle Dateien und Gruppen, unabhängig von Team-Zuordnung.
-- **Globale Teams** -> Dateien/Gruppen, die einem als "global sichtbar" markierten
-  Team zugeordnet sind, werden für alle Nutzer angezeigt.
-- **Ohne Team-Zuordnung** -> Dateien/Gruppen ohne Team-Zuordnung sind nur für den
-  Nutzer sichtbar, der sie hochgeladen/erstellt hat.
-- **Mit Team-Zuordnung** -> Dateien/Gruppen mit Team-Zuordnung sind nur für
-  Mitglieder dieser Teams sichtbar.
+- **Globale Teams** -> Dateien/Gruppen, die einem als "global sichtbar" markierten Team zugeordnet sind, werden für alle Nutzer angezeigt.
+- **Ohne Team-Zuordnung** -> Dateien/Gruppen ohne Team-Zuordnung sind nur für den Nutzer sichtbar, der sie hochgeladen/erstellt hat.
+- **Mit Team-Zuordnung** -> Dateien/Gruppen mit Team-Zuordnung sind nur für Mitglieder dieser Teams sichtbar.
 
-**Team-Filter auf der Chat-Seite**
+Team-Filter auf der Chat-Seite
 
 Das "Team"-Dropdown auf der Chat-Seite dient dem Filtern der Suchergebnisse.
 
-- "Alle Teams" (kein Filter) -> Admin sieht alles, normaler Nutzer nur Inhalte
-  aus eigenen Teams.
-- Konkretes Team -> Es werden nur Dateien/Gruppen angezeigt, die diesem Team
-  zugeordnet sind.
+- "Alle Teams" (kein Filter) -> Admin sieht alles, normaler Nutzer nur Inhalte aus eigenen Teams.
+- Konkretes Team -> Es werden nur Dateien/Gruppen angezeigt, die diesem Team zugeordnet sind.
 
 Wichtige Unterscheidung je nach Such-Modus:
 
-- **"In Datei(en) suchen"** -> Der Filter wird auf Dateiebene angewendet. Nur
-  Dateien des gewählten Teams erscheinen in der Dropdown-Liste.
-- **"In Dateigruppe(n) suchen"** -> Der Filter wird auf Gruppenebene angewendet.
-  Nur Gruppen des gewählten Teams erscheinen. Alle Dateien innerhalb dieser
-  Gruppen stehen dann zur Verfügung, auch wenn die einzelnen Dateien keinem
-  Team zugeordnet sind.
+- **"In Datei(en) suchen"** -> Der Filter wird auf Dateiebene angewendet. Nur Dateien des gewählten Teams erscheinen in der Dropdown-Liste.
+- **"In Dateigruppe(n) suchen"** -> Der Filter wird auf Gruppenebene angewendet. Nur Gruppen des gewählten Teams erscheinen. Alle Dateien innerhalb dieser Gruppen stehen dann zur Verfügung, auch wenn die einzelnen Dateien keinem Team zugeordnet sind.
 
 ---
 
