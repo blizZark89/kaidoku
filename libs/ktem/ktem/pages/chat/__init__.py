@@ -50,7 +50,7 @@ if KH_WEB_SEARCH_BACKEND:
 
 REASONING_LIMITS = 2 if KH_DEMO_MODE else 10
 DEFAULT_SETTING = "(default)"
-INFO_PANEL_SCALES = {True: 5, False: 6}
+INFO_PANEL_SCALES = {True: 4, False: 6}
 DEFAULT_QUESTION = (
     "Was ist die Zusammenfassung dieses Dokuments?"
     if not KH_DEMO_MODE
