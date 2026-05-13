@@ -8,6 +8,10 @@
 2. [Docker](https://www.docker.com/): optional, if you [install with Docker](#with-docker-recommended)
 3. [Unstructured](https://docs.unstructured.io/open-source/installation/full-installation#full-installation) if you want to process files other than `.pdf`, `.html`, `.mhtml`, and `.xlsx` documents. Installation steps differ depending on your operating system. Please visit the link and follow the specific instructions provided there.
 
+### pdf Viewer
+
+To enable in-browser `PDF_JS viewer`, download [PDF_JS_DIST](https://github.com/mozilla/pdf.js/releases/download/v4.0.379/pdfjs-4.0.379-dist.zip)  extract it to libs/ktem/ktem/assets/prebuilt
+
 ### With Docker (recommended)
 
 ```shell
