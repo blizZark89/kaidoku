@@ -897,7 +897,10 @@ class FileIndexPage(BasePage):
                             label="Web-URLs eingeben",
                             lines=8,
                         )
-                        gr.Markdown("(durch Zeilenumbruch getrennt)")
+                        gr.Markdown(
+                            "- Aktueller Stand der Links wird indexiert.\n"
+                            "- Mehrere Links durch Zeilenumbruch trennen."
+                        )
 
                     with gr.Accordion("Erweiterte Indexierungsoptionen", open=False):
                         with gr.Row():
