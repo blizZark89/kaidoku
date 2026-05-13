@@ -12,6 +12,8 @@
 
 To enable in-browser `PDF_JS viewer`, download [PDF_JS_DIST](https://github.com/mozilla/pdf.js/releases/download/v4.0.379/pdfjs-4.0.379-dist.zip)  extract it to libs/ktem/ktem/assets/prebuilt
 
+<img src="https://raw.githubusercontent.com/Cinnamon/kotaemon/main/docs/images/pdf-viewer-setup.png" alt="pdf-setup" width="250">
+
 ### With Docker (recommended)
 
 ```shell
