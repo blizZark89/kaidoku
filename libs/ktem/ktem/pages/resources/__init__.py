@@ -9,6 +9,7 @@ from ktem.mcp.ui import MCPManagement
 from ktem.rerankings.ui import RerankingManagement
 from sqlmodel import Session
 
+from .team import TeamManagement
 from .user import UserManagement
 
 
@@ -18,6 +19,13 @@ class ResourcesTab(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
+        if self._app.f_user_management:
+            with gr.Tab("Benutzer", visible=False) as self.user_management_tab:
+                self.user_management = UserManagement(self._app)
+
+            with gr.Tab("Teams", visible=False) as self.team_management_tab:
+                self.team_management = TeamManagement(self._app)
+
         with gr.Tab("Index-Sammlungen", visible=False) as self.index_management_tab:
             self.index_management = IndexManagement(self._app)
 
@@ -32,10 +40,6 @@ class ResourcesTab(BasePage):
 
         with gr.Tab("MCP-Server", visible=False) as self.mcp_management_tab:
             self.mcp_management = MCPManagement(self._app)
-
-        if self._app.f_user_management:
-            with gr.Tab("Benutzer", visible=False) as self.user_management_tab:
-                self.user_management = UserManagement(self._app)
 
     def on_subscribe_public_events(self):
         if self._app.f_user_management:
@@ -71,15 +75,17 @@ class ResourcesTab(BasePage):
             )
 
     def _management_tabs(self):
-        tabs = [
+        tabs = []
+        if self._app.f_user_management:
+            tabs.append(self.user_management_tab)
+            tabs.append(self.team_management_tab)
+        tabs.extend([
             self.index_management_tab,
             self.llm_management_tab,
             self.emb_management_tab,
             self.rerank_management_tab,
             self.mcp_management_tab,
-        ]
-        if self._app.f_user_management:
-            tabs.append(self.user_management_tab)
+        ])
         return tabs
 
     def toggle_management_tabs(self, user_id):
@@ -88,11 +94,15 @@ class ResourcesTab(BasePage):
             is_admin = bool(actor and actor.is_admin)
             can_manage_users = bool(actor and (actor.is_admin or actor.is_key_user))
 
-        return [
-            gr.update(visible=is_admin),
-            gr.update(visible=is_admin),
-            gr.update(visible=is_admin),
-            gr.update(visible=is_admin),
-            gr.update(visible=is_admin),
-            gr.update(visible=can_manage_users),
-        ]
+        updates = []
+        if self._app.f_user_management:
+            updates.append(gr.update(visible=can_manage_users))  # Benutzer
+            updates.append(gr.update(visible=is_admin))          # Teams
+        updates.extend([
+            gr.update(visible=is_admin),  # Index-Sammlungen
+            gr.update(visible=is_admin),  # LLMs
+            gr.update(visible=is_admin),  # Embeddings
+            gr.update(visible=is_admin),  # Rerankings
+            gr.update(visible=is_admin),  # MCP-Server
+        ])
+        return updates
