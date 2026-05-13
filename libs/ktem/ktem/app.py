@@ -185,7 +185,7 @@ class BaseApp:
         """
         external_js = (
             "<script type='module' "
-            "src='https://cdn.skypack.dev/pdfjs-viewer-element'>"
+            "src='https://unpkg.com/pdfjs-viewer-element'>"
             "</script>"
             "<script type='module' "
             "src='https://cdnjs.cloudflare.com/ajax/libs/tributejs/5.1.3/tribute.min.js'>"  # noqa
