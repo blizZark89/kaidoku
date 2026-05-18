@@ -1,4 +1,5 @@
 import logging
+import re
 from textwrap import dedent
 
 from ktem.llms.manager import llms
@@ -51,14 +52,18 @@ Context:
 
 Generate a sample PlantUML mindmap for based on the provided question and context above. Only includes context relevant to the question to produce the mindmap.
 
+IMPORTANT: For each non-root node that refers to content from a specific source document, append the source filename and page number at the end of the node label using this format: [filename.pdf:page_number]
+For example: "*** Access Control [usermanual.pdf:12]"
+The Context above already contains source information like "Content from filename.pdf (Page X)". Use that information to annotate your mindmap nodes.
+
 Use the template like this:
 
 @startmindmap
 * Title
-** Item A
-*** Item B
-**** Item C
-*** Item D
+** Item A [source.pdf:3]
+*** Item B [source.pdf:3]
+**** Item C [another.pdf:7]
+*** Item D [source.pdf:5]
 @endmindmap
     """  # noqa: E501
     prompt_template: str = MINDMAP_PROMPT_TEMPLATE
@@ -76,6 +81,31 @@ Use the template like this:
             text = ""
 
         return text
+
+    @classmethod
+    def extract_source_refs_from_markdown(
+        cls, markdown_text: str
+    ) -> dict[str, list[tuple[str, str]]]:
+        """Extract source file + page references from mindmap nodes.
+
+        Returns a dict mapping node text (without source annotation) to
+        list of (filename, page) tuples.
+        """
+        refs: dict[str, list[tuple[str, str]]] = {}
+        pattern = re.compile(r"\[([^\[\]]+\.pdf)\s*:\s*(\d+)\]", re.IGNORECASE)
+
+        for line in markdown_text.split("\n"):
+            match = pattern.search(line)
+            if match:
+                filename = match.group(1).strip()
+                page = match.group(2).strip()
+                # Get node label without the source annotation
+                clean_line = pattern.sub("", line).strip()
+                node_text = clean_line.lstrip("#").strip()
+                if node_text:
+                    refs.setdefault(node_text, []).append((filename, page))
+
+        return refs
 
     def run(self, question: str, context: str) -> Document:  # type: ignore
         prompt_template = PromptTemplate(self.prompt_template)
