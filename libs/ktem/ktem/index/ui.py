@@ -24,7 +24,7 @@ def update_current_module_atime():
 
 def format_description(cls):
     user_settings = cls.get_admin_settings()
-    params_lines = ["| Name | Standard | Beschreibung |", "| --- | --- | --- |"]
+    params_lines = ["| Name | Default | Beschreibung |", "| --- | --- | --- |"]
     for key, value in user_settings.items():
         params_lines.append(
             f"| {key} | {value.get('value', '')} | {value.get('info', '')} |"

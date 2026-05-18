@@ -23,16 +23,20 @@ def generate_uuid():
 
 class FileIndex(BaseIndex):
     """
-    File index to store and allow retrieval of files
+    Datei-Index zum Speichern und Abrufen von Dateien
 
-    The file index stores files in a local folder and index them for retrieval.
-    This file index provides the following infrastructure to support the indexing:
-        - SQL table Source: store the list of files that are indexed by the system
-        - Vector store: contain the embedding of segments of the files
-        - Document store: contain the text of segments of the files. Each text stored
-        in this document store is associated with a vector in the vector store.
-        - SQL table Index: store the relationship between (1) the source and the
-        docstore, and (2) the source and the vector store.
+    Der Datei-Index speichert Dateien in einem lokalen Ordner und indiziert sie
+    für den Abruf.
+    Dieser Datei-Index stellt die folgende Infrastruktur zur Unterstützung der
+    Indexierung bereit:
+        - SQL-Tabelle Source: speichert die Liste der vom System indizierten
+        Dateien
+        - Vector Store: enthält die Embeddings der Segmente der Dateien
+        - Document Store: enthält den Text der Segmente der Dateien. Jeder
+        gespeicherte Text in diesem Document Store ist mit einem Vektor im
+        Vector Store verknüpft.
+        - SQL-Tabelle Index: speichert die Beziehung zwischen (1) der Quelle
+        und dem Document Store sowie (2) der Quelle und dem Vector Store.
     """
 
     def __init__(self, app, id: int, name: str, config: dict):
