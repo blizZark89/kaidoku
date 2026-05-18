@@ -12,7 +12,7 @@ from .manager import embedding_models_manager
 
 def format_description(cls):
     params = cls.describe()["params"]
-    params_lines = ["| Name | Type | Description |", "| --- | --- | --- |"]
+    params_lines = ["| Name | Type | Beschreibung |", "| --- | --- | --- |"]
     for key, value in params.items():
         if isinstance(value["auto_callback"], str):
             continue
