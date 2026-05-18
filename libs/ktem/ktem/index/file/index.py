@@ -390,27 +390,27 @@ class FileIndex(BaseIndex):
                 "value": embedding_default,
                 "component": "dropdown",
                 "choices": embedding_choices,
-                "info": "The name of embedding model to use.",
+                "info": "Der Name des zu verwendenden Embedding-Modells.",
             },
             "supported_file_types": {
                 "name": "Supported file types",
                 "value": ".pdf, .txt",
                 "component": "text",
-                "info": "The file types that can be indexed, separated by comma.",
+                "info": "Die Dateitypen, die indiziert werden können, durch Komma getrennt.",
             },
             "max_file_size": {
                 "name": "Max file size (MB)",
                 "value": 1000,
                 "component": "number",
-                "info": "The maximum size of file. Set 0 to disable.",
+                "info": "Die maximale Dateigröße. 0 zum Deaktivieren.",
             },
             "max_number_of_files": {
                 "name": "Max number of files that can be indexed",
                 "value": 0,
                 "component": "number",
                 "info": (
-                    "The total number of files that can be indexed on the system. "
-                    "Set 0 to disable."
+                    "Die Gesamtzahl der Dateien, die auf dem System indiziert werden "
+                    "können. 0 zum Deaktivieren."
                 ),
             },
             "private": {
@@ -418,15 +418,15 @@ class FileIndex(BaseIndex):
                 "value": False,
                 "component": "radio",
                 "choices": [("Yes", True), ("No", False)],
-                "info": "If private, files will not be accessible across users.",
+                "info": "Wenn privat, sind Dateien nicht für andere Benutzer zugänglich.",
             },
             "chunk_size": {
                 "name": "Size of chunk (number of tokens)",
                 "value": 0,
                 "component": "number",
                 "info": (
-                    "Number of tokens of each text segment. "
-                    "Set 0 to use developer setting."
+                    "Anzahl der Token jedes Textsegments. "
+                    "0 für Entwickler-Einstellung."
                 ),
             },
             "chunk_overlap": {
@@ -434,9 +434,8 @@ class FileIndex(BaseIndex):
                 "value": 0,
                 "component": "number",
                 "info": (
-                    "Number of tokens that consecutive text segments "
-                    "should overlap with each other. "
-                    "Set 0 to use developer setting."
+                    "Anzahl der Token, die aufeinanderfolgende Textsegmente "
+                    "überlappen sollen. 0 für Entwickler-Einstellung."
                 ),
             },
         }
