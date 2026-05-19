@@ -144,7 +144,7 @@ function() {
     setTimeout(() => {
         var mindmap_el = document.querySelector('svg.markmap');
 
-        var text_nodes = document.querySelectorAll("svg.markmap div");
+        var text_nodes = document.querySelectorAll("svg.markmap .markmap-node text");
         for (var i = 0; i < text_nodes.length; i++) {
             text_nodes[i].onclick = fillChatInput;
         }
