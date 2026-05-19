@@ -144,9 +144,19 @@ function() {
     setTimeout(() => {
         var mindmap_el = document.querySelector('svg.markmap');
 
-        var text_nodes = document.querySelectorAll("svg.markmap .markmap-node text");
-        for (var i = 0; i < text_nodes.length; i++) {
-            text_nodes[i].onclick = fillChatInput;
+        // Event delegation on the SVG: catch any click on text/tspan
+        if (mindmap_el) {
+            mindmap_el.addEventListener('click', function(event) {
+                var target = event.target;
+                // Walk up to find the <text> element
+                var textEl = target.closest ? target.closest('text') : null;
+                if (!textEl && target.tagName === 'tspan') {
+                    textEl = target.parentElement;
+                }
+                if (textEl && textEl.tagName === 'text') {
+                    fillChatInput({ target: textEl });
+                }
+            });
         }
 
         if (mindmap_el) {
