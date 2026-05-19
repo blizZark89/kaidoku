@@ -269,17 +269,15 @@ function run() {
 
   globalThis.fillChatInput = (event) => {
     let text = event.target.textContent || "";
-    // Check for source reference [filename.pdf:page_number]
-    const match = text.match(/\[([^\[\]]+\.pdf)\s*:\s*(\d+)\]/i);
+    // Check for source reference [PDF:page_number]
+    const match = text.match(/\[PDF\s*:\s*(\d+)\]/i);
     if (match) {
-      let filename = match[1].trim();
-      let page = match[2];
-      // Find matching pdf-link in the info panel
+      let page = match[1];
+      // Find any pdf-link with matching page number
       let links = document.querySelectorAll("#html-info-panel .pdf-link");
       for (let link of links) {
-        let src = link.getAttribute("data-src") || "";
         let linkPage = link.getAttribute("data-page");
-        if ((src.endsWith("/" + filename) || src.endsWith(filename)) && linkPage == page) {
+        if (linkPage == page) {
           link.click();
           return;
         }

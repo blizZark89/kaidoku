@@ -52,18 +52,18 @@ Context:
 
 Generate a sample PlantUML mindmap for based on the provided question and context above. Only includes context relevant to the question to produce the mindmap.
 
-IMPORTANT: For each non-root node that refers to content from a specific source document, append the source filename and page number at the end of the node label using this format: [filename.pdf:page_number]
-For example: "*** Access Control [usermanual.pdf:12]"
-The Context above already contains source information like "Content from filename.pdf (Page X)". Use that information to annotate your mindmap nodes.
+IMPORTANT: For each non-root node that refers to content from a specific source document, append PDF and the page number at the end of the node label using this format: [PDF:page_number]
+For example: "*** Access Control [PDF:12]"
+The Context above already contains source information like "Content from filename.pdf (Page X)". Use that information to find the correct page number for each node. Do NOT include the document filename — only write [PDF:X].
 
 Use the template like this:
 
 @startmindmap
 * Title
-** Item A [source.pdf:3]
-*** Item B [source.pdf:3]
-**** Item C [another.pdf:7]
-*** Item D [source.pdf:5]
+** Item A [PDF:3]
+*** Item B [PDF:3]
+**** Item C [PDF:7]
+*** Item D [PDF:5]
 @endmindmap
     """  # noqa: E501
     prompt_template: str = MINDMAP_PROMPT_TEMPLATE
@@ -92,7 +92,7 @@ Use the template like this:
         list of (filename, page) tuples.
         """
         refs: dict[str, list[tuple[str, str]]] = {}
-        pattern = re.compile(r"\[([^\[\]]+\.pdf)\s*:\s*(\d+)\]", re.IGNORECASE)
+        pattern = re.compile(r"\[PDF\s*:\s*(\d+)\]", re.IGNORECASE)
 
         for line in markdown_text.split("\n"):
             match = pattern.search(line)
