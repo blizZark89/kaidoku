@@ -1,7 +1,5 @@
 ## Installation
 
-> If you are not a developer and just want to use the app, please check out our easy-to-follow [User Guide](https://cinnamon.github.io/kotaemon/). Download the `.zip` file from the [latest release](https://github.com/Cinnamon/kotaemon/releases/latest) to get all the newest features and bug fixes.
-
 ### System requirements
 
 1. [Python](https://www.python.org/downloads/) >= 3.10
