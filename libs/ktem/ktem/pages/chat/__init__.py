@@ -115,7 +115,7 @@ function() {
 
 pdfview_js = """
 function() {
-    setTimeout(fullTextSearch(), 100);
+    setTimeout(fullTextSearch, 100);
 
     // Get all links and attach click event
     var links = document.getElementsByClassName("pdf-link");
