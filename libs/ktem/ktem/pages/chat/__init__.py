@@ -197,18 +197,19 @@ function() {
         });
         observer.observe(infoPanel, { childList: true, subtree: true });
 
-        // Capture pointerdown on infoPanel — fires BEFORE D3's zoom handlers
-        // D3 blocks 'click' on svg.markmap, but capture fires in capture phase
-        infoPanel.addEventListener("pointerdown", function(evt) {
-            var target = evt.target;
-            if (!target.closest || !target.closest("svg.markmap")) return;
-            var textEl = target.closest("text");
-            if (!textEl && target.tagName === "tspan") {
-                textEl = target.parentElement;
-            }
-            if (textEl && textEl.tagName === "text") {
-                console.log("pdfview_js: mindmap node clicked (capture):", textEl.textContent);
-                fillChatInput({ target: textEl });
+        // DEBUG: catch pointerdown at document level to see if clicks arrive
+        document.addEventListener("pointerdown", function(evt) {
+            console.log("pdfview_js: document pointerdown tag=" + evt.target.tagName + " cls=" + evt.target.className);
+            var inMarkmap = evt.target.closest && evt.target.closest("svg.markmap");
+            if (inMarkmap) {
+                console.log("pdfview_js: IN markmap!");
+                var textEl = evt.target.closest("text");
+                if (textEl) {
+                    console.log("pdfview_js: text found:", textEl.textContent.substring(0, 60));
+                    fillChatInput({ target: textEl });
+                } else {
+                    console.log("pdfview_js: no text element near click");
+                }
             }
         }, { capture: true });
     }
