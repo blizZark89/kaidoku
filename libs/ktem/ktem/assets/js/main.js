@@ -296,3 +296,6 @@ function run() {
     chatInput.focus();
   };
 }
+
+// Run setup on page load
+run();
