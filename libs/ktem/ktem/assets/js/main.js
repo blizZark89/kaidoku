@@ -290,12 +290,37 @@ function run() {
     }
     // Fallback: old behavior — fill chat input
     let chatInput = document.querySelector("#chat-input textarea");
-    chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
-    var evt = new Event("change");
-    chatInput.dispatchEvent(new Event("input", { bubbles: true }));
-    chatInput.focus();
+    if (chatInput) {
+      chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
+      chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+      chatInput.focus();
+    }
   };
 }
 
-// Run setup on page load
-run();
+// Export fillChatInput to global scope for mindmap click handler
+// run() is called by Gradio internally — we don't add run() here
+(function() {
+  if (!globalThis.fillChatInput) {
+    globalThis.fillChatInput = function(event) {
+      var text = event.target.textContent || "";
+      var match = text.match(/\[PDF\s*:\s*(\d+)\]/i);
+      if (match) {
+        var page = match[1];
+        var links = document.querySelectorAll("#html-info-panel .pdf-link");
+        for (var i = 0; i < links.length; i++) {
+          if (links[i].getAttribute("data-page") == page) {
+            links[i].click();
+            return;
+          }
+        }
+      }
+      var chatInput = document.querySelector("#chat-input textarea");
+      if (chatInput) {
+        chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
+        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+        chatInput.focus();
+      }
+    };
+  }
+})();
