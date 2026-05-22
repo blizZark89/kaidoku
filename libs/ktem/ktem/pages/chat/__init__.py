@@ -115,6 +115,31 @@ function() {
 
 pdfview_js = """
 function() {
+    // Export fillChatInput globally for mindmap click handler
+    // (defined here in chat context, not in main.js, to avoid login page conflicts)
+    if (!globalThis.fillChatInput) {
+        globalThis.fillChatInput = function(event) {
+            var text = event.target.textContent || "";
+            var match = text.match(/\[PDF\s*:\s*(\d+)\]/i);
+            if (match) {
+                var page = match[1];
+                var links = document.querySelectorAll("#html-info-panel .pdf-link");
+                for (var i = 0; i < links.length; i++) {
+                    if (links[i].getAttribute("data-page") == page) {
+                        links[i].click();
+                        return;
+                    }
+                }
+            }
+            var chatInput = document.querySelector("#chat-input textarea");
+            if (chatInput) {
+                chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
+                chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+                chatInput.focus();
+            }
+        };
+    }
+
     // Safe fullTextSearch: skip if no bot message yet
     var _bot_msgs = document.querySelectorAll(
         "div#main-chat-bot div.message-row.bot-row"
