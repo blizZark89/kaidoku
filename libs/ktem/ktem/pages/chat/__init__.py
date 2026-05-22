@@ -197,12 +197,11 @@ function() {
             bindMindmapClick(svg);
         }
 
-        // Watch for future SVGs
+        // Watch for future SVGs (stay connected — Gradio may replace the SVG)
         var observer = new MutationObserver(function() {
-            var svg = infoPanel.querySelector("svg.markmap");
-            if (svg) {
-                bindMindmapClick(svg);
-                observer.disconnect();
+            var svgs = infoPanel.querySelectorAll("svg.markmap");
+            for (var i = 0; i < svgs.length; i++) {
+                bindMindmapClick(svgs[i]);
             }
         });
         observer.observe(infoPanel, { childList: true, subtree: true });
