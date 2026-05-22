@@ -115,7 +115,13 @@ function() {
 
 pdfview_js = """
 function() {
-    setTimeout(fullTextSearch, 100);
+    // Safe fullTextSearch: skip if no bot message yet
+    var _bot_msgs = document.querySelectorAll(
+        "div#main-chat-bot div.message-row.bot-row"
+    );
+    if (_bot_msgs.length > 0) {
+        setTimeout(fullTextSearch, 100);
+    }
 
     // Get all links and attach click event
     var links = document.getElementsByClassName("pdf-link");
@@ -141,52 +147,57 @@ function() {
         markmap.autoLoader.renderAll();
     }
 
-    setTimeout(() => {
-        var mindmap_el = document.querySelector('svg.markmap');
+    // --- Mindmap Click-Handler (Event Delegation) ---
+    // Use event delegation on #html-info-panel so it catches clicks even if
+    // the SVG is rendered later (no setTimeout gambling needed).
+    // Run once: remove any old listener first to avoid stacking duplicates.
+    var infoPanel = document.getElementById("html-info-panel");
+    if (infoPanel && !infoPanel._mindmapClickBound) {
+        infoPanel._mindmapClickBound = true;
+        infoPanel.addEventListener("click", function(evt) {
+            var target = evt.target;
+            // Walk up to find the <text> element inside svg.markmap
+            var textEl = target.closest ? target.closest("text") : null;
+            if (!textEl && target.tagName === "tspan") {
+                textEl = target.parentElement;
+            }
+            if (textEl && textEl.tagName === "text" && textEl.closest("svg.markmap")) {
+                fillChatInput({ target: textEl });
+            }
+        });
+    }
 
-        // Event delegation on the SVG: catch any click on text/tspan
-        if (mindmap_el) {
-            mindmap_el.addEventListener('click', function(event) {
-                var target = event.target;
-                // Walk up to find the <text> element
-                var textEl = target.closest ? target.closest('text') : null;
-                if (!textEl && target.tagName === 'tspan') {
-                    textEl = target.parentElement;
-                }
-                if (textEl && textEl.tagName === 'text') {
-                    fillChatInput({ target: textEl });
-                }
-            });
+    // Mindmap toggle + export — run every time (SVG must exist now)
+    setTimeout(function() {
+        var mindmap_el = document.querySelector("svg.markmap");
+        if (!mindmap_el) return;
+
+        function on_svg_export(event) {
+            html = "{html_template}";
+            html = html.replace("{markmap_div}", markmap_div_html);
+            spawnDocument(html, {window: "width=1000,height=1000"});
         }
 
-        if (mindmap_el) {
-            function on_svg_export(event) {
-                html = "{html_template}";
-                html = html.replace("{markmap_div}", markmap_div_html);
-                spawnDocument(html, {window: "width=1000,height=1000"});
-            }
-
-            var link = document.getElementById("mindmap-toggle");
-            if (link) {
-                link.onclick = function(event) {
-                    event.preventDefault(); // Prevent the default link behavior
-                    var div = document.querySelector("div.markmap");
-                    if (div) {
-                        var currentHeight = div.style.height;
-                        if (currentHeight === '400px' || (currentHeight === '')) {
-                            div.style.height = '650px';
-                        } else {
-                            div.style.height = '400px'
-                        }
+        var link = document.getElementById("mindmap-toggle");
+        if (link) {
+            link.onclick = function(event) {
+                event.preventDefault();
+                var div = document.querySelector("div.markmap");
+                if (div) {
+                    var currentHeight = div.style.height;
+                    if (currentHeight === "400px" || currentHeight === "") {
+                        div.style.height = "650px";
+                    } else {
+                        div.style.height = "400px";
                     }
-                };
-            }
-
-            if (markmap_div_html) {
-                var link = document.getElementById("mindmap-export");
-                if (link) {
-                    link.addEventListener('click', on_svg_export);
                 }
+            };
+        }
+
+        if (markmap_div_html) {
+            var link2 = document.getElementById("mindmap-export");
+            if (link2) {
+                link2.addEventListener("click", on_svg_export);
             }
         }
     }, 250);
