@@ -474,11 +474,6 @@ div.markmap {
   height: 400px;
 }
 
-/* Markmap-Knoten: cursor pointer, da klickbar (öffnet PDF oder Explain) */
-svg.markmap text {
-  cursor: pointer;
-}
-
 #google-login {
   max-width: 450px;
 }

@@ -1,9 +1,5 @@
 function run() {
-  // Safety: only run on pages with chat (login page has no chat-tab)
-  var chatTab = document.getElementById("chat-tab");
-  if (!chatTab) return;
-
-  let main_parent = chatTab.parentNode;
+  let main_parent = document.getElementById("chat-tab").parentNode;
 
   main_parent.childNodes[0].classList.add("header-bar");
   main_parent.style = "padding: 0; margin: 0";
@@ -147,11 +143,6 @@ function run() {
     );
     var last_bot_message = bot_messages[bot_messages.length - 1];
 
-    // Safety: no bot message yet
-    if (!last_bot_message) {
-      return;
-    }
-
     // check if the last bot message has class "text_selection"
     if (last_bot_message.classList.contains("text_selection")) {
       return;
@@ -294,37 +285,9 @@ function run() {
     }
     // Fallback: old behavior — fill chat input
     let chatInput = document.querySelector("#chat-input textarea");
-    if (chatInput) {
-      chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
-      chatInput.dispatchEvent(new Event("input", { bubbles: true }));
-      chatInput.focus();
-    }
+    chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
+    var evt = new Event("change");
+    chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+    chatInput.focus();
   };
 }
-
-// Export fillChatInput to global scope for mindmap click handler
-// run() is called by Gradio internally — we don't add run() here
-(function() {
-  if (!globalThis.fillChatInput) {
-    globalThis.fillChatInput = function(event) {
-      var text = event.target.textContent || "";
-      var match = text.match(/\[PDF\s*:\s*(\d+)\]/i);
-      if (match) {
-        var page = match[1];
-        var links = document.querySelectorAll("#html-info-panel .pdf-link");
-        for (var i = 0; i < links.length; i++) {
-          if (links[i].getAttribute("data-page") == page) {
-            links[i].click();
-            return;
-          }
-        }
-      }
-      var chatInput = document.querySelector("#chat-input textarea");
-      if (chatInput) {
-        chatInput.value = "Explain " + text.replace(/\[[^\]]+\]/g, "").trim();
-        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
-        chatInput.focus();
-      }
-    };
-  }
-})();
