@@ -177,18 +177,9 @@ function() {
             if (svg._mindmapBound) return;
             svg._mindmapBound = true;
             svg.style.cursor = "pointer";
-            svg.addEventListener("click", function(evt) {
-                var target = evt.target;
-                var textEl = target.closest ? target.closest("text") : null;
-                if (!textEl && target.tagName === "tspan") {
-                    textEl = target.parentElement;
-                }
-                if (textEl && textEl.tagName === "text") {
-                    console.log("pdfview_js: mindmap node clicked:", textEl.textContent);
-                    fillChatInput({ target: textEl });
-                }
-            });
-            console.log("pdfview_js: mindmap click handler bound");
+            // Use capture pointerdown on infoPanel to fire BEFORE D3.js zoom
+            // D3 blocks 'click' on svg.markmap, but capture fires in capture phase
+            console.log("pdfview_js: mindmap click handler bound (capture pointerdown)");
         }
 
         // Try immediately — SVG may already be rendered
@@ -205,6 +196,21 @@ function() {
             }
         });
         observer.observe(infoPanel, { childList: true, subtree: true });
+
+        // Capture pointerdown on infoPanel — fires BEFORE D3's zoom handlers
+        // D3 blocks 'click' on svg.markmap, but capture fires in capture phase
+        infoPanel.addEventListener("pointerdown", function(evt) {
+            var target = evt.target;
+            if (!target.closest || !target.closest("svg.markmap")) return;
+            var textEl = target.closest("text");
+            if (!textEl && target.tagName === "tspan") {
+                textEl = target.parentElement;
+            }
+            if (textEl && textEl.tagName === "text") {
+                console.log("pdfview_js: mindmap node clicked (capture):", textEl.textContent);
+                fillChatInput({ target: textEl });
+            }
+        }, { capture: true });
     }
 
     // Mindmap toggle + export — run every time (SVG must exist now)
