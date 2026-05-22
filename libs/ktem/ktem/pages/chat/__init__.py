@@ -166,22 +166,46 @@ function() {
         markmap.autoLoader.renderAll();
     }
 
-    // --- Mindmap Click-Handler (Event Delegation) ---
-    // Use event delegation on #html-info-panel so it catches clicks even if
-    // the SVG is rendered later. Bound only once (_mindmapClickBound flag).
+    // --- Mindmap Click-Handler (MutationObserver) ---
+    // Watch #html-info-panel for svg.markmap to appear (more reliable than setTimeout)
     var infoPanel = document.getElementById("html-info-panel");
-    if (infoPanel && !infoPanel._mindmapClickBound) {
-        infoPanel._mindmapClickBound = true;
-        infoPanel.addEventListener("click", function(evt) {
-            var target = evt.target;
-            var textEl = target.closest ? target.closest("text") : null;
-            if (!textEl && target.tagName === "tspan") {
-                textEl = target.parentElement;
-            }
-            if (textEl && textEl.tagName === "text" && textEl.closest("svg.markmap")) {
-                fillChatInput({ target: textEl });
+    if (infoPanel && !infoPanel._mindmapWatch) {
+        infoPanel._mindmapWatch = true;
+        console.log("pdfview_js: setting up mutation observer for mindmap");
+
+        function bindMindmapClick(svg) {
+            if (svg._mindmapBound) return;
+            svg._mindmapBound = true;
+            svg.style.cursor = "pointer";
+            svg.addEventListener("click", function(evt) {
+                var target = evt.target;
+                var textEl = target.closest ? target.closest("text") : null;
+                if (!textEl && target.tagName === "tspan") {
+                    textEl = target.parentElement;
+                }
+                if (textEl && textEl.tagName === "text") {
+                    console.log("pdfview_js: mindmap node clicked:", textEl.textContent);
+                    fillChatInput({ target: textEl });
+                }
+            });
+            console.log("pdfview_js: mindmap click handler bound");
+        }
+
+        // Try immediately — SVG may already be rendered
+        var svg = infoPanel.querySelector("svg.markmap");
+        if (svg) {
+            bindMindmapClick(svg);
+        }
+
+        // Watch for future SVGs
+        var observer = new MutationObserver(function() {
+            var svg = infoPanel.querySelector("svg.markmap");
+            if (svg) {
+                bindMindmapClick(svg);
+                observer.disconnect();
             }
         });
+        observer.observe(infoPanel, { childList: true, subtree: true });
     }
 
     // Mindmap toggle + export — run every time (SVG must exist now)
