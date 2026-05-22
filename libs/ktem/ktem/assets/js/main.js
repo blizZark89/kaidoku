@@ -1,5 +1,9 @@
 function run() {
-  let main_parent = document.getElementById("chat-tab").parentNode;
+  // Safety: only run on pages with chat (login page has no chat-tab)
+  var chatTab = document.getElementById("chat-tab");
+  if (!chatTab) return;
+
+  let main_parent = chatTab.parentNode;
 
   main_parent.childNodes[0].classList.add("header-bar");
   main_parent.style = "padding: 0; margin: 0";
