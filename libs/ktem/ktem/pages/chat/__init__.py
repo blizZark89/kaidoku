@@ -177,9 +177,6 @@ function() {
             if (svg._mindmapBound) return;
             svg._mindmapBound = true;
             svg.style.cursor = "pointer";
-            // Use capture pointerdown on infoPanel to fire BEFORE D3.js zoom
-            // D3 blocks 'click' on svg.markmap, but capture fires in capture phase
-            console.log("pdfview_js: mindmap click handler bound (capture pointerdown)");
         }
 
         // Try immediately — SVG may already be rendered
@@ -197,19 +194,23 @@ function() {
         });
         observer.observe(infoPanel, { childList: true, subtree: true });
 
-        // DEBUG: catch pointerdown at document level to see if clicks arrive
+        // Catch pointerdown on mindmap nodes — walks up DOM to find text content
+        // regardless of whether markmap renders <text>/<tspan> or <foreignObject>/<div>
         document.addEventListener("pointerdown", function(evt) {
-            console.log("pdfview_js: document pointerdown tag=" + evt.target.tagName + " cls=" + evt.target.className);
-            var inMarkmap = evt.target.closest && evt.target.closest("svg.markmap");
-            if (inMarkmap) {
-                console.log("pdfview_js: IN markmap!");
-                var textEl = evt.target.closest("text");
-                if (textEl) {
-                    console.log("pdfview_js: text found:", textEl.textContent.substring(0, 60));
-                    fillChatInput({ target: textEl });
-                } else {
-                    console.log("pdfview_js: no text element near click");
-                }
+            var svg = evt.target.closest && evt.target.closest("svg.markmap");
+            if (!svg) return;
+
+            // Walk up from clicked element to SVG to find the node's text content
+            var el = evt.target;
+            var text = "";
+            while (el && el !== svg) {
+                text = el.textContent || "";
+                if (text.trim()) break;
+                el = el.parentElement;
+            }
+
+            if (text && text.trim()) {
+                fillChatInput({ target: { textContent: text } });
             }
         }, { capture: true });
     }
