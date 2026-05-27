@@ -194,8 +194,8 @@ function() {
         });
         observer.observe(infoPanel, { childList: true, subtree: true });
 
-        // Catch pointerdown on mindmap nodes — walks up DOM to find text content
-        // regardless of whether markmap renders <text>/<tspan> or <foreignObject>/<div>
+        // Catch pointerdown on mindmap nodes — only intercept clicks that
+        // contain a PDF reference, otherwise let D3.js handle expand/collapse
         document.addEventListener("pointerdown", function(evt) {
             var svg = evt.target.closest && evt.target.closest("svg.markmap");
             if (!svg) return;
@@ -209,8 +209,14 @@ function() {
                 el = el.parentElement;
             }
 
+            // Only handle nodes with a [PDF:X] reference — everything else
+            // passes through to D3.js for expand/collapse/zoom naturally
             if (text && text.trim()) {
-                fillChatInput({ target: { textContent: text } });
+                var match = text.match(/\[PDF\s*:\s*(\d+)\]/i);
+                if (match) {
+                    evt.stopPropagation();
+                    fillChatInput({ target: { textContent: text } });
+                }
             }
         }, { capture: true });
     }
