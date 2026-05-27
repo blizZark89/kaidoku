@@ -200,13 +200,16 @@ function() {
             var svg = evt.target.closest && evt.target.closest("svg.markmap");
             if (!svg) return;
 
-            // Walk up from clicked element to SVG to find the node's text content
-            var el = evt.target;
-            var text = "";
-            while (el && el !== svg) {
-                text = el.textContent || "";
-                if (text.trim()) break;
-                el = el.parentElement;
+            // Get text from the clicked element directly
+            var text = evt.target.textContent || "";
+
+            // If click landed on a non-text element (circle, path, connector),
+            // scope to the nearest markmap-node group — never walk up further
+            if (!text.trim()) {
+                var nodeGroup = evt.target.closest(".markmap-node");
+                if (nodeGroup) {
+                    text = nodeGroup.textContent || "";
+                }
             }
 
             // Only handle nodes with a [PDF:X] reference — everything else
