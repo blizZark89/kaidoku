@@ -194,26 +194,14 @@ function() {
         });
         observer.observe(infoPanel, { childList: true, subtree: true });
 
-        // Catch pointerdown on mindmap nodes — only intercept clicks that
-        // contain a PDF reference, otherwise let D3.js handle expand/collapse
+        // Catch pointerdown on mindmap nodes — only intercept clicks directly
+        // on text labels that contain a [PDF:X] reference
         document.addEventListener("pointerdown", function(evt) {
             var svg = evt.target.closest && evt.target.closest("svg.markmap");
             if (!svg) return;
 
-            // Get text from the clicked element directly
+            // Only act on the exact clicked element's text — never walk up
             var text = evt.target.textContent || "";
-
-            // If click landed on a non-text element (circle, path, connector),
-            // scope to the nearest markmap-node group — never walk up further
-            if (!text.trim()) {
-                var nodeGroup = evt.target.closest(".markmap-node");
-                if (nodeGroup) {
-                    text = nodeGroup.textContent || "";
-                }
-            }
-
-            // Only handle nodes with a [PDF:X] reference — everything else
-            // passes through to D3.js for expand/collapse/zoom naturally
             if (text && text.trim()) {
                 var match = text.match(/\[PDF\s*:\s*(\d+)\]/i);
                 if (match) {
