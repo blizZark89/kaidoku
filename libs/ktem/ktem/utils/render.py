@@ -118,7 +118,7 @@ class Render:
         return f"""
         {html_content}
         <a href="#" class="pdf-link" data-src="{BASE_PATH}/file={pdf_path}" data-page="{page_idx}" data-search="{highlight_text}" data-phrase="{phrase}">
-            [Preview]
+            [PDF Viewer]
         </a>
         """  # noqa
 
