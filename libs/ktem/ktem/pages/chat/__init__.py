@@ -247,6 +247,20 @@ function() {
         }
     }, 250);
 
+    if (!document._pdfAutoCloseSetup) {
+        document._pdfAutoCloseSetup = true;
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                var modal = document.getElementById("pdf-modal");
+                if (modal && modal.style.display !== "none") {
+                    modal.style.display = "none";
+                    var info = document.getElementById("html-info-panel");
+                    if (info) info.style.display = "block";
+                }
+            }
+        });
+    }
+
     return [links.length]
 }
 """.replace(
