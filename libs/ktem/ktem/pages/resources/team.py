@@ -68,7 +68,7 @@ class TeamManagement(BasePage):
         self.team_list.select(
             self.select_team,
             inputs=[self.team_state],
-            outputs=[self.selected_team_id],
+            outputs=[self.selected_team_id, self.team_name_new],
             show_progress="hidden",
         )
         self.selected_team_id.change(
@@ -160,8 +160,9 @@ class TeamManagement(BasePage):
 
     def select_team(self, team_rows, ev: gr.SelectData):
         if (ev.value == "-" and ev.index[0] == 0) or not ev.selected:
-            return None
-        return team_rows[ev.index[0]]["id"]
+            return None, ""
+        team = team_rows[ev.index[0]]
+        return team["id"], team["name"]
 
     def create_team(self, actor_user_id, team_name):
         team_name = (team_name or "").strip()
