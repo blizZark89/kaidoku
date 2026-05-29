@@ -2324,10 +2324,12 @@ class FileIndexPage(BasePage):
             all_group_names: set[str] = set()
             for groups in file_id_to_groups.values():
                 all_group_names.update(groups)
-            available_group_names = sorted(all_group_names)
+            available_group_names = ["-"] + sorted(all_group_names)
 
             # --- Group filter ---
             group_filter = (group_filter or "").strip()
+            if group_filter == "-":
+                group_filter = ""
             filtered_count = total_count
             filtered_size = total_size
             filtered_tokens = total_tokens
