@@ -40,6 +40,7 @@ KH_SSO_ENABLED = getattr(flowsettings, "KH_SSO_ENABLED", False)
 DOWNLOAD_MESSAGE = "Download starten"
 MAX_FILENAME_LENGTH = 20
 MAX_FILE_COUNT = 200
+MAX_LISTED_FILES = 200
 FILESYNC_GROUP_PREFIX = "FileSync / "
 
 chat_input_focus_js = """
@@ -724,14 +725,26 @@ class FileIndexPage(BasePage):
         ]
 
     def render_file_list(self):
-        self.filter = gr.Textbox(
-            value="",
-            label="Nach Namen filtern:",
-            info=(
-                "(1) Groß-/Kleinschreibung wird ignoriert. "
-                "(2) Mit leerer Suche werden alle Dateien angezeigt."
-            ),
-        )
+        self.file_stats = gr.Markdown("")
+
+        with gr.Row():
+            self.filter = gr.Textbox(
+                value="",
+                label="Nach Namen filtern:",
+                info=(
+                    "(1) Groß-/Kleinschreibung wird ignoriert. "
+                    "(2) Mit leerer Suche werden alle Dateien angezeigt."
+                ),
+                scale=3,
+            )
+            self.group_filter = gr.Dropdown(
+                label="Gruppe",
+                choices=[],
+                value="",
+                filterable=True,
+                allow_custom_value=False,
+                scale=1,
+            )
         self.file_list_state = gr.State(value=None)
         self.file_list = gr.DataFrame(
             headers=[
@@ -966,8 +979,8 @@ class FileIndexPage(BasePage):
                 name="onSignIn",
                 definition={
                     "fn": self.list_file,
-                    "inputs": [self._app.user_id],
-                    "outputs": [self.file_list_state, self.file_list],
+                    "inputs": [self._app.user_id, self.group_filter],
+                    "outputs": [self.file_list_state, self.file_list, self.file_stats, self.group_filter],
                     "show_progress": "hidden",
                 },
             )
@@ -1002,8 +1015,8 @@ class FileIndexPage(BasePage):
                 name="onSignOut",
                 definition={
                     "fn": self.list_file,
-                    "inputs": [self._app.user_id],
-                    "outputs": [self.file_list_state, self.file_list],
+                    "inputs": [self._app.user_id, self.group_filter],
+                    "outputs": [self.file_list_state, self.file_list, self.file_stats, self.group_filter],
                     "show_progress": "hidden",
                 },
             )
@@ -1367,8 +1380,8 @@ class FileIndexPage(BasePage):
                         )
                         .then(
                             fn=self.list_file,
-                            inputs=[self._app.user_id, self.filter],
-                            outputs=[self.file_list_state, self.file_list],
+                            inputs=[self._app.user_id, self.filter, self.group_filter],
+                            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
                             concurrency_limit=20,
                         )
                         .then(
@@ -1424,8 +1437,8 @@ class FileIndexPage(BasePage):
                 if not KH_DEMO_MODE:
                     quickURLUploadedEvent = quickURLUploadedEvent.then(
                         fn=self.list_file,
-                        inputs=[self._app.user_id, self.filter],
-                        outputs=[self.file_list_state, self.file_list],
+                        inputs=[self._app.user_id, self.filter, self.group_filter],
+                        outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
                         concurrency_limit=20,
                     )
 
@@ -1460,8 +1473,8 @@ class FileIndexPage(BasePage):
             )
             .then(
                 fn=self.list_file,
-                inputs=[self._app.user_id, self.filter],
-                outputs=[self.file_list_state, self.file_list],
+                inputs=[self._app.user_id, self.filter, self.group_filter],
+                outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
             )
             .then(
                 fn=self.file_selected,
@@ -1552,8 +1565,8 @@ class FileIndexPage(BasePage):
             show_progress="hidden",
         ).then(
             fn=self.list_file,
-            inputs=[self._app.user_id, self.filter],
-            outputs=[self.file_list_state, self.file_list],
+            inputs=[self._app.user_id, self.filter, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
         ).then(
             lambda: [
                 gr.update(visible=True),
@@ -1609,8 +1622,8 @@ class FileIndexPage(BasePage):
 
         uploadedEvent = onUploaded.then(
             fn=self.list_file,
-            inputs=[self._app.user_id, self.filter],
-            outputs=[self.file_list_state, self.file_list],
+            inputs=[self._app.user_id, self.filter, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
             concurrency_limit=20,
         )
         for event in self._app.get_event(f"onFileIndex{self._index.id}Changed"):
@@ -1657,8 +1670,8 @@ class FileIndexPage(BasePage):
                 show_progress="hidden",
             ).then(
                 fn=self.list_file,
-                inputs=[self._app.user_id, self.filter],
-                outputs=[self.file_list_state, self.file_list],
+                inputs=[self._app.user_id, self.filter, self.group_filter],
+                outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
                 show_progress="hidden",
             )
             for event in self._app.get_event(f"onFileIndex{self._index.id}Changed"):
@@ -1693,8 +1706,15 @@ class FileIndexPage(BasePage):
 
         self.filter.submit(
             fn=self.list_file,
-            inputs=[self._app.user_id, self.filter],
-            outputs=[self.file_list_state, self.file_list],
+            inputs=[self._app.user_id, self.filter, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+            show_progress="hidden",
+        )
+
+        self.group_filter.change(
+            fn=self.list_file,
+            inputs=[self._app.user_id, self.filter, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
             show_progress="hidden",
         )
 
@@ -1783,8 +1803,8 @@ class FileIndexPage(BasePage):
 
         self._app.app.load(
             self.list_file,
-            inputs=[self._app.user_id, self.filter],
-            outputs=[self.file_list_state, self.file_list],
+            inputs=[self._app.user_id, self.filter, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
         ).then(
             self.list_group,
             inputs=[self._app.user_id, self.file_list_state],
@@ -2121,48 +2141,12 @@ class FileIndexPage(BasePage):
             num /= 1024.0
         return f"{num:.0f}Yi{suffix}"
 
-    def list_file(self, user_id, name_pattern=""):
+    def list_file(self, user_id, name_pattern="", group_filter=""):
         if user_id is None:
             # not signed in
-            return [], pd.DataFrame.from_records(
-                [
-                    {
-                        "id": "-",
-                        "name": "-",
-                        "group": "-",
-                        "size": "-",
-                        "tokens": "-",
-                        "loader": "-",
-                        "date_created": "-",
-                    }
-                ]
-            )
-
-        Source = self._index._resources["Source"]
-        FileGroup = self._index._resources["FileGroup"]
-        with Session(engine) as session:
-            statement = select(Source)
-            actor = None
-            scope_ids = None
-            if self._app.f_user_management:
-                actor = get_access_context(session, user_id)
-                if not actor or not has_read_access(actor):
-                    return [], pd.DataFrame.from_records(
-                        [
-                            {
-                                "id": "-",
-                                "name": "-",
-                                "group": "-",
-                                "size": "-",
-                                "tokens": "-",
-                                "loader": "-",
-                                "date_created": "-",
-                            }
-                        ]
-                    )
-                scope_ids = allowed_user_ids_for_scope(session, actor)
-            if scope_ids == []:
-                return [], pd.DataFrame.from_records(
+            return (
+                [],
+                pd.DataFrame.from_records(
                     [
                         {
                             "id": "-",
@@ -2174,6 +2158,57 @@ class FileIndexPage(BasePage):
                             "date_created": "-",
                         }
                     ]
+                ),
+                "",
+                gr.update(choices=[], value=""),
+            )
+
+        Source = self._index._resources["Source"]
+        FileGroup = self._index._resources["FileGroup"]
+        with Session(engine) as session:
+            statement = select(Source)
+            actor = None
+            scope_ids = None
+            if self._app.f_user_management:
+                actor = get_access_context(session, user_id)
+                if not actor or not has_read_access(actor):
+                    return (
+                        [],
+                        pd.DataFrame.from_records(
+                            [
+                                {
+                                    "id": "-",
+                                    "name": "-",
+                                    "group": "-",
+                                    "size": "-",
+                                    "tokens": "-",
+                                    "loader": "-",
+                                    "date_created": "-",
+                                }
+                            ]
+                        ),
+                        "",
+                        gr.update(choices=[], value=""),
+                    )
+                scope_ids = allowed_user_ids_for_scope(session, actor)
+            if scope_ids == []:
+                return (
+                    [],
+                    pd.DataFrame.from_records(
+                        [
+                            {
+                                "id": "-",
+                                "name": "-",
+                                "group": "-",
+                                "size": "-",
+                                "tokens": "-",
+                                "loader": "-",
+                                "date_created": "-",
+                            }
+                        ]
+                    ),
+                    "",
+                    gr.update(choices=[], value=""),
                 )
             if scope_ids is not None and not self._app.f_user_management:
                 statement = statement.where(Source.user.in_(scope_ids))
@@ -2218,6 +2253,83 @@ class FileIndexPage(BasePage):
                         _display_group_name(group.name)
                     )
 
+            # --- Sort by date_created descending (newest first) ---
+            visible_sources.sort(key=lambda s: s.date_created, reverse=True)
+
+            # --- Compute stats from ALL visible sources (before filtering) ---
+            total_count = len(visible_sources)
+            total_size = sum(getattr(s, "size", 0) or 0 for s in visible_sources)
+            total_tokens = sum(
+                (getattr(s, "note", None) or {}).get("tokens", 0) or 0
+                for s in visible_sources
+            )
+            newest_date = (
+                max(s.date_created for s in visible_sources).strftime("%d.%m.%Y")
+                if visible_sources
+                else None
+            )
+
+            # --- Collect unique group names for filter dropdown ---
+            all_group_names: set[str] = set()
+            for groups in file_id_to_groups.values():
+                all_group_names.update(groups)
+            available_group_names = sorted(all_group_names)
+
+            # --- Group filter ---
+            group_filter = (group_filter or "").strip()
+            filtered_count = total_count
+            filtered_size = total_size
+            filtered_tokens = total_tokens
+            if group_filter:
+                visible_sources = [
+                    s for s in visible_sources
+                    if group_filter in file_id_to_groups.get(s.id, [])
+                ]
+                # Recompute total for filtered view
+                filtered_count = len(visible_sources)
+                filtered_size = sum(getattr(s, "size", 0) or 0 for s in visible_sources)
+                filtered_tokens = sum(
+                    (getattr(s, "note", None) or {}).get("tokens", 0) or 0
+                    for s in visible_sources
+                )
+
+            # --- Limit to MAX_LISTED_FILES ---
+            has_more = len(visible_sources) > MAX_LISTED_FILES
+            if has_more:
+                visible_sources = visible_sources[:MAX_LISTED_FILES]
+
+            # --- Build stats markdown ---
+            if group_filter:
+                stats_parts = [
+                    f"**{filtered_count}** von {total_count} Dateien",
+                    f"{self.format_size_human_readable(filtered_size)}",
+                    f"{self.format_size_human_readable(filtered_tokens, suffix='')} Tokens",
+                ]
+                if newest_date:
+                    stats_parts.append(f"neueste: {newest_date}")
+                stats_parts.append(
+                    f'<br><small>Gruppen-Filter: &bdquo;{group_filter}&ldquo; &mdash; '
+                    f'{total_count} Dateien ({self.format_size_human_readable(total_size)}) insgesamt</small>'
+                )
+            else:
+                stats_parts = [
+                    f"**{total_count}** Dateien",
+                    f"{self.format_size_human_readable(total_size)}",
+                    f"{self.format_size_human_readable(total_tokens, suffix='')} Tokens",
+                ]
+                if newest_date:
+                    stats_parts.append(f"neueste: {newest_date}")
+
+            stats_html = " &nbsp;|&nbsp; ".join(stats_parts)
+
+            if has_more:
+                stats_html += (
+                    f"<br><small>{MAX_LISTED_FILES} von "
+                    f"{filtered_count if group_filter else total_count} "
+                    f"Dateien. Weitere mit Filter eingrenzen.</small>"
+                )
+
+            # --- Build results ---
             results = []
             for source in visible_sources:
                 group_names = sorted(file_id_to_groups.get(source.id, []))
@@ -2252,7 +2364,12 @@ class FileIndexPage(BasePage):
                 ]
             )
 
-        return results, file_list
+        return (
+            results,
+            file_list,
+            stats_html,
+            gr.update(choices=available_group_names, value=group_filter),
+        )
 
     def list_file_names(self, file_list_state):
         if file_list_state:
