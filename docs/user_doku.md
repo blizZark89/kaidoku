@@ -1,5 +1,12 @@
 # Anleitung: Rolle User
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/user_chat_interface.PNG" alt="Chat-Ansicht User" />
+    </td>
+    <td valign="top">
+
 ## Überblick
 
 Als `user` nutzt du die Plattform für deine tägliche Arbeit, ohne Verwaltungsaufgaben.
@@ -43,3 +50,7 @@ Als `user` nutzt du die Plattform für deine tägliche Arbeit, ohne Verwaltungsa
 - Nutze dein Standardteam sinnvoll
 - Lade nur relevante Dokumente hoch
 - Halte deine Inhalte übersichtlich
+
+    </td>
+  </tr>
+</table>

@@ -1,5 +1,12 @@
 # Anleitung: Rolle Key User
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/keyuser_benutzerverwaltung.PNG" alt="Benutzerverwaltung Key User" />
+    </td>
+    <td valign="top">
+
 ## Überblick
 Als `key_user` verwaltest du dein Team fachlich. Du bist die Schnittstelle zwischen Admin und normalen Nutzern.
 
@@ -39,3 +46,7 @@ Als `key_user` verwaltest du dein Team fachlich. Du bist die Schnittstelle zwisc
 - Halte dein Team sauber organisiert
 - Gib Upload-Rechte bewusst weiter
 - Unterstütze deine User bei der Nutzung der Plattform
+
+    </td>
+  </tr>
+</table>

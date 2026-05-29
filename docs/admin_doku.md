@@ -1,5 +1,12 @@
 # Anleitung: Rolle Admin
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/admin_ressourcen_tab.PNG" alt="Ressourcen-Tab Admin" />
+    </td>
+    <td valign="top">
+
 ## Überblick
 Als `admin` hast du vollständige Kontrolle über das gesamte System. Du bist für die Einrichtung, Verwaltung und den Betrieb verantwortlich.
 
@@ -38,3 +45,7 @@ Als `admin` hast du vollständige Kontrolle über das gesamte System. Du bist f�
 - Vergib `admin`-Rechte nur sehr sparsam
 - Nutze `key_user` für Teamverwaltung
 - Halte Teams und Berechtigungen übersichtlich
+
+    </td>
+  </tr>
+</table>

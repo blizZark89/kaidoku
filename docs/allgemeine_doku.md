@@ -88,6 +88,13 @@ Dieser Tab hat drei Untertabs:
 
 **3.1 Benutzerliste**
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/3.1 Benutzerliste.PNG" alt="3.1 Benutzerliste" />
+    </td>
+    <td valign="top">
+
 - Tabelle mit Spalten: id, username, role, team, standardteam, can_read, can_upload
   - Sortierbar nach jeder Spalte (Dropdown "Sortieren nach" + aufsteigend/absteigend)
 - Beim Klick auf einen Benutzer öffnet sich der Bearbeitungsbereich:
@@ -106,6 +113,10 @@ Dieser Tab hat drei Untertabs:
   - Leserechte (Checkbox) — für Rolle "user" manuell setzbar; Admin/Key User haben automatisch true
   - Upload-Rechte (Checkbox) — für Rolle "user" manuell setzbar; Admin/Key User haben automatisch true
   - Buttons: Speichern | Löschen (mit Bestätigungsdialog "Löschen bestätigen" / "Abbrechen") | Schließen
+
+    </td>
+  </tr>
+</table>
 
 Rollen-Detail:
 
@@ -139,6 +150,13 @@ Einschränkungen beim Bearbeiten:
 - "Benutzer anlegen" Button
 
 **3.3 Teams**
+
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/3.3 Teams.PNG" alt="3.3 Teams" />
+    </td>
+    <td valign="top">
 
 Es gibt zwei Ebenen, auf denen Teams zugeordnet werden können:
 
@@ -177,9 +195,20 @@ Wichtige Unterscheidung je nach Such-Modus:
 - **"In Datei(en) suchen"** -> Der Filter wird auf Dateiebene angewendet. Nur Dateien des gewählten Teams erscheinen in der Dropdown-Liste.
 - **"In Dateigruppe(n) suchen"** -> Der Filter wird auf Gruppenebene angewendet. Nur Gruppen des gewählten Teams erscheinen. Alle Dateien innerhalb dieser Gruppen stehen dann zur Verfügung, auch wenn die einzelnen Dateien keinem Team zugeordnet sind.
 
+    </td>
+  </tr>
+</table>
+
 ---
 
 ### 4. Dokumentenverwaltung
+
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/4. Dokumentenverwaltung.PNG" alt="4. Dokumentenverwaltung" />
+    </td>
+    <td valign="top">
 
 **4.1 Dateien hochladen**
 - einzelne oder mehrere Dateien gleichzeitig hochladen
@@ -205,6 +234,10 @@ Wichtige Unterscheidung je nach Such-Modus:
 - Dateien können direkt einem oder mehreren Teams zugewiesen werden
 - ohne Zuordnung bleibt die Datei nur für den Ersteller sichtbar
 - spätere Änderungen sind in der Dateiverwaltung möglich
+
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -269,6 +302,13 @@ Das erlaubt flexible Anpassung an:
 
 ### 9. FileSync (automatischer Import)
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/9. FileSync.PNG" alt="9. FileSync" />
+    </td>
+    <td valign="top">
+
 - Überwacht definierte Ordner und sorgt dafür, dass alle Dateien automatisch aktuell im System sind
 
 Wie Dateiunterschiede erkannt werden:
@@ -297,6 +337,10 @@ Zusätzliche Logik im Hintergrund:
 Kurz gesagt:
 - FileSync erkennt präzise Inhaltsänderungen auf Byte-Ebene
 - Aktualisiert wird nur das, was sich wirklich geändert hat
+
+    </td>
+  </tr>
+</table>
 
 ---
 
