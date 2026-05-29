@@ -41,6 +41,7 @@ DOWNLOAD_MESSAGE = "Download starten"
 MAX_FILENAME_LENGTH = 20
 MAX_FILE_COUNT = 200
 MAX_LISTED_FILES = 200
+PAGE_SIZE = 50
 FILESYNC_GROUP_PREFIX = "FileSync / "
 
 chat_input_focus_js = """
@@ -762,6 +763,12 @@ class FileIndexPage(BasePage):
             elem_id="file_list_view",
         )
 
+        self.page = gr.State(value=1)
+        with gr.Row():
+            self.btn_prev_page = gr.Button("←", min_width=40, visible=False)
+            self.page_info = gr.Markdown("", elem_classes=["page-info"])
+            self.btn_next_page = gr.Button("→", min_width=40, visible=False)
+
         with gr.Row():
 
             self.chat_button = gr.Button(
@@ -1381,7 +1388,7 @@ class FileIndexPage(BasePage):
                         .then(
                             fn=self.list_file,
                             inputs=[self._app.user_id, self.filter, self.group_filter],
-                            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+                            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
                             concurrency_limit=20,
                         )
                         .then(
@@ -1438,7 +1445,7 @@ class FileIndexPage(BasePage):
                     quickURLUploadedEvent = quickURLUploadedEvent.then(
                         fn=self.list_file,
                         inputs=[self._app.user_id, self.filter, self.group_filter],
-                        outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+                        outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
                         concurrency_limit=20,
                     )
 
@@ -1474,7 +1481,7 @@ class FileIndexPage(BasePage):
             .then(
                 fn=self.list_file,
                 inputs=[self._app.user_id, self.filter, self.group_filter],
-                outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+                outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
             )
             .then(
                 fn=self.file_selected,
@@ -1566,7 +1573,7 @@ class FileIndexPage(BasePage):
         ).then(
             fn=self.list_file,
             inputs=[self._app.user_id, self.filter, self.group_filter],
-            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
         ).then(
             lambda: [
                 gr.update(visible=True),
@@ -1623,7 +1630,7 @@ class FileIndexPage(BasePage):
         uploadedEvent = onUploaded.then(
             fn=self.list_file,
             inputs=[self._app.user_id, self.filter, self.group_filter],
-            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
             concurrency_limit=20,
         )
         for event in self._app.get_event(f"onFileIndex{self._index.id}Changed"):
@@ -1671,7 +1678,7 @@ class FileIndexPage(BasePage):
             ).then(
                 fn=self.list_file,
                 inputs=[self._app.user_id, self.filter, self.group_filter],
-                outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+                outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
                 show_progress="hidden",
             )
             for event in self._app.get_event(f"onFileIndex{self._index.id}Changed"):
@@ -1705,16 +1712,48 @@ class FileIndexPage(BasePage):
         )
 
         self.filter.submit(
+            fn=lambda: 1,
+            outputs=[self.page],
+            show_progress="hidden",
+        ).then(
             fn=self.list_file,
-            inputs=[self._app.user_id, self.filter, self.group_filter],
-            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+            inputs=[self._app.user_id, self.filter, self.group_filter, self.page],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
             show_progress="hidden",
         )
 
         self.group_filter.change(
+            fn=lambda: 1,
+            outputs=[self.page],
+            show_progress="hidden",
+        ).then(
             fn=self.list_file,
-            inputs=[self._app.user_id, self.filter, self.group_filter],
-            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+            inputs=[self._app.user_id, self.filter, self.group_filter, self.page],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
+            show_progress="hidden",
+        )
+
+        self.btn_prev_page.click(
+            fn=lambda p: max(1, p - 1),
+            inputs=[self.page],
+            outputs=[self.page],
+            show_progress="hidden",
+        ).then(
+            fn=self.list_file,
+            inputs=[self._app.user_id, self.filter, self.group_filter, self.page],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
+            show_progress="hidden",
+        )
+
+        self.btn_next_page.click(
+            fn=lambda p: p + 1,
+            inputs=[self.page],
+            outputs=[self.page],
+            show_progress="hidden",
+        ).then(
+            fn=self.list_file,
+            inputs=[self._app.user_id, self.filter, self.group_filter, self.page],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
             show_progress="hidden",
         )
 
@@ -1804,7 +1843,7 @@ class FileIndexPage(BasePage):
         self._app.app.load(
             self.list_file,
             inputs=[self._app.user_id, self.filter, self.group_filter],
-            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter],
+            outputs=[self.file_list_state, self.file_list, self.file_stats, self.group_filter, self.page_info, self.btn_prev_page, self.btn_next_page, self.page],
         ).then(
             self.list_group,
             inputs=[self._app.user_id, self.file_list_state],
@@ -2141,7 +2180,7 @@ class FileIndexPage(BasePage):
             num /= 1024.0
         return f"{num:.0f}Yi{suffix}"
 
-    def list_file(self, user_id, name_pattern="", group_filter=""):
+    def list_file(self, user_id, name_pattern="", group_filter="", page=1):
         if user_id is None:
             # not signed in
             return (
@@ -2161,6 +2200,10 @@ class FileIndexPage(BasePage):
                 ),
                 "",
                 gr.update(choices=[], value=""),
+                "",
+                gr.update(visible=False),
+                gr.update(visible=False),
+                1,
             )
 
         Source = self._index._resources["Source"]
@@ -2189,6 +2232,10 @@ class FileIndexPage(BasePage):
                         ),
                         "",
                         gr.update(choices=[], value=""),
+                        "",
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        1,
                     )
                 scope_ids = allowed_user_ids_for_scope(session, actor)
             if scope_ids == []:
@@ -2209,6 +2256,10 @@ class FileIndexPage(BasePage):
                     ),
                     "",
                     gr.update(choices=[], value=""),
+                    "",
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    1,
                 )
             if scope_ids is not None and not self._app.f_user_management:
                 statement = statement.where(Source.user.in_(scope_ids))
@@ -2293,10 +2344,12 @@ class FileIndexPage(BasePage):
                     for s in visible_sources
                 )
 
-            # --- Limit to MAX_LISTED_FILES ---
-            has_more = len(visible_sources) > MAX_LISTED_FILES
-            if has_more:
-                visible_sources = visible_sources[:MAX_LISTED_FILES]
+            # --- Pagination ---
+            display_count = filtered_count if group_filter else total_count
+            total_pages = max(1, (display_count + PAGE_SIZE - 1) // PAGE_SIZE)
+            page = max(1, min(page, total_pages))
+            offset = (page - 1) * PAGE_SIZE
+            visible_sources = visible_sources[offset : offset + PAGE_SIZE]
 
             # --- Build stats markdown ---
             if group_filter:
@@ -2322,12 +2375,18 @@ class FileIndexPage(BasePage):
 
             stats_html = " &nbsp;|&nbsp; ".join(stats_parts)
 
-            if has_more:
-                stats_html += (
-                    f"<br><small>{MAX_LISTED_FILES} von "
-                    f"{filtered_count if group_filter else total_count} "
-                    f"Dateien. Weitere mit Filter eingrenzen.</small>"
+            # --- Page info ---
+            if total_pages > 1:
+                page_html = (
+                    f"Seite **{page}** von **{total_pages}** "
+                    f"({offset + 1}–{min(offset + PAGE_SIZE, display_count)} von {display_count})"
                 )
+                prev_visible = gr.update(visible=True, interactive=page > 1)
+                next_visible = gr.update(visible=True, interactive=page < total_pages)
+            else:
+                page_html = ""
+                prev_visible = gr.update(visible=False)
+                next_visible = gr.update(visible=False)
 
             # --- Build results ---
             results = []
@@ -2369,6 +2428,10 @@ class FileIndexPage(BasePage):
             file_list,
             stats_html,
             gr.update(choices=available_group_names, value=group_filter),
+            page_html,
+            prev_visible,
+            next_visible,
+            page,
         )
 
     def list_file_names(self, file_list_state):
