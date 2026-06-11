@@ -369,7 +369,10 @@ SETTINGS_REASONING = {
     "lang": {
         "name": "Sprache",
         "value": "de",
-        "choices": [(lang, code) for code, lang in SUPPORTED_LANGUAGE_MAP.items()],
+        "choices": sorted(
+            [(lang, code) for code, lang in SUPPORTED_LANGUAGE_MAP.items()],
+            key=lambda x: x[0].lower(),
+        ),
         "component": "dropdown",
     },
     "max_context_length": {
