@@ -30,5 +30,4 @@ SUPPORTED_LANGUAGE_MAP = {
     "th": "Thai",
     "id": "Indonesian",
     "ms": "Malay",
-    "swg": "Schwäbisch",
 }
