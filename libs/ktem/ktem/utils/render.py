@@ -198,7 +198,7 @@ class Render:
             relevant_score = 0.0
 
         rendered_score = Render.collapsible(
-            header=f"<b>&emsp;Relevance score</b>: {relevant_score:.1f}",
+            header=f"<b>&emsp;Trefferquote</b>: {relevant_score * 100:.0f}%",
             content="<b>&emsp;&emsp;Vectorstore score:</b>"
             f" {vectorstore_score}"
             f"{text_search_str}"
