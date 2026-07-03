@@ -55,6 +55,16 @@ docker ps
 ## Update:
 ```shell
 cd ~/kaidoku
+git ls-files "*.yml" "*.yaml" | xargs -r git update-index --skip-worktree
+git pull --rebase origin main
+docker compose down
+docker compose up -d --build
+docker system prune -f
+docker ps
+
+----------------------------------------
+
+cd ~/kaidoku
 git pull origin main
 docker compose down
 docker compose build
