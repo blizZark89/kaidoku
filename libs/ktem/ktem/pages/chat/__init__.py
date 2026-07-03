@@ -1027,9 +1027,10 @@ class ChatPage(BasePage):
             print("User ID:", sso_user_id)
 
         if not chat_input:
-            raise ValueError("Eingabe ist leer")
-
-        chat_input_text = chat_input.get("text", "")
+            print("Warning: empty chat_input")
+            chat_input_text = ""
+        else:
+            chat_input_text = chat_input.get("text", "")
         file_ids = []
         used_command = None
 
@@ -1436,6 +1437,25 @@ class ChatPage(BasePage):
         *selecteds,
     ):
         """Chat function"""
+        text, refs, plot, plot_gr = "", "", None, gr.update(visible=False)
+        msg_placeholder = getattr(
+            flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Thinking ..."
+        )
+        empty_msg = getattr(
+            flowsettings, "KH_CHAT_EMPTY_MSG_PLACEHOLDER", "(Sorry, I don't know)"
+        )
+
+        # guard: empty chat_history (Gradio race condition)
+        if not chat_history:
+            yield (
+                [("", empty_msg)],
+                refs,
+                plot_gr,
+                plot,
+                chat_state,
+            )
+            return
+
         chat_input, chat_output = chat_history[-1]
         chat_history = chat_history[:-1]
 
@@ -1445,26 +1465,34 @@ class ChatPage(BasePage):
 
         queue: asyncio.Queue[Optional[dict]] = asyncio.Queue()
 
-        # construct the pipeline
-        pipeline, reasoning_state = self.create_pipeline(
-            settings,
-            reasoning_type,
-            llm_type,
-            use_mind_map,
-            use_citation,
-            language,
-            chat_state,
-            command_state,
-            user_id,
-            *selecteds,
-        )
-        print("Reasoning state", reasoning_state)
-        pipeline.set_output_queue(queue)
+        # construct the pipeline — wrapped in try to prevent Gradio showing red Error
+        try:
+            pipeline, reasoning_state = self.create_pipeline(
+                settings,
+                reasoning_type,
+                llm_type,
+                use_mind_map,
+                use_citation,
+                language,
+                chat_state,
+                command_state,
+                user_id,
+                *selecteds,
+            )
+            pipeline.set_output_queue(queue)
+        except Exception as e:
+            print(f"Pipeline creation error: {e}")
+            error_msg = f"Fehler beim Starten: {str(e)}"
+            yield (
+                chat_history + [(chat_input, error_msg)],
+                refs,
+                plot_gr,
+                plot,
+                chat_state,
+            )
+            return
 
-        text, refs, plot, plot_gr = "", "", None, gr.update(visible=False)
-        msg_placeholder = getattr(
-            flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Thinking ..."
-        )
+        print("Reasoning state", reasoning_state)
         print(msg_placeholder)
         yield (
             chat_history + [(chat_input, text or msg_placeholder)],
