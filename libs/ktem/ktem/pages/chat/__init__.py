@@ -535,6 +535,8 @@ class ChatPage(BasePage):
                     self.chat_control.conversation_id,
                     self.chat_control.conversation_rn,
                     self.first_selector_choices,
+                    self._indices_input[0],
+                    self._indices_input[1],
                 ],
                 outputs=[
                     self.chat_panel.text_input,
@@ -1019,6 +1021,8 @@ class ChatPage(BasePage):
         conv_id,
         conv_name,
         first_selector_choices,
+        current_mode,
+        current_selected,
         request: gr.Request,
     ):
         """Submit a message to the chatbot"""
@@ -1077,11 +1081,15 @@ class ChatPage(BasePage):
 
         if file_ids:
             selector_output = [
-                "select",
+                gr.update(value=current_mode) if current_mode else gr.update(),
                 gr.update(value=file_ids, choices=first_selector_choices),
             ]
         else:
-            selector_output = [gr.update(), gr.update()]
+            selector_output = [
+                gr.update(value=current_mode) if current_mode else gr.update(),
+                gr.update(value=current_selected, choices=first_selector_choices)
+                if current_selected else gr.update(),
+            ]
 
         # check if regen mode is active
         if chat_input_text:
