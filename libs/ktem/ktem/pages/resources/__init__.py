@@ -9,6 +9,9 @@ from ktem.mcp.ui import MCPManagement
 from ktem.rerankings.ui import RerankingManagement
 from sqlmodel import Session
 
+from ktem.db.models import Settings, engine
+from sqlmodel import Session, select
+from theflow.settings import settings as flowsettings
 from .team import TeamManagement
 from .user import UserManagement
 
@@ -88,21 +91,32 @@ class ResourcesTab(BasePage):
         ])
         return tabs
 
+    def _get_setting(self, key, default=False):
+        with Session(engine) as session:
+            stmt = select(Settings).where(Settings.key == key)
+            result = session.exec(stmt).first()
+            if result:
+                return result.value
+        return default
+
     def toggle_management_tabs(self, user_id):
         with Session(engine) as session:
             actor = get_access_context(session, user_id)
             is_admin = bool(actor and actor.is_admin)
             can_manage_users = bool(actor and (actor.is_admin or actor.is_key_user))
 
+        show_rerank = self._get_setting("show_rerankings_tab", False)
+        show_mcp = self._get_setting("show_mcp_tab", False)
+
         updates = []
         if self._app.f_user_management:
             updates.append(gr.update(visible=can_manage_users))  # Benutzer
             updates.append(gr.update(visible=is_admin))          # Teams
         updates.extend([
-            gr.update(visible=is_admin),  # Index-Sammlungen
-            gr.update(visible=is_admin),  # LLMs
-            gr.update(visible=is_admin),  # Embeddings
-            gr.update(visible=is_admin),  # Rerankings
-            gr.update(visible=is_admin),  # MCP-Server
+            gr.update(visible=is_admin),                         # Index-Sammlungen
+            gr.update(visible=is_admin),                         # LLMs
+            gr.update(visible=is_admin),                         # Embeddings
+            gr.update(visible=is_admin and show_rerank),         # Rerankings
+            gr.update(visible=is_admin and show_mcp),            # MCP-Server
         ])
         return updates

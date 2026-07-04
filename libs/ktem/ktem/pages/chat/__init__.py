@@ -50,7 +50,7 @@ if KH_WEB_SEARCH_BACKEND:
 
 REASONING_LIMITS = 2 if KH_DEMO_MODE else 10
 DEFAULT_SETTING = "(default)"
-INFO_PANEL_SCALES = {True: 3, False: 6}
+INFO_PANEL_SCALES = {True: 6, False: 3}
 DEFAULT_QUESTION = (
     "Was ist die Zusammenfassung dieses Dokuments?"
     if not KH_DEMO_MODE
@@ -268,6 +268,27 @@ function() {
     MINDMAP_HTML_EXPORT_TEMPLATE.replace("\n", "").replace('"', '\\"'),
 )
 
+on_chat_submit_js = """
+function() {
+    // Chat nach unten scrollen (zur letzten Nachricht)
+    var chatBot = document.getElementById("main-chat-bot");
+    if (chatBot) {
+        setTimeout(function() {
+            var msgs = chatBot.querySelectorAll(".message-row");
+            if (msgs.length) {
+                msgs[msgs.length - 1].scrollIntoView({ behavior: "smooth", block: "end" });
+            }
+        }, 150);
+    }
+    // PDF-Modal schliessen falls offen
+    var modal = document.getElementById("pdf-modal");
+    if (modal && modal.style.display !== "none") {
+        modal.style.display = "none";
+        var info = document.getElementById("html-info-panel");
+        if (info) info.style.display = "block";
+    }
+}
+"""
 fetch_api_key_js = """
 function(_, __) {
     api_key = getStorage('google_api_key', '');
@@ -290,7 +311,7 @@ class ChatPage(BasePage):
         self._use_suggestion = gr.State(
             value=getattr(flowsettings, "KH_FEATURE_CHAT_SUGGESTION", False)
         )
-        self._info_panel_expanded = gr.State(value=True)
+        self._info_panel_expanded = gr.State(value=False)
         self._command_state = gr.State(value=None)
         self._user_api_key = gr.Text(value="", visible=False)
 
@@ -475,7 +496,7 @@ class ChatPage(BasePage):
                             )
 
             with gr.Column(
-                scale=INFO_PANEL_SCALES[False], elem_id="chat-info-panel"
+                scale=INFO_PANEL_SCALES[True], elem_id="chat-info-panel"
             ) as self.info_column:
                 with gr.Accordion(
                     label="Informationsbereich", open=True, elem_id="info-expand"
@@ -535,8 +556,6 @@ class ChatPage(BasePage):
                     self.chat_control.conversation_id,
                     self.chat_control.conversation_rn,
                     self.first_selector_choices,
-                    self._indices_input[0],
-                    self._indices_input[1],
                 ],
                 outputs=[
                     self.chat_panel.text_input,
@@ -551,6 +570,12 @@ class ChatPage(BasePage):
                 ],
                 concurrency_limit=20,
                 show_progress="hidden",
+            )
+            .then(
+                fn=None,
+                inputs=None,
+                outputs=None,
+                js=on_chat_submit_js,
             )
             .success(
                 fn=self.chat_fn,
@@ -1021,8 +1046,6 @@ class ChatPage(BasePage):
         conv_id,
         conv_name,
         first_selector_choices,
-        current_mode,
-        current_selected,
         request: gr.Request,
     ):
         """Submit a message to the chatbot"""
@@ -1031,10 +1054,9 @@ class ChatPage(BasePage):
             print("User ID:", sso_user_id)
 
         if not chat_input:
-            print("Warning: empty chat_input")
-            chat_input_text = ""
-        else:
-            chat_input_text = chat_input.get("text", "")
+            raise ValueError("Eingabe ist leer")
+
+        chat_input_text = chat_input.get("text", "")
         file_ids = []
         used_command = None
 
@@ -1081,15 +1103,11 @@ class ChatPage(BasePage):
 
         if file_ids:
             selector_output = [
-                gr.update(value=current_mode) if current_mode else gr.update(),
+                "select",
                 gr.update(value=file_ids, choices=first_selector_choices),
             ]
         else:
-            selector_output = [
-                gr.update(value=current_mode) if current_mode else gr.update(),
-                gr.update(value=current_selected, choices=first_selector_choices)
-                if current_selected else gr.update(),
-            ]
+            selector_output = [gr.update(), gr.update()]
 
         # check if regen mode is active
         if chat_input_text:
@@ -1445,25 +1463,6 @@ class ChatPage(BasePage):
         *selecteds,
     ):
         """Chat function"""
-        text, refs, plot, plot_gr = "", "", None, gr.update(visible=False)
-        msg_placeholder = getattr(
-            flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Thinking ..."
-        )
-        empty_msg = getattr(
-            flowsettings, "KH_CHAT_EMPTY_MSG_PLACEHOLDER", "(Sorry, I don't know)"
-        )
-
-        # guard: empty chat_history (Gradio race condition)
-        if not chat_history:
-            yield (
-                [("", empty_msg)],
-                refs,
-                plot_gr,
-                plot,
-                chat_state,
-            )
-            return
-
         chat_input, chat_output = chat_history[-1]
         chat_history = chat_history[:-1]
 
@@ -1473,34 +1472,26 @@ class ChatPage(BasePage):
 
         queue: asyncio.Queue[Optional[dict]] = asyncio.Queue()
 
-        # construct the pipeline — wrapped in try to prevent Gradio showing red Error
-        try:
-            pipeline, reasoning_state = self.create_pipeline(
-                settings,
-                reasoning_type,
-                llm_type,
-                use_mind_map,
-                use_citation,
-                language,
-                chat_state,
-                command_state,
-                user_id,
-                *selecteds,
-            )
-            pipeline.set_output_queue(queue)
-        except Exception as e:
-            print(f"Pipeline creation error: {e}")
-            error_msg = f"Fehler beim Starten: {str(e)}"
-            yield (
-                chat_history + [(chat_input, error_msg)],
-                refs,
-                plot_gr,
-                plot,
-                chat_state,
-            )
-            return
-
+        # construct the pipeline
+        pipeline, reasoning_state = self.create_pipeline(
+            settings,
+            reasoning_type,
+            llm_type,
+            use_mind_map,
+            use_citation,
+            language,
+            chat_state,
+            command_state,
+            user_id,
+            *selecteds,
+        )
         print("Reasoning state", reasoning_state)
+        pipeline.set_output_queue(queue)
+
+        text, refs, plot, plot_gr = "", "", None, gr.update(visible=False)
+        msg_placeholder = getattr(
+            flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Thinking ..."
+        )
         print(msg_placeholder)
         yield (
             chat_history + [(chat_input, text or msg_placeholder)],

@@ -336,10 +336,16 @@ class SettingsPage(BasePage):
                     inputs=[self._user_id, self._settings_state],
                     outputs=self._app.graph_index_tabs(),
                 )
-            save_chain.then(
+            save_chain = save_chain.then(
                 lambda: gr.Tabs(selected="chat-tab"),
                 outputs=self._app.tabs,
             )
+            if hasattr(self._app, "resources_page"):
+                save_chain = save_chain.then(
+                    self._app.resources_page.toggle_management_tabs,
+                    inputs=[self._user_id],
+                    outputs=self._app.resources_page._management_tabs(),
+                )
         self._components["reasoning.use"].change(
             self.change_reasoning_mode,
             inputs=[self._components["reasoning.use"]],

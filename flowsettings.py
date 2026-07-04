@@ -326,6 +326,16 @@ KH_VLM_ENDPOINT = "{0}/openai/deployments/{1}/chat/completions?api-version={2}".
 
 
 SETTINGS_APP: dict[str, dict] = {
+    "show_rerankings_tab": {
+        "name": "Rerankings-Reiter anzeigen",
+        "value": False,
+        "component": "checkbox",
+    },
+    "show_mcp_tab": {
+        "name": "MCP-Server-Reiter anzeigen",
+        "value": False,
+        "component": "checkbox",
+    },
     "show_graphrag_collection": {
         "name": "GraphRAG Sammlung im Dateien-Reiter anzeigen",
         "value": False,

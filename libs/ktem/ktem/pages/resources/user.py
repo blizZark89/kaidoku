@@ -29,7 +29,7 @@ from theflow.settings import settings as flowsettings
 USERNAME_RULE = """**Benutzername-Regeln:**
 
 - Groß-/Kleinschreibung wird nicht unterschieden
-- Mindestens 3 Zeichen
+- Mindestens 2 Zeichen
 - Höchstens 32 Zeichen
 - Nur Buchstaben, Zahlen und Unterstriche
 """
@@ -48,8 +48,8 @@ PASSWORD_RULE = """**Passwort-Regeln:**
 
 def validate_username(usn):
     errors = []
-    if len(usn) < 3:
-        errors.append("Der Benutzername muss mindestens 3 Zeichen lang sein")
+    if len(usn) < 2:
+        errors.append("Der Benutzername muss mindestens 2 Zeichen lang sein")
     if len(usn) > 32:
         errors.append("Der Benutzername darf höchstens 32 Zeichen lang sein")
     if not usn.replace("_", "").isalnum():

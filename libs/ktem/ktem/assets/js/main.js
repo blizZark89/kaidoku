@@ -142,7 +142,6 @@ function run() {
       "div#main-chat-bot div.message-row.bot-row"
     );
     var last_bot_message = bot_messages[bot_messages.length - 1];
-    if (!last_bot_message) return;
 
     // check if the last bot message has class "text_selection"
     if (last_bot_message.classList.contains("text_selection")) {
