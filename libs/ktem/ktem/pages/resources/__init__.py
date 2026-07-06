@@ -120,3 +120,22 @@ class ResourcesTab(BasePage):
             gr.update(visible=is_admin and show_mcp),            # MCP-Server
         ])
         return updates
+
+    def _on_app_created(self):
+        if self._app.f_user_management:
+            self._app.app.load(
+                self._sso_initial_visibility,
+                inputs=[],
+                outputs=self._management_tabs(),
+                show_progress="hidden",
+            )
+
+    def _sso_initial_visibility(self, request: gr.Request):
+        try:
+            import gradiologin as grlogin
+            user = grlogin.get_user(request)
+            if user:
+                return self.toggle_management_tabs(user["sub"])
+        except Exception:
+            pass
+        return self.toggle_management_tabs(None)
