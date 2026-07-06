@@ -50,7 +50,7 @@ if KH_WEB_SEARCH_BACKEND:
 
 REASONING_LIMITS = 2 if KH_DEMO_MODE else 10
 DEFAULT_SETTING = "(default)"
-INFO_PANEL_SCALES = {True: 6, False: 3}
+INFO_PANEL_SCALES = {True: 3, False: 6}
 DEFAULT_QUESTION = (
     "Was ist die Zusammenfassung dieses Dokuments?"
     if not KH_DEMO_MODE
@@ -268,27 +268,6 @@ function() {
     MINDMAP_HTML_EXPORT_TEMPLATE.replace("\n", "").replace('"', '\\"'),
 )
 
-on_chat_submit_js = """
-function() {
-    // Chat nach unten scrollen (zur letzten Nachricht)
-    var chatBot = document.getElementById("main-chat-bot");
-    if (chatBot) {
-        setTimeout(function() {
-            var msgs = chatBot.querySelectorAll(".message-row");
-            if (msgs.length) {
-                msgs[msgs.length - 1].scrollIntoView({ behavior: "smooth", block: "end" });
-            }
-        }, 150);
-    }
-    // PDF-Modal schliessen falls offen
-    var modal = document.getElementById("pdf-modal");
-    if (modal && modal.style.display !== "none") {
-        modal.style.display = "none";
-        var info = document.getElementById("html-info-panel");
-        if (info) info.style.display = "block";
-    }
-}
-"""
 fetch_api_key_js = """
 function(_, __) {
     api_key = getStorage('google_api_key', '');
@@ -570,12 +549,6 @@ class ChatPage(BasePage):
                 ],
                 concurrency_limit=20,
                 show_progress="hidden",
-            )
-            .then(
-                fn=None,
-                inputs=None,
-                outputs=None,
-                js=on_chat_submit_js,
             )
             .success(
                 fn=self.chat_fn,
