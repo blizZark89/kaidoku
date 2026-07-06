@@ -2771,8 +2771,8 @@ class FileSelector(BasePage):
 
     def default(self):
         if self._app.f_user_management:
-            return "disabled", [], -1
-        return "disabled", [], 1
+            return "all", [], -1
+        return "all", [], 1
 
     def on_building_ui(self):
         default_mode, default_selector, user_id = self.default()
@@ -2929,7 +2929,7 @@ class FileSelector(BasePage):
 
         return file_ids
 
-    def load_files(self, selected_files, selected_groups, user_id, team_filter="", current_mode="disabled"):
+    def load_files(self, selected_files, selected_groups, user_id, team_filter="", current_mode="all"):
         options: list = []
         group_options: list = []
         available_ids = []
@@ -3107,7 +3107,7 @@ class FileSelector(BasePage):
             outputs=[self.selector, self.selector_choices, self.group_selector, self.team_filter, self.mode],
         )
 
-    def refresh_after_index(self, selected_files, selected_groups, user_id, team_filter="", current_mode="disabled"):
+    def refresh_after_index(self, selected_files, selected_groups, user_id, team_filter="", current_mode="all"):
         selector, selector_choices, group_selector, team_filter_update, mode_update = self.load_files(
             selected_files,
             selected_groups,
