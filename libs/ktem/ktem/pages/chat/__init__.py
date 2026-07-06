@@ -311,7 +311,7 @@ class ChatPage(BasePage):
         self._use_suggestion = gr.State(
             value=getattr(flowsettings, "KH_FEATURE_CHAT_SUGGESTION", False)
         )
-        self._info_panel_expanded = gr.State(value=False)
+        self._info_panel_expanded = gr.State(value=True)
         self._command_state = gr.State(value=None)
         self._user_api_key = gr.Text(value="", visible=False)
 
@@ -496,7 +496,7 @@ class ChatPage(BasePage):
                             )
 
             with gr.Column(
-                scale=INFO_PANEL_SCALES[True], elem_id="chat-info-panel"
+                scale=INFO_PANEL_SCALES[False], elem_id="chat-info-panel"
             ) as self.info_column:
                 with gr.Accordion(
                     label="Informationsbereich", open=True, elem_id="info-expand"
