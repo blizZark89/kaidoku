@@ -68,8 +68,6 @@ class ResourcesTab(BasePage):
 
     def on_register_events(self):
         if self._app.f_user_management:
-            # Defensive update path: keep visibility in sync even if a public event
-            # chain fails or is skipped.
             self._app.user_id.change(
                 self.toggle_management_tabs,
                 inputs=[self._app.user_id],
@@ -138,4 +136,6 @@ class ResourcesTab(BasePage):
                 return self.toggle_management_tabs(user["sub"])
         except Exception:
             pass
-        return self.toggle_management_tabs(None)
+        # No active SSO session: do nothing, keep current state (local login
+        # flow via onSignIn events will set visibility correctly).
+        return [gr.update() for _ in self._management_tabs()]
