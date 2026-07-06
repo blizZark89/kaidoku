@@ -475,7 +475,7 @@ class ChatPage(BasePage):
                             )
 
             with gr.Column(
-                scale=INFO_PANEL_SCALES[False], elem_id="chat-info-panel"
+                scale=INFO_PANEL_SCALES[True], elem_id="chat-info-panel"
             ) as self.info_column:
                 with gr.Accordion(
                     label="Informationsbereich", open=True, elem_id="info-expand"
