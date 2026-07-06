@@ -6,8 +6,6 @@ from ktem.index.ui import IndexManagement
 from ktem.llms.ui import LLMManagement
 from ktem.mcp.ui import MCPManagement
 from ktem.rerankings.ui import RerankingManagement
-from sqlmodel import Session
-
 from ktem.db.models import Settings, engine
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
@@ -92,12 +90,16 @@ class ResourcesTab(BasePage):
         return tabs
 
     def _get_setting(self, key, default=False):
-        with Session(engine) as session:
-            stmt = select(Settings).where(Settings.key == key)
-            result = session.exec(stmt).first()
-            if result:
-                return result.value
-        return default
+        # Prüfe zuerst die im Speicher gehaltenen Default-Settings der App
+        try:
+            if hasattr(self._app, "default_settings") and self._app.default_settings:
+                app_settings = self._app.default_settings.flatten()
+                if key in app_settings:
+                    return app_settings[key]
+        except Exception:
+            pass
+        # Fallback auf flowsettings
+        return getattr(flowsettings, key, default)
 
     def toggle_management_tabs(self, user_id):
         with Session(engine) as session:
