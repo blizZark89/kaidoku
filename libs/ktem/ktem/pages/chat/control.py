@@ -374,7 +374,17 @@ class ConversationControl(BasePage):
             if isinstance(index.selector, int):
                 indices.append(selected.get(str(index.id), index.default_selector))
             if isinstance(index.selector, tuple):
-                indices.extend(selected.get(str(index.id), index.default_selector))
+                val = selected.get(str(index.id))
+                if val is None:
+                    indices.extend([gr.update()] * len(index.selector))
+                elif len(val) < len(index.selector):
+                    # Old conversation with fewer index components — pad
+                    indices.extend(
+                        list(val)
+                        + [gr.update()] * (len(index.selector) - len(val))
+                    )
+                else:
+                    indices.extend(val)
 
         return (
             id_,

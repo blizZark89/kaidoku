@@ -2771,11 +2771,11 @@ class FileSelector(BasePage):
 
     def default(self):
         if self._app.f_user_management:
-            return "all", [], -1
-        return "all", [], 1
+            return "all", [], -1, "", []
+        return "all", [], 1, "", []
 
     def on_building_ui(self):
-        default_mode, default_selector, user_id = self.default()
+        default_mode, default_selector, user_id, default_team_filter, default_group_selector = self.default()
 
         self.mode = gr.Radio(
             value=default_mode,
@@ -2798,7 +2798,7 @@ class FileSelector(BasePage):
         )
         self.group_selector = gr.Dropdown(
             label="Dateigruppen",
-            value=[],
+            value=default_group_selector,
             choices=[],
             multiselect=True,
             filterable=True,
@@ -2808,7 +2808,7 @@ class FileSelector(BasePage):
         )
         self.team_filter = gr.Dropdown(
             label="Team",
-            value="",
+            value=default_team_filter,
             choices=[("Alle Teams", "")],
             container=False,
             interactive=True,
