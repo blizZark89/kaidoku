@@ -23,25 +23,25 @@ class ResourcesTab(BasePage):
 
     def on_building_ui(self):
         if self._app.f_user_management:
-            with gr.Tab("Benutzer", visible=False) as self.user_management_tab:
+            with gr.Tab("Benutzer", visible=True) as self.user_management_tab:
                 self.user_management = UserManagement(self._app)
 
-            with gr.Tab("Teams", visible=False) as self.team_management_tab:
+            with gr.Tab("Teams", visible=True) as self.team_management_tab:
                 self.team_management = TeamManagement(self._app)
 
-        with gr.Tab("Index-Sammlungen", visible=False) as self.index_management_tab:
+        with gr.Tab("Index-Sammlungen", visible=True) as self.index_management_tab:
             self.index_management = IndexManagement(self._app)
 
-        with gr.Tab("LLMs", visible=False) as self.llm_management_tab:
+        with gr.Tab("LLMs", visible=True) as self.llm_management_tab:
             self.llm_management = LLMManagement(self._app)
 
-        with gr.Tab("Embeddings", visible=False) as self.emb_management_tab:
+        with gr.Tab("Embeddings", visible=True) as self.emb_management_tab:
             self.emb_management = EmbeddingManagement(self._app)
 
-        with gr.Tab("Rerankings", visible=False) as self.rerank_management_tab:
+        with gr.Tab("Rerankings", visible=True) as self.rerank_management_tab:
             self.rerank_management = RerankingManagement(self._app)
 
-        with gr.Tab("MCP-Server", visible=False) as self.mcp_management_tab:
+        with gr.Tab("MCP-Server", visible=True) as self.mcp_management_tab:
             self.mcp_management = MCPManagement(self._app)
 
     def on_subscribe_public_events(self):
