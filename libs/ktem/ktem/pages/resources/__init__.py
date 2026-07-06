@@ -1,7 +1,6 @@
 import gradio as gr
 from ktem.authz import get_access_context
 from ktem.app import BasePage
-from ktem.db.models import engine
 from ktem.embeddings.ui import EmbeddingManagement
 from ktem.index.ui import IndexManagement
 from ktem.llms.ui import LLMManagement
@@ -22,6 +21,9 @@ class ResourcesTab(BasePage):
         self.on_building_ui()
 
     def on_building_ui(self):
+        show_rerank = self._get_setting("show_rerankings_tab", False)
+        show_mcp = self._get_setting("show_mcp_tab", False)
+
         if self._app.f_user_management:
             with gr.Tab("Benutzer", visible=True) as self.user_management_tab:
                 self.user_management = UserManagement(self._app)
@@ -38,10 +40,10 @@ class ResourcesTab(BasePage):
         with gr.Tab("Embeddings", visible=True) as self.emb_management_tab:
             self.emb_management = EmbeddingManagement(self._app)
 
-        with gr.Tab("Rerankings", visible=True) as self.rerank_management_tab:
+        with gr.Tab("Rerankings", visible=show_rerank) as self.rerank_management_tab:
             self.rerank_management = RerankingManagement(self._app)
 
-        with gr.Tab("MCP-Server", visible=True) as self.mcp_management_tab:
+        with gr.Tab("MCP-Server", visible=show_mcp) as self.mcp_management_tab:
             self.mcp_management = MCPManagement(self._app)
 
     def on_subscribe_public_events(self):
