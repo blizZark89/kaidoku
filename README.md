@@ -20,7 +20,15 @@ Fuer die Verarbeitung von Office-Dateien (.pptx, .docx, .xlsx) wird `docling` be
 
 **Lokale Installation:**
 ```shell
-pip install "docling<=2.5.2" --break-system-packages
+apt update
+apt install -y python3-full python3-venv
+
+cd ~/kaidoku
+python3 -m venv .venv
+source .venv/bin/activate
+
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install "docling<=2.5.2"
 ```
 
 ### Mit Docker (empfohlen)
