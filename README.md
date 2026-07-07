@@ -20,11 +20,7 @@ Fuer die Verarbeitung von Office-Dateien (.pptx, .docx, .xlsx) wird `docling` be
 
 **Lokale Installation:**
 ```shell
-pip install "docling<=2.5.2"
-```
-Oder mit uv:
-```shell
-uv pip install "docling<=2.5.2"
+pip install "docling<=2.5.2" --break-system-packages
 ```
 
 ### Mit Docker (empfohlen)
