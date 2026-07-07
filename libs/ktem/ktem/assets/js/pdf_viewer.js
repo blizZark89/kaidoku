@@ -10,18 +10,17 @@ function onBlockLoad() {
 
     modal.id = "pdf-modal";
     modal.className = "modal";
-    modal.innerHTML = `
-            <div class="modal-content">
-              <div class="modal-header">
-                <span class="close" id="modal-close">&times;</span>
-                <span class="close" id="modal-expand">&#x26F6;</span>
-              </div>
-              <div class="modal-body">
-                <pdfjs-viewer-element id="pdf-viewer" viewer-path="GR_FILE_ROOT_PATH/file=PDFJS_PREBUILT_DIR" locale="en" phrase="true">
-                </pdfjs-viewer-element>
-              </div>
-            </div>
-          `;
+    modal.innerHTML = [
+      '<div class="modal-content">',
+      '  <div class="modal-header">',
+      '    <span class="close" id="modal-close">&times;</span>',
+      '    <span class="close" id="modal-expand">&#x26F6;</span>',
+      '  </div>',
+      '  <div class="modal-body">',
+      '    <iframe id="pdf-viewer" style="width:100%;height:100%;border:none"></iframe>',
+      '  </div>',
+      '</div>',
+    ].join('\n');
 
     modal.querySelector("#modal-close").onclick = function () {
       modal.style.display = "none";
@@ -43,162 +42,31 @@ function onBlockLoad() {
         modal.style.position = "fixed";
         modal.style.width = "70%";
         modal.style.left = "15%";
-        modal.style.height = "100dvh";
+        modal.style.height = "100vh";
       } else {
         modal.style.position = old_position;
         modal.style.width = old_width;
         modal.style.left = old_left;
-        modal.style.height = "85dvh";
+        modal.style.height = "85vh";
       }
     };
   };
 
-  function matchRatio(str1, str2) {
-    let n = str1.length;
-    let m = str2.length;
-
-    let lcs = [];
-    for (let i = 0; i <= n; i++) {
-      lcs[i] = [];
-      for (let j = 0; j <= m; j++) {
-        lcs[i][j] = 0;
-      }
-    }
-
-    let result = "";
-    let max = 0;
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < m; j++) {
-        if (str1[i] === str2[j]) {
-          lcs[i + 1][j + 1] = lcs[i][j] + 1;
-          if (lcs[i + 1][j + 1] > max) {
-            max = lcs[i + 1][j + 1];
-            result = str1.substring(i - max + 1, i + 1);
-          }
-        }
-      }
-    }
-
-    return result.length / Math.min(n, m);
-  }
-
-  function getPdfIframe() {
-    var pdfViewer = document.querySelector("#pdf-viewer");
-    if (!pdfViewer) {
-      return null;
-    }
-
-    return (
-      pdfViewer.iframe ||
-      pdfViewer.querySelector("iframe") ||
-      (pdfViewer.shadowRoot ? pdfViewer.shadowRoot.querySelector("iframe") : null)
-    );
-  }
-
-  async function waitForPdfIframe(retries = 20) {
-    for (var attempt = 0; attempt < retries; attempt++) {
-      var iframe = getPdfIframe();
-      if (iframe) {
-        return iframe;
-      }
-      await sleep(100);
-    }
-    return null;
-  }
-
-  async function waitForPdfDocument(retries = 40) {
-    for (var attempt = 0; attempt < retries; attempt++) {
-      var iframe = await waitForPdfIframe(1);
-      if (!iframe) {
-        await sleep(100);
-        continue;
-      }
-
-      var innerDoc = iframe.contentDocument
-        ? iframe.contentDocument
-        : iframe.contentWindow
-          ? iframe.contentWindow.document
-          : null;
-      if (innerDoc) {
-        return innerDoc;
-      }
-
-      await sleep(100);
-    }
-    return null;
-  }
-
-  globalThis.compareText = async (search_phrases, page_label) => {
-    var innerDoc = await waitForPdfDocument();
-    if (!innerDoc) return;
-
-    var renderedPages = innerDoc.querySelectorAll("div#viewer div.page");
-    if (renderedPages.length == 0) {
-      // if pages are not rendered yet, wait and try again
-      setTimeout(() => compareText(search_phrases, page_label), 100);
-      return;
-    }
-
-    var query_selector =
-      "#viewer > div[data-page-number='" +
-      page_label +
-      "'] > div.textLayer > span";
-    var page_spans = innerDoc.querySelectorAll(query_selector);
-    for (var i = 0; i < page_spans.length; i++) {
-      var span = page_spans[i];
-      if (
-        span.textContent.length > 4 &&
-        search_phrases.some(
-          (phrase) => matchRatio(phrase, span.textContent) > 0.5
-        )
-      ) {
-        span.innerHTML =
-          "<span class='highlight selected'>" + span.textContent + "</span>";
-      } else {
-        // if span is already highlighted, remove it
-        if (span.querySelector(".highlight")) {
-          span.innerHTML = span.textContent;
-        }
-      }
-    }
-  };
-
-  // Sleep function using Promise and setTimeout
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   // Function to open modal and display PDF
-  globalThis.openModal = async (event) => {
+  globalThis.openModal = (event) => {
     event.preventDefault();
     var target = event.currentTarget;
     var src = target.getAttribute("data-src");
     var page = target.getAttribute("data-page");
-    var search = target.getAttribute("data-search");
-    var highlighted_spans =
-      target.parentElement.parentElement.querySelectorAll("mark");
 
-    // Get text from highlighted spans
-    var search_phrases = Array.from(highlighted_spans).map(
-      (span) => span.textContent
-    );
-    // Use regex to strip 【id】from search phrases
-    search_phrases = search_phrases.map((phrase) =>
-      phrase.replace(/【\d+】/g, "")
-    );
+    var pdfUrl = page ? src + "#page=" + page : src;
 
-    // var phrase = target.getAttribute("data-phrase");
+    var iframe = document.getElementById("pdf-viewer");
+    if (!iframe) return;
 
-    var pdfViewer = document.getElementById("pdf-viewer");
-    if (!pdfViewer) return;
-
-    current_src = pdfViewer.getAttribute("src");
-    if (current_src != src) {
-      pdfViewer.setAttribute("src", src);
+    if (iframe.src !== pdfUrl) {
+      iframe.src = pdfUrl;
     }
-    // pdfViewer.setAttribute("phrase", phrase);
-    // pdfViewer.setAttribute("search", search);
-    pdfViewer.setAttribute("page", page);
 
     var scrollableDiv = document.getElementById("chat-info-panel");
     infor_panel_scroll_pos = scrollableDiv.scrollTop;
@@ -210,16 +78,6 @@ function onBlockLoad() {
       info_panel.style.display = "none";
     }
     scrollableDiv.scrollTop = 0;
-
-    if (window.customElements && customElements.whenDefined) {
-      customElements
-        .whenDefined("pdfjs-viewer-element")
-        .catch(() => null);
-    }
-
-    /* search for text inside PDF page */
-    await sleep(100);
-    await compareText(search_phrases, page);
   };
 
   globalThis.assignPdfOnclickEvent = () => {

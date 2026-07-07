@@ -1,19 +1,16 @@
-import os
 from pathlib import Path
 from typing import Optional
 
 import gradio as gr
 import pluggy
 from ktem import extension_protocol
-from ktem.assets import PDFJS_PREBUILT_DIR, KotaemonTheme
+from ktem.assets import KotaemonTheme
 from ktem.components import reasonings
 from ktem.exceptions import HookAlreadyDeclared, HookNotDeclared
 from ktem.index import IndexManager
 from ktem.settings import BaseSettingGroup, SettingGroup, SettingReasoningGroup
 from theflow.settings import settings
 from theflow.utils.modules import import_dotted_string
-
-BASE_PATH = os.environ.get("GR_FILE_ROOT_PATH", "")
 
 
 class BaseApp:
@@ -52,12 +49,6 @@ class BaseApp:
             self._js = self._js.replace("KH_APP_VERSION", self.app_version)
         with (dir_assets / "js" / "pdf_viewer.js").open(encoding="utf-8") as fi:
             self._pdf_view_js = fi.read()
-            # workaround for Windows path
-            pdf_js_dist_dir = str(PDFJS_PREBUILT_DIR).replace("\\", "\\\\")
-            self._pdf_view_js = self._pdf_view_js.replace(
-                "PDFJS_PREBUILT_DIR",
-                pdf_js_dist_dir,
-            ).replace("GR_FILE_ROOT_PATH", BASE_PATH)
         with (dir_assets / "js" / "svg-pan-zoom.min.js").open() as fi:
             self._svg_js = fi.read()
 
@@ -184,9 +175,6 @@ class BaseApp:
         </script>
         """
         external_js = (
-            "<script type='module' "
-            "src='https://unpkg.com/pdfjs-viewer-element@3.2.2'>"
-            "</script>"
             "<script type='module' "
             "src='https://cdnjs.cloudflare.com/ajax/libs/tributejs/5.1.3/tribute.min.js'>"  # noqa
             f"{markmap_js}"

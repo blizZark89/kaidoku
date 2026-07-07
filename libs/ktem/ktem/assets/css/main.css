@@ -306,8 +306,10 @@ span.icon {
   overflow: unset !important;
 }
 
-pdfjs-viewer-element {
-  height: 100dvh;
+#pdf-viewer {
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 
 /* Modal styles */
@@ -319,7 +321,7 @@ pdfjs-viewer-element {
   left: 0;
   top: 0;
   width: 100%;
-  height: 85dvh;
+  height: 85vh;
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.4);
 }
