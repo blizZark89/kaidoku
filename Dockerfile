@@ -91,7 +91,7 @@ RUN --mount=type=ssh  \
 
 RUN --mount=type=ssh  \
     --mount=type=cache,target=/root/.cache/uv  \
-    uv pip install --python .venv "docling<=2.5.2"
+    uv pip install --python .venv "docling<=2.5.2" "docling-core<2.80"
 
 # Download NLTK data for unstructured (PPTX, DOCX parsing)
 ENV NLTK_DATA=/usr/local/share/nltk_data
