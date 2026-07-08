@@ -96,12 +96,7 @@ RUN --mount=type=ssh  \
 # Download NLTK data for unstructured (PPTX, DOCX parsing)
 ENV NLTK_DATA=/usr/local/share/nltk_data
 RUN mkdir -p "$NLTK_DATA" \
-    && /app/.venv/bin/python -c "
-import nltk
-for pkg in ('punkt_tab', 'averaged_perceptron_tagger_eng', 'stopwords'):
-    nltk.download(pkg, download_dir='$NLTK_DATA', quiet=True)
-    print(f'NLTK {pkg}: downloaded')
-" \
+    && /app/.venv/bin/python /app/scripts/download_nltk_data.py \
     && /app/.venv/bin/python -c "from llama_index.core.readers.base import BaseReader; print('llama_index OK')"
 
 ENTRYPOINT ["sh", "/app/launch.sh"]
