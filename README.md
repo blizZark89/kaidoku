@@ -20,14 +20,19 @@ Fuer die Verarbeitung von Office-Dateien (.pptx, .docx, .xlsx) wird `docling` be
 
 **Lokale Installation:**
 ```shell
+deactivate 2>/dev/null || true
 apt update
-apt install -y python3.11 python3.11-venv python3.11-full
+apt install -y curl ca-certificates build-essential
 cd ~/kaidoku
 rm -rf .venv
-python3.11 -m venv .venv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv python install 3.12
+uv venv --python 3.12 .venv
 source .venv/bin/activate
+python -V
 python -m pip install --upgrade "pip<26" setuptools wheel
-python -m pip install "docling<=2.5.2"
+python -m pip install "docling==2.5.2"
 ```
 
 ### Mit Docker (empfohlen)
