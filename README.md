@@ -33,6 +33,7 @@ source .venv/bin/activate
 python -V
 python -m pip install --upgrade "pip<26" setuptools wheel
 python -m pip install "docling==2.5.2"
+deactivate
 ```
 
 ### Mit Docker (empfohlen)
