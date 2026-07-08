@@ -194,6 +194,8 @@ class Render:
             relevant_score = llm_reranking_score
         elif reranking_score > 0:
             relevant_score = reranking_score
+        elif not is_close(doc.score, -1.0) and doc.score > 0:
+            relevant_score = doc.score
         else:
             relevant_score = 0.0
 
