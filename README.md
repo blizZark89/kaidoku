@@ -21,13 +21,12 @@ Fuer die Verarbeitung von Office-Dateien (.pptx, .docx, .xlsx) wird `docling` be
 **Lokale Installation:**
 ```shell
 apt update
-apt install -y python3-full python3-venv
-
+apt install -y python3.11 python3.11-venv python3.11-full
 cd ~/kaidoku
-python3 -m venv .venv
+rm -rf .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
-
-python -m pip install --upgrade pip setuptools wheel
+python -m pip install --upgrade "pip<26" setuptools wheel
 python -m pip install "docling<=2.5.2"
 ```
 
