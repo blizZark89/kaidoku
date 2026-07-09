@@ -504,21 +504,22 @@ svg.markmap text {
   right: 8px;
   bottom: 6px;
   z-index: 10;
+  width: 30px;
+  height: 30px;
   min-height: unset !important;
   overflow: hidden;
+  pointer-events: none;
 }
 
-/* Alles außer Record/Stop-Button ausblenden */
-#mic-input > *:not(.record-button):not(.stop-button),
-#mic-input button:not(.record-button):not(.stop-button),
-#mic-input .icon-button,
-#mic-input input[type="range"],
-#mic-input .volume-slider {
+/* Alles im Audio-Container ausblenden, nur Buttons sichtbar */
+#mic-input * {
   display: none !important;
 }
 
-/* Record-Button: rund, 30x30, Mikrofon-Icon */
+/* Record-Button: rund, 30x30, klickbar */
 #mic-input .record-button {
+  pointer-events: auto;
+  display: flex !important;
   border-radius: 50% !important;
   width: 30px !important;
   height: 30px !important;
@@ -531,6 +532,8 @@ svg.markmap text {
 
 /* Stop-Button während Aufnahme: rot, rund, pulsierend */
 #mic-input .stop-button {
+  pointer-events: auto;
+  display: flex !important;
   border-radius: 50% !important;
   width: 30px !important;
   height: 30px !important;
@@ -541,10 +544,6 @@ svg.markmap text {
   color: white !important;
   animation: mic-pulse 1.5s ease-in-out infinite;
   cursor: pointer;
-}
-
-#mic-input audio {
-  display: none;
 }
 
 @keyframes mic-pulse {
