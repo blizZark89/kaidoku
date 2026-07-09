@@ -499,9 +499,14 @@ svg.markmap text {
   position: relative;
 }
 
+/* Textfeld rechts schmaler machen — Platz für Mikro + Senden */
+#chat-input textarea {
+  padding-right: 74px !important;
+}
+
 #mic-input {
   position: absolute;
-  right: 8px;
+  right: 40px;
   bottom: 6px;
   z-index: 10;
   width: 30px;
