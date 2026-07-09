@@ -959,6 +959,15 @@ class ChatPage(BasePage):
             show_progress="hidden",
         )
 
+        self.chat_panel.audio_input.stop_recording(
+            fn=self.transcribe_audio,
+            inputs=[self.chat_panel.audio_input],
+            outputs=[self.chat_panel.text_input],
+        ).then(
+            fn=None, inputs=None, outputs=None,
+            js=chat_input_focus_js,
+        )
+
         def toggle_chat_suggestion(current_state):
             return current_state, gr.update(visible=current_state)
 
@@ -1009,6 +1018,53 @@ class ChatPage(BasePage):
                 outputs=None,
                 js=quick_urls_submit_js,
             )
+
+    def transcribe_audio(self, audio_path: str) -> str:
+        """Transcribe audio using the configured speech-to-text settings."""
+        if not audio_path:
+            raise gr.Error("Keine Audioaufnahme erkannt.")
+
+        try:
+            from openai import OpenAI
+            from ktem.speech.manager import speech_manager
+
+            speech_config = speech_manager.get_default_spec()
+            if not speech_config:
+                raise gr.Error(
+                    "Keine Speech-Konfiguration gefunden. "
+                    "Bitte unter Ressourcen > Speech einen API-Key hinterlegen."
+                )
+
+            api_key = speech_config.get("api_key")
+            if not api_key:
+                raise gr.Error(
+                    "Speech-API-Key nicht konfiguriert. "
+                    "Bitte unter Ressourcen > Speech einen API-Key hinterlegen."
+                )
+
+            base_url = speech_config.get("base_url", "")
+            model = speech_config.get("model", "whisper-1")
+            language = speech_config.get("language", "de")
+
+            client_kwargs = {"api_key": api_key}
+            if base_url:
+                client_kwargs["base_url"] = base_url
+
+            client = OpenAI(**client_kwargs)
+            with open(audio_path, "rb") as f:
+                transcript = client.audio.transcriptions.create(
+                    model=model,
+                    file=f,
+                    language=language or None,
+                )
+            return transcript.text
+        except ImportError:
+            raise gr.Error(
+                "OpenAI-Paket nicht installiert. "
+                "Bitte 'pip install openai' ausführen."
+            )
+        except Exception as e:
+            raise gr.Error(f"Transkription fehlgeschlagen: {str(e)}")
 
     def submit_msg(
         self,

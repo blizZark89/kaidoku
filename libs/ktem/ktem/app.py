@@ -174,10 +174,28 @@ class BaseApp:
             };
         </script>
         """
+        mic_fix_js = (
+            "<script>"
+            "(function(){"
+            "var t=0;var iv=setInterval(function(){"
+            "t++;"
+            "var b=document.querySelector('#mic-input .record-button');"
+            "if(b&&b.textContent.trim()==='Record'){"
+            "b.textContent='';b.setAttribute('aria-label','Aufnahme starten');"
+            "b.setAttribute('title','Aufnahme starten');}"
+            "var s=document.querySelector('#mic-input .stop-button');"
+            "if(s&&s.textContent.trim()==='Stop'){"
+            "s.textContent='';s.setAttribute('aria-label','Aufnahme stoppen');}"
+            "if(t>30)clearInterval(iv);"
+            "},500);"
+            "})();"
+            "</script>"
+        )
         external_js = (
             "<script type='module' "
             "src='https://cdnjs.cloudflare.com/ajax/libs/tributejs/5.1.3/tribute.min.js'>"  # noqa
             f"{markmap_js}"
+            f"{mic_fix_js}"
             "<script src='https://cdn.jsdelivr.net/npm/markmap-autoloader@0.16'></script>"  # noqa
             "<script src='https://cdn.jsdelivr.net/npm/minisearch@7.1.1/dist/umd/index.min.js'></script>"  # noqa
             "</script>"

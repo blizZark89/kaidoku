@@ -32,7 +32,7 @@ class ChatPanel(BasePage):
             likeable=True,
             bubble_full_width=False,
         )
-        with gr.Row():
+        with gr.Row(elem_id="chat-input-row"):
             self.text_input = gr.MultimodalTextbox(
                 interactive=True,
                 scale=20,
@@ -43,6 +43,14 @@ class ChatPanel(BasePage):
                 container=False,
                 show_label=False,
                 elem_id="chat-input",
+            )
+            self.audio_input = gr.Audio(
+                sources=["microphone"],
+                type="filepath",
+                label="Sprachaufnahme",
+                show_label=False,
+                container=False,
+                elem_id="mic-input",
             )
 
     def submit_msg(self, chat_input, chat_history):
