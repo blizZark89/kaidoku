@@ -962,7 +962,7 @@ class ChatPage(BasePage):
         self.chat_panel.audio_input.stop_recording(
             fn=self.transcribe_audio,
             inputs=[self.chat_panel.audio_input],
-            outputs=[self.chat_panel.text_input],
+            outputs=[self.chat_panel.text_input, self.chat_panel.audio_input],
         ).then(
             fn=None, inputs=None, outputs=None,
             js=chat_input_focus_js,
@@ -1019,10 +1019,14 @@ class ChatPage(BasePage):
                 js=quick_urls_submit_js,
             )
 
-    def transcribe_audio(self, audio_path: str) -> str:
-        """Transcribe audio using the configured speech-to-text settings."""
+    def transcribe_audio(self, audio_path: str):
+        """Transcribe audio and clear the audio component.
+        
+        Returns (transcript_text, audio_update) so the audio player
+        is immediately cleared after transcription.
+        """
         if not audio_path:
-            raise gr.Error("Keine Audioaufnahme erkannt.")
+            return "", gr.update(value=None)
 
         try:
             from openai import OpenAI
@@ -1057,7 +1061,7 @@ class ChatPage(BasePage):
                     file=f,
                     language=language or None,
                 )
-            return transcript.text
+            return transcript.text, gr.update(value=None)
         except ImportError:
             raise gr.Error(
                 "OpenAI-Paket nicht installiert. "

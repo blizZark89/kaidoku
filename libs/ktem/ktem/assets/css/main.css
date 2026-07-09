@@ -505,6 +505,16 @@ svg.markmap text {
   bottom: 6px;
   z-index: 10;
   min-height: unset !important;
+  overflow: hidden;
+}
+
+/* Alles außer Record/Stop-Button ausblenden */
+#mic-input > *:not(.record-button):not(.stop-button),
+#mic-input button:not(.record-button):not(.stop-button),
+#mic-input .icon-button,
+#mic-input input[type="range"],
+#mic-input .volume-slider {
+  display: none !important;
 }
 
 /* Record-Button: rund, 30x30, Mikrofon-Icon */
