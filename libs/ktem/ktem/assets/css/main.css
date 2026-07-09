@@ -513,11 +513,21 @@ svg.markmap text {
   height: 30px;
   min-height: unset !important;
   overflow: hidden;
-  pointer-events: none;
 }
 
-/* Alles im Audio-Container ausblenden, nur Buttons sichtbar */
-#mic-input * {
+/* Alle Audio-Controls außer den Buttons ausblenden */
+#mic-input audio,
+#mic-input .icon-button,
+#mic-input input[type="range"],
+#mic-input select,
+#mic-input label,
+#mic-input [class*="clear"],
+#mic-input [class*="source"],
+#mic-input [class*="volume"],
+#mic-input [class*="play"],
+#mic-input [class*="pause"],
+#mic-input [class*="seek"],
+#mic-input [class*="time"] {
   display: none !important;
 }
 
