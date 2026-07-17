@@ -31,6 +31,14 @@ function(usn, pwd) {
 }
 """
 
+clear_storage_oauth_js = """
+function() {
+    removeFromStorage('username');
+    removeFromStorage('password');
+    return [];
+}
+"""
+
 
 class LoginPage(BasePage):
 
@@ -93,12 +101,13 @@ class LoginPage(BasePage):
         )
 
     def _on_app_created(self):
+        load_js = clear_storage_oauth_js if self._is_oidc else fetch_creds
         onSignIn = self._app.app.load(
             self.login,
             inputs=[self.usn, self.pwd],
             outputs=[self._app.user_id, self.usn, self.pwd],
             show_progress="hidden",
-            js=fetch_creds,
+            js=load_js,
         ).then(
             self.toggle_login_visibility,
             inputs=[self._app.user_id],
