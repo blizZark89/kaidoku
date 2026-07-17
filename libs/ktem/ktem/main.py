@@ -120,15 +120,14 @@ class App(BaseApp):
                             )
 
             if not KH_DEMO_MODE:
-                if not KH_SSO_ENABLED:
-                    with gr.Tab(
-                        "Ressourcen",
-                        elem_id="resources-tab",
-                        id="resources-tab",
-                        visible=not self.f_user_management,
-                        elem_classes=["fill-main-area-height", "scrollable"],
-                    ) as self._tabs["resources-tab"]:
-                        self.resources_page = ResourcesTab(self)
+                with gr.Tab(
+                    "Ressourcen",
+                    elem_id="resources-tab",
+                    id="resources-tab",
+                    visible=True,
+                    elem_classes=["fill-main-area-height", "scrollable"],
+                ) as self._tabs["resources-tab"]:
+                    self.resources_page = ResourcesTab(self)
 
                 with gr.Tab(
                     "Einstellungen",
