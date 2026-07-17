@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from decouple import config
-from ldap3 import ALL, Connection, Server, Tls
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -341,6 +340,8 @@ def sync_external_user(
 
 
 def authenticate_ldap_user(username: str, password: str) -> ExternalIdentity:
+    from ldap3 import ALL, Connection, Server, Tls
+
     username = str(username or "").strip()
     password = str(password or "")
     if not username or not password:
