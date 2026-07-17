@@ -3,6 +3,15 @@ import hashlib
 import gradio as gr
 from ktem.app import BasePage
 from ktem.db.models import User, engine
+from ktem.external_auth import (
+    ExternalAuthError,
+    authenticate_ldap_user,
+    get_authentication_method,
+    get_session_user_id,
+    is_ldap_auth,
+    is_oidc_auth,
+    sync_external_user,
+)
 from ktem.pages.resources.user import create_user
 from sqlmodel import Session, select
 
@@ -33,9 +42,32 @@ class LoginPage(BasePage):
 
     def on_building_ui(self):
         gr.Markdown(f"# Willkommen bei {self._app.app_name}!")
-        self.usn = gr.Textbox(label="Benutzername", visible=False)
-        self.pwd = gr.Textbox(label="Passwort", type="password", visible=False)
-        self.btn_login = gr.Button("Anmelden", visible=False)
+        auth_method = get_authentication_method()
+        self._is_oidc = is_oidc_auth()
+        if self._is_oidc:
+            gr.Markdown(
+                "Die Anmeldung erfolgt ?ber Authentik. "
+                "Verwende den Button unten, um den OIDC-Login zu starten."
+            )
+        elif is_ldap_auth():
+            gr.Markdown("Die Anmeldung erfolgt direkt ?ber LDAP.")
+
+        self.usn = gr.Textbox(label="Benutzername", visible=not self._is_oidc)
+        self.pwd = gr.Textbox(
+            label="Passwort", type="password", visible=not self._is_oidc
+        )
+        self.btn_login = gr.Button(
+            "Anmelden" if auth_method != "AUTHENTIK" else "Sitzung pr?fen",
+            visible=not self._is_oidc,
+        )
+        self.btn_oidc_login = gr.Button(
+            "Mit Authentik anmelden", visible=self._is_oidc
+        )
+        if self._is_oidc:
+            self.btn_oidc_login.click(
+                fn=None,
+                js="() => { window.location.href = '/login'; }",
+            )
 
     def on_register_events(self):
         onSignIn = gr.on(
@@ -55,9 +87,9 @@ class LoginPage(BasePage):
 
     def toggle_login_visibility(self, user_id):
         return (
-            gr.update(visible=user_id is None),
-            gr.update(visible=user_id is None),
-            gr.update(visible=user_id is None),
+            gr.update(visible=user_id is None and not self._is_oidc),
+            gr.update(visible=user_id is None and not self._is_oidc),
+            gr.update(visible=user_id is None and not self._is_oidc),
         )
 
     def _on_app_created(self):
@@ -87,46 +119,49 @@ class LoginPage(BasePage):
         )
 
     def login(self, usn, pwd, request: gr.Request):
-        try:
-            import gradiologin as grlogin
-
-            user = grlogin.get_user(request)
-        except (ImportError, AssertionError):
-            user = None
-
-        if user:
-            user_id = user["sub"]
+        if is_oidc_auth():
+            user_id = get_session_user_id(request)
+            if not user_id:
+                return None, usn, pwd
             with Session(engine) as session:
-                stmt = select(User).where(
-                    User.id == user_id,
-                )
-                result = session.exec(stmt).all()
+                user = session.exec(select(User).where(User.id == user_id)).first()
+            if user:
+                return user.id, "", ""
+            gr.Warning(
+                "OIDC-Sitzung gefunden, aber der Benutzer ist lokal nicht synchronisiert."
+            )
+            return None, usn, pwd
 
-            if result:
-                print("Existing user:", user)
-                return user_id, "", ""
-            else:
-                print("Creating new user:", user)
-                create_user(
-                    usn=user["email"],
-                    pwd="",
-                    user_id=user_id,
-                    is_admin=False,
-                )
-                return user_id, "", ""
-        else:
+        if is_ldap_auth():
             if not usn or not pwd:
                 return None, usn, pwd
-
-            hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
-            with Session(engine) as session:
-                stmt = select(User).where(
-                    User.username_lower == usn.lower().strip(),
-                    User.password == hashed_password,
-                )
-                result = session.exec(stmt).all()
-                if result:
-                    return result[0].id, "", ""
-
-                gr.Warning("Ungültiger Benutzername oder Passwort")
+            try:
+                identity = authenticate_ldap_user(usn, pwd)
+                user, decision = sync_external_user(identity)
+            except ExternalAuthError as exc:
+                gr.Warning(str(exc))
                 return None, usn, pwd
+
+            if user is None or not decision.can_access:
+                gr.Warning(
+                    decision.reason
+                    or "LDAP-Anmeldung erfolgreich, aber keine passende Zugriffsgruppe gefunden."
+                )
+                return None, usn, ""
+            return user.id, "", ""
+
+        if not usn or not pwd:
+            return None, usn, pwd
+
+        hashed_password = hashlib.sha256(pwd.encode()).hexdigest()
+        with Session(engine) as session:
+            stmt = select(User).where(
+                User.username_lower == usn.lower().strip(),
+                User.password == hashed_password,
+            )
+            result = session.exec(stmt).all()
+            if result:
+                return result[0].id, "", ""
+
+            gr.Warning("Ung?ltiger Benutzername oder Passwort")
+            return None, usn, pwd
