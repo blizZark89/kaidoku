@@ -146,11 +146,9 @@ def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids
     if source_team_ids and source_team_ids.intersection(global_team_ids):
         return True
     if not source_team_ids:
-        # Legacy behavior (without document team mapping):
-        # only visible within uploader scope.
-        if scope_user_ids is None:
-            return False
-        return getattr(source, "user", None) in set(scope_user_ids)
+        if scope_user_ids is not None:
+            return getattr(source, "user", None) in set(scope_user_ids)
+        return True
     actor_team_ids = set(actor.team_ids)
     return bool(actor_team_ids.intersection(source_team_ids))
 
@@ -233,7 +231,7 @@ def _effective_search_team_ids(actor, team_filter="", global_team_ids=None) -> s
     visible_global_team_ids = {
         team_id for team_id in (global_team_ids or []) if str(team_id).strip()
     }
-    return actor_team_ids.union(visible_global_team_ids)
+    return actor_team_ids.union(visible_global_team_ids) or None
 
 
 def _source_matches_search_team(
@@ -532,7 +530,7 @@ class FileIndexPage(BasePage):
                 ]
                 values = []
 
-        return gr.update(choices=choices, value=values, visible=True)
+        return gr.update(choices=choices, value=values, visible=False)
 
     def selected_file_team_choices(self, file_id, user_id):
         if not self._app.f_user_management or user_id is None or not file_id:
@@ -935,6 +933,7 @@ class FileIndexPage(BasePage):
                                 multiselect=True,
                                 container=False,
                                 interactive=True,
+                                visible=False,
                                 info="Nur ausgewählte Teams sehen diese Dokumente.",
                             )
                         else:
@@ -2238,7 +2237,7 @@ class FileIndexPage(BasePage):
                         1,
                     )
                 scope_ids = allowed_user_ids_for_scope(session, actor)
-            if scope_ids == []:
+            if scope_ids == [] and self._index.config.get("private", False):
                 return (
                     [],
                     pd.DataFrame.from_records(
@@ -2469,7 +2468,7 @@ class FileIndexPage(BasePage):
         with Session(engine) as session:
             statement = select(FileGroup)
             scope_ids = self._scope_user_ids(session, user_id)
-            if scope_ids == []:
+            if scope_ids == [] and self._index.config.get("private", False):
                 return [], pd.DataFrame.from_records(
                     [
                         {
@@ -2598,7 +2597,7 @@ class FileIndexPage(BasePage):
 
         with Session(engine) as session:
             scope_ids = self._scope_user_ids(session, user_id)
-            if scope_ids == []:
+            if scope_ids == [] and self._index.config.get("private", False):
                 raise gr.Error("Keine Berechtigung")
             actor = get_access_context(session, user_id) if self._app.f_user_management else None
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()

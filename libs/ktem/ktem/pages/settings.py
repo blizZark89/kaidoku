@@ -5,6 +5,11 @@ from ktem.app import BasePage
 from ktem.components import reasonings
 from ktem.authz import get_access_context
 from ktem.db.models import Settings, Team, User, engine
+from ktem.external_auth import (
+    can_manage_local_users,
+    is_oidc_auth,
+    local_user_management_block_reason,
+)
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -16,6 +21,14 @@ function(u, c, pw, pwc) {
     removeFromStorage('username');
     removeFromStorage('password');
     return [u, c, pw, pwc];
+}
+"""
+
+oidc_signout_js = """
+function() {
+    removeFromStorage('username');
+    removeFromStorage('password');
+    window.location.href = "/logout";
 }
 """
 
@@ -87,37 +100,35 @@ class SettingsPage(BasePage):
         # render application page if there are application settings
         self._render_app_tab = False
 
-        if not KH_SSO_ENABLED and self._default_settings.application.settings:
+        if self._default_settings.application.settings:
             self._render_app_tab = True
 
         # render index page if there are index settings (general and/or specific)
         self._render_index_tab = False
 
-        if not KH_SSO_ENABLED:
-            if self._default_settings.index.settings:
-                self._render_index_tab = True
-            else:
-                for sig in self._default_settings.index.options.values():
-                    if sig.settings:
-                        self._render_index_tab = True
-                        break
+        if self._default_settings.index.settings:
+            self._render_index_tab = True
+        else:
+            for sig in self._default_settings.index.options.values():
+                if sig.settings:
+                    self._render_index_tab = True
+                    break
 
         # render reasoning page if there are reasoning settings
         self._render_reasoning_tab = False
 
-        if not KH_SSO_ENABLED:
-            if len(self._default_settings.reasoning.settings) > 1:
-                self._render_reasoning_tab = True
-            else:
-                for sig in self._default_settings.reasoning.options.values():
-                    if sig.settings:
-                        self._render_reasoning_tab = True
-                        break
+        if len(self._default_settings.reasoning.settings) > 1:
+            self._render_reasoning_tab = True
+        else:
+            for sig in self._default_settings.reasoning.options.values():
+                if sig.settings:
+                    self._render_reasoning_tab = True
+                    break
 
         self.on_building_ui()
 
     def on_building_ui(self):
-        if not KH_SSO_ENABLED:
+        if True:
             self.setting_save_btn = gr.Button(
                 "Speichern und schließen",
                 variant="primary",
@@ -322,7 +333,7 @@ class SettingsPage(BasePage):
                 show_progress="hidden",
             )
 
-        if not KH_SSO_ENABLED:
+        if True:
             save_chain = self.setting_save_btn.click(
                 self.save_setting,
                 inputs=[self._user_id] + self.components(),
@@ -352,7 +363,7 @@ class SettingsPage(BasePage):
             outputs=list(self._reasoning_mode.values()),
             show_progress="hidden",
             )
-        if self._app.f_user_management and not KH_SSO_ENABLED:
+        if self._app.f_user_management and can_manage_local_users():
             self.password_change_btn.click(
                 self.change_password,
                 inputs=[
@@ -363,6 +374,32 @@ class SettingsPage(BasePage):
                 outputs=[self.password_change, self.password_change_confirm],
                 show_progress="hidden",
             )
+            onSignOutClick = self.signout.click(
+                lambda: (None, "Aktueller Benutzer: ___", "Aktuelles Team: ___", "", ""),
+                inputs=[],
+                outputs=[
+                    self._user_id,
+                    self.current_name,
+                    self.current_team,
+                    self.password_change,
+                    self.password_change_confirm,
+                ],
+                show_progress="hidden",
+                js=signout_js,
+            ).then(
+                self.load_setting,
+                inputs=self._user_id,
+                outputs=[self._settings_state] + self.components(),
+                show_progress="hidden",
+            )
+            for event in self._app.get_event("onSignOut"):
+                onSignOutClick = onSignOutClick.then(**event)
+        elif self._app.f_user_management and is_oidc_auth():
+            self.signout.click(
+                fn=None,
+                js=oidc_signout_js,
+            )
+        elif self._app.f_user_management:
             onSignOutClick = self.signout.click(
                 lambda: (None, "Aktueller Benutzer: ___", "Aktuelles Team: ___", "", ""),
                 inputs=[],
@@ -451,21 +488,26 @@ class SettingsPage(BasePage):
         # user management
         self.current_name = gr.Markdown("Aktueller Benutzer: ___")
         self.current_team = gr.Markdown("Aktuelles Team: ___")
+        self.signout = gr.Button("Abmelden")
 
-        if KH_SSO_ENABLED:
-            import gradiologin as grlogin
-
-            self.sso_signout = grlogin.LogoutButton("Abmelden")
-        else:
-            self.signout = gr.Button("Abmelden")
-
+        if can_manage_local_users():
             self.password_change = gr.Textbox(
                 label="Neues Passwort", interactive=True, type="password"
             )
             self.password_change_confirm = gr.Textbox(
-                label="Passwort bestätigen", interactive=True, type="password"
+                label="Passwort best?tigen", interactive=True, type="password"
             )
-            self.password_change_btn = gr.Button("Passwort ändern", interactive=True)
+            self.password_change_btn = gr.Button("Passwort ?ndern", interactive=True)
+        else:
+            self.password_change = gr.Textbox(
+                label="Neues Passwort", interactive=False, type="password", visible=False
+            )
+            self.password_change_confirm = gr.Textbox(
+                label="Passwort bestätigen", interactive=False, type="password", visible=False
+            )
+            self.password_change_btn = gr.Button(
+                "Passwort ändern", interactive=False, visible=False
+            )
 
     def filesync_tab(self):
         with gr.Tab("FileSync", visible=False) as self.filesync_settings_tab:
@@ -552,6 +594,9 @@ class SettingsPage(BasePage):
         ]
 
     def change_password(self, user_id, password, password_confirm):
+        if not can_manage_local_users():
+            gr.Warning(local_user_management_block_reason())
+            return password, password_confirm
         from ktem.pages.resources.user import validate_password
 
         errors = validate_password(password, password_confirm)
