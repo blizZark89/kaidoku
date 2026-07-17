@@ -749,7 +749,7 @@ class FileIndexPage(BasePage):
             headers=[
                 "id",
                 "name",
-                "group",
+                "filegroup",
                 "teams",
                 "size",
                 "tokens",
@@ -2190,7 +2190,7 @@ class FileIndexPage(BasePage):
                         {
                             "id": "-",
                             "name": "-",
-                            "group": "-",
+                            "filegroup": "-",
                             "teams": "-",
                             "size": "-",
                             "tokens": "-",
@@ -2223,7 +2223,7 @@ class FileIndexPage(BasePage):
                                 {
                                     "id": "-",
                                     "name": "-",
-                                    "group": "-",
+                                    "filegroup": "-",
                                     "teams": "-",
                                     "size": "-",
                                     "tokens": "-",
@@ -2248,7 +2248,7 @@ class FileIndexPage(BasePage):
                             {
                                 "id": "-",
                                 "name": "-",
-                                "group": "-",
+                                "filegroup": "-",
                                 "teams": "-",
                                 "size": "-",
                                 "tokens": "-",
@@ -2409,7 +2409,7 @@ class FileIndexPage(BasePage):
                     {
                         "id": source.id,
                         "name": source.name,
-                        "group": ", ".join(group_names) if group_names else "-",
+                        "filegroup": ", ".join(group_names) if group_names else "-",
                         "teams": ", ".join(team_names) if team_names else "-",
                         "size": self.format_size_human_readable(source.size),
                         "tokens": self.format_size_human_readable(
@@ -2428,7 +2428,7 @@ class FileIndexPage(BasePage):
                     {
                         "id": "-",
                         "name": "-",
-                        "group": "-",
+                        "filegroup": "-",
                         "teams": "-",
                         "size": "-",
                         "tokens": "-",
