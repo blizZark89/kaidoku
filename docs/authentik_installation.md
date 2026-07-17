@@ -1,4 +1,4 @@
-# Authentik-Integration mit Kaidoku
+# Authentik-Integration mit Kaidoku (v0.6.6)
 
 Diese Anleitung beschreibt die Installation von Kaidoku mit
 [Authentik](https://goauthentik.io) als OIDC-Identity-Provider für Single Sign-On.

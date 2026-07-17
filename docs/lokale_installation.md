@@ -1,4 +1,4 @@
-# Lokale Installation von Kaidoku
+# Lokale Installation von Kaidoku (v0.6.6)
 
 Diese Anleitung beschreibt die Einrichtung einer lokalen Kaidoku-Entwicklungsumgebung
 ohne Authentik/SSO. Für den Produktivbetrieb mit Authentik siehe
