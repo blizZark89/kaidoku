@@ -44,14 +44,6 @@ class ChatPanel(BasePage):
                 show_label=False,
                 elem_id="chat-input",
             )
-            self.audio_input = gr.Audio(
-                sources=["microphone"],
-                type="filepath",
-                label="Sprachaufnahme",
-                show_label=False,
-                container=False,
-                elem_id="mic-input",
-            )
 
     def submit_msg(self, chat_input, chat_history):
         """Submit a message to the chatbot"""
