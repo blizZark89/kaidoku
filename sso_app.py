@@ -25,6 +25,12 @@ KEYCLOAK_REALM = config("KEYCLOAK_REALM", default="")
 KEYCLOAK_CLIENT_ID = config("KEYCLOAK_CLIENT_ID", default="")
 KEYCLOAK_CLIENT_SECRET = config("KEYCLOAK_CLIENT_SECRET", default="")
 
+# for authentication with Authentik
+AUTHENTIK_SERVER_URL = config("AUTHENTIK_SERVER_URL", default="")
+AUTHENTIK_SLUG = config("AUTHENTIK_SLUG", default="")
+AUTHENTIK_CLIENT_ID = config("AUTHENTIK_CLIENT_ID", default="")
+AUTHENTIK_CLIENT_SECRET = config("AUTHENTIK_CLIENT_SECRET", default="")
+
 from ktem.main import App  # noqa
 
 gradio_app = App()
@@ -42,6 +48,20 @@ if AUTHENTICATION_METHOD == "KEYCLOAK":
         ),
         client_id=KEYCLOAK_CLIENT_ID,
         client_secret=KEYCLOAK_CLIENT_SECRET,
+        client_kwargs={
+            "scope": "openid email profile",
+        },
+    )
+
+elif AUTHENTICATION_METHOD == "AUTHENTIK":
+    grlogin.register(
+        name="authentik",
+        server_metadata_url=(
+            f"{AUTHENTIK_SERVER_URL.rstrip('/')}/application/o/{AUTHENTIK_SLUG}/"
+            ".well-known/openid-configuration"
+        ),
+        client_id=AUTHENTIK_CLIENT_ID,
+        client_secret=AUTHENTIK_CLIENT_SECRET,
         client_kwargs={
             "scope": "openid email profile",
         },
