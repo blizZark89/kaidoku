@@ -750,12 +750,13 @@ class FileIndexPage(BasePage):
                 "id",
                 "name",
                 "group",
+                "teams",
                 "size",
                 "tokens",
                 "loader",
                 "date_created",
             ],
-            column_widths=[0, 34, 16, 8, 7, 15, 20],
+            column_widths=[0, 30, 14, 12, 8, 7, 15, 14],
             interactive=False,
             wrap=False,
             elem_id="file_list_view",
@@ -2190,6 +2191,7 @@ class FileIndexPage(BasePage):
                             "id": "-",
                             "name": "-",
                             "group": "-",
+                            "teams": "-",
                             "size": "-",
                             "tokens": "-",
                             "loader": "-",
@@ -2222,6 +2224,7 @@ class FileIndexPage(BasePage):
                                     "id": "-",
                                     "name": "-",
                                     "group": "-",
+                                    "teams": "-",
                                     "size": "-",
                                     "tokens": "-",
                                     "loader": "-",
@@ -2246,6 +2249,7 @@ class FileIndexPage(BasePage):
                                 "id": "-",
                                 "name": "-",
                                 "group": "-",
+                                "teams": "-",
                                 "size": "-",
                                 "tokens": "-",
                                 "loader": "-",
@@ -2270,6 +2274,10 @@ class FileIndexPage(BasePage):
 
             visible_global_team_ids = globally_visible_team_ids(session) if actor else set()
             team_ref_map = _team_ref_map(session)
+            team_map: dict[str, str] = {
+                team.id: team.name
+                for team in list_teams(session)
+            } if self._app.f_user_management else {}
             visible_sources = []
             for each in session.execute(statement).all():
                 source = each[0]
@@ -2393,11 +2401,16 @@ class FileIndexPage(BasePage):
             results = []
             for source in visible_sources:
                 group_names = sorted(file_id_to_groups.get(source.id, []))
+                source_team_ids = _source_team_ids(source, team_ref_map)
+                team_names = [
+                    team_map.get(tid, tid) for tid in source_team_ids
+                ] if self._app.f_user_management and team_ref_map else []
                 results.append(
                     {
                         "id": source.id,
                         "name": source.name,
                         "group": ", ".join(group_names) if group_names else "-",
+                        "teams": ", ".join(team_names) if team_names else "-",
                         "size": self.format_size_human_readable(source.size),
                         "tokens": self.format_size_human_readable(
                             (source.note or {}).get("tokens", "-"), suffix=""
@@ -2416,6 +2429,7 @@ class FileIndexPage(BasePage):
                         "id": "-",
                         "name": "-",
                         "group": "-",
+                        "teams": "-",
                         "size": "-",
                         "tokens": "-",
                         "loader": "-",
