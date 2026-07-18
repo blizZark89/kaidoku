@@ -269,7 +269,7 @@ def allowed_user_ids_for_scope(session: Session, actor: AccessContext) -> list[s
 
     actor_team_ids = managed_team_ids(session, actor)
     if not actor_team_ids:
-        return []
+        return [actor.user.id]
 
     team_user_ids = []
     for access in _all(session, select(UserAccess)):
