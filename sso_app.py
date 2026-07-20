@@ -89,6 +89,11 @@ KH_PUBLIC_URL = str(config("KH_PUBLIC_URL", default="") or "").strip()
 
 @app.get("/login", include_in_schema=False)
 async def login(request: Request):
+    # Clear any stale user session before starting the OIDC flow.
+    # Without this, closing the browser and re-opening would auto-login
+    # the previous user via the persisted session cookie, and the
+    # subsequent OIDC callback could carry over stale identity data.
+    clear_session_user(request)
     if KH_PUBLIC_URL:
         redirect_uri = KH_PUBLIC_URL.rstrip("/") + "/auth/callback"
     else:
