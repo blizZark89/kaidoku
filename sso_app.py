@@ -123,7 +123,20 @@ async def auth_callback(request: Request):
         request.session["user_id"] = user_id
         if token.get("id_token"):
             request.session["id_token"] = token["id_token"]
-        return RedirectResponse(url="/app", status_code=302)
+
+        # HTML-Redirect statt 302: stellt sicher, dass der Browser den
+        # Session-Cookie speichert, BEVOR er /app anfordert.
+        # Ohne das kann ein Race entstehen, bei dem /app noch den
+        # alten Cookie (admin) mitsendet und der falsche User
+        # angezeigt wird.
+        return HTMLResponse(
+            "<html><head>"
+            "<meta http-equiv=\"refresh\" content=\"0;url=/app\">"
+            "</head><body>"
+            "<p>Anmeldung erfolgreich, du wirst weitergeleitet…</p>"
+            "<script>window.location.replace('/app');</script>"
+            "</body></html>"
+        )
     except ExternalAuthError as exc:
         clear_session_user(request)
         params = urlencode({"message": str(exc)})
