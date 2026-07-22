@@ -2963,6 +2963,10 @@ class FileSelector(BasePage):
                 gr.update(value=resolved_mode),
             )
 
+        # Auto-activate mode on sign-in: promote "disabled" → "all"
+        if resolved_mode == "disabled":
+            resolved_mode = "all"
+
         with Session(engine) as session:
             # get file list from Source table
             statement = select(self._index._resources["Source"])
