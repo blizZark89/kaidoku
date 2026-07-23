@@ -102,6 +102,8 @@ async def _revalidate_user_groups(request: Request) -> bool:
 
 @app.middleware("http")
 async def revalidate_groups_middleware(request: Request, call_next):
+    if "session" not in request.scope:
+        return await call_next(request)
     if request.url.path.startswith("/app") and request.session.get("user_id"):
         last_sync = request.session.get("_last_group_sync", 0)
         if int(time.time()) - last_sync > 300:  # every 5 minutes
