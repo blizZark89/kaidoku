@@ -141,7 +141,13 @@ async def login(request: Request):
 @app.get("/auth/callback", include_in_schema=False, name="auth_callback")
 async def auth_callback(request: Request):
     try:
-        token = await oauth.authentik.authorize_access_token(request)
+        if KH_PUBLIC_URL:
+            redirect_uri = KH_PUBLIC_URL.rstrip("/") + "/auth/callback"
+        else:
+            redirect_uri = str(request.url_for("auth_callback"))
+        token = await oauth.authentik.authorize_access_token(
+            request, redirect_uri=redirect_uri
+        )
         userinfo = token.get("userinfo")
         if not userinfo:
             userinfo = await oauth.authentik.userinfo(token=token)
