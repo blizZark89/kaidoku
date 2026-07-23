@@ -647,6 +647,16 @@ class IndexPipeline(BaseComponent):
         extra_info["file_id"] = file_id
         extra_info["collection_name"] = self.collection_name
 
+        # Include date_created in metadata for search result display
+        with Session(engine) as session:
+            source = session.exec(
+                select(self.Source).where(self.Source.id == file_id)
+            ).first()
+            if source and source.date_created:
+                extra_info["date_created"] = source.date_created.strftime(
+                    "%d.%m.%Y"
+                )
+
         yield Document(f" => Converting {file_name} to text", channel="debug")
         docs = self.loader.load_data(file_path, extra_info=extra_info)
         yield Document(f" => Converted {file_name} to text", channel="debug")

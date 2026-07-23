@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 import markdown
 from fast_langdetect import detect
@@ -6,6 +7,34 @@ from fast_langdetect import detect
 from kotaemon.base import RetrievedDocument
 
 BASE_PATH = os.environ.get("GR_FILE_ROOT_PATH", "")
+
+
+@lru_cache(maxsize=256)
+def _lookup_date_created(file_id: str) -> str | None:
+    """Look up date_created from Source table by file_id.
+
+    Used as a fallback for documents indexed before date_created was
+    included in metadata.
+    """
+    from sqlalchemy import inspect as sa_inspect, text
+
+    from ktem.db.models import engine
+
+    inspector = sa_inspect(engine)
+    for table_name in inspector.get_table_names():
+        if not table_name.endswith("__source"):
+            continue
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text(f'SELECT date_created FROM "{table_name}" WHERE id = :fid'),
+                    {"fid": file_id},
+                ).first()
+                if result and result[0]:
+                    return result[0].strftime("%d.%m.%Y")
+        except Exception:
+            continue
+    return None
 
 
 def is_close(val1, val2, tolerance=1e-9):
@@ -32,6 +61,15 @@ def get_header(doc: RetrievedDocument) -> str:
         header += f" [Page {doc.metadata['page_label']}]"
 
     header += f" {doc.metadata.get('file_name', '<evidence>')}"
+
+    date_created = doc.metadata.get("date_created")
+    if not date_created:
+        file_id = doc.metadata.get("file_id")
+        if file_id:
+            date_created = _lookup_date_created(file_id)
+    if date_created:
+        header += f" ({date_created})"
+
     return header.strip()
 
 
