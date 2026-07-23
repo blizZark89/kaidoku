@@ -649,9 +649,10 @@ class IndexPipeline(BaseComponent):
 
         # Include date_created in metadata for search result display
         with Session(engine) as session:
-            source = session.exec(
+            result = session.execute(
                 select(self.Source).where(self.Source.id == file_id)
-            ).first()
+            )
+            source = result.scalars().first()
             if source and source.date_created:
                 extra_info["date_created"] = source.date_created.strftime(
                     "%d.%m.%Y"
