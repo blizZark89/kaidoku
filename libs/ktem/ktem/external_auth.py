@@ -187,6 +187,8 @@ def clear_session_user(request) -> None:
     if session is not None:
         session.pop("user_id", None)
         session.pop("id_token", None)
+        session.pop("access_token", None)
+        session.pop("_last_group_sync", None)
 
 
 def _preferred_claim(claims: dict[str, Any], *names: str) -> str:

@@ -1,4 +1,5 @@
 import os
+import time
 from urllib.parse import urlencode
 
 import gradio as gr
@@ -75,6 +76,40 @@ app = gr.mount_gradio_app(
 )
 
 
+async def _revalidate_user_groups(request: Request) -> bool:
+    """Re-fetch user groups from Authentik and update DB.
+
+    Uses the stored access_token to call the userinfo endpoint,
+    then re-syncs group memberships via sync_external_user.
+    Returns True on success, False if revalidation was skipped or failed.
+    """
+    access_token = request.session.get("access_token")
+    if not access_token:
+        return False
+    try:
+        token_data = {"access_token": access_token}
+        userinfo = await oauth.authentik.userinfo(token=token_data)
+        if not userinfo:
+            return False
+        identity = identity_from_oidc_claims(dict(userinfo))
+        print(f"[REVALIDATE] groups={identity.groups}", flush=True)
+        sync_external_user(identity)
+        request.session["_last_group_sync"] = int(time.time())
+        return True
+    except Exception:
+        return False
+
+
+@app.middleware("http")
+async def revalidate_groups_middleware(request: Request, call_next):
+    if request.url.path.startswith("/app") and request.session.get("user_id"):
+        last_sync = request.session.get("_last_group_sync", 0)
+        if int(time.time()) - last_sync > 300:  # every 5 minutes
+            await _revalidate_user_groups(request)
+    response = await call_next(request)
+    return response
+
+
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/app")
@@ -123,6 +158,8 @@ async def auth_callback(request: Request):
         request.session["user_id"] = user_id
         if token.get("id_token"):
             request.session["id_token"] = token["id_token"]
+        if token.get("access_token"):
+            request.session["access_token"] = token["access_token"]
 
         # HTML-Redirect statt 302: stellt sicher, dass der Browser den
         # Session-Cookie speichert, BEVOR er /app anfordert.
