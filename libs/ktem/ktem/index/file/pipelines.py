@@ -658,7 +658,11 @@ class IndexPipeline(BaseComponent):
                 {"fid": file_id},
             ).first()
             if result and result[0]:
-                extra_info["date_created"] = result[0].strftime("%d.%m.%Y")
+                raw = result[0]
+                if hasattr(raw, "strftime"):
+                    extra_info["date_created"] = raw.strftime("%d.%m.%Y")
+                elif isinstance(raw, str):
+                    extra_info["date_created"] = raw[:10]  # e.g. "2026-07-23"
 
         yield Document(f" => Converting {file_name} to text", channel="debug")
         docs = self.loader.load_data(file_path, extra_info=extra_info)
