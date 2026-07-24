@@ -31,7 +31,11 @@ def _lookup_date_created(file_id: str) -> str | None:
                     {"fid": file_id},
                 ).first()
                 if result and result[0]:
-                    return result[0].strftime("%d.%m.%Y")
+                    raw = result[0]
+                    if hasattr(raw, "strftime"):
+                        return raw.strftime("%d.%m.%Y")
+                    elif isinstance(raw, str):
+                        return raw[:10]  # e.g. "2026-07-23"
         except Exception:
             continue
     return None
@@ -117,6 +121,11 @@ class Render:
     ) -> str:
         text = doc.content
         pdf_path = doc.metadata.get("file_path", "")
+
+        # Validate file path to prevent path traversal
+        if not pdf_path or ".." in pdf_path or not os.path.isabs(pdf_path):
+            print(f"Invalid or unsafe pdf path: {pdf_path}")
+            return html_content
 
         if not os.path.isfile(pdf_path):
             print(f"pdf-path: {pdf_path} does not exist")

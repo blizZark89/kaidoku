@@ -1,4 +1,5 @@
 import os
+import html
 from urllib.parse import urlencode
 
 import gradio as gr
@@ -109,12 +110,12 @@ async def auth_callback(request: Request):
         if not userinfo:
             userinfo = await oauth.authentik.userinfo(token=token)
         identity = identity_from_oidc_claims(dict(userinfo))
-        print("[AUTH DEBUG] userinfo keys: " + str(list(userinfo.keys()) if userinfo else "None"), flush=True)
-        print(f"[AUTH DEBUG] identity.groups: {identity.groups}", flush=True)
+        # Log basic auth flow without sensitive details
+        print(f"[AUTH] Login successful for user: {identity.username}", flush=True)
         result = sync_external_user(identity)
         user_id = result.user_id
         decision = result.decision
-        print(f"[AUTH DEBUG] decision: can_access={decision.can_access}, is_admin={decision.is_admin}, reason={decision.reason}", flush=True)
+        print(f"[AUTH] Access decision: can_access={decision.can_access}, is_admin={decision.is_admin}", flush=True)
         if not user_id or not decision.can_access:
             clear_session_user(request)
             params = urlencode({"message": decision.reason or "Zugriff verweigert"})
@@ -146,20 +147,21 @@ async def auth_callback(request: Request):
         if "mismatching_state" in error_msg.lower() or "state not equal" in error_msg.lower():
             return RedirectResponse(url="/login", status_code=302)
         clear_session_user(request)
-        params = urlencode({"message": f"OIDC-Callback fehlgeschlagen: {exc}"})
+        params = urlencode({"message": "OIDC-Callback fehlgeschlagen"})
         return RedirectResponse(url=f"/auth/error?{params}", status_code=302)
 
 
 @app.get("/auth/error", include_in_schema=False)
 async def auth_error(message: str = "Unbekannter Authentifizierungsfehler"):
+    safe_message = html.escape(message)
     return HTMLResponse(
         f"""
         <html>
           <head><title>Kaidoku Anmeldung</title></head>
           <body>
             <h2>Anmeldung fehlgeschlagen</h2>
-            <p>{message}</p>
-            <p><a href="/app">Zur?ck zur Anwendung</a></p>
+            <p>{safe_message}</p>
+            <p><a href="/app">Zurück zur Anwendung</a></p>
           </body>
         </html>
         """.strip()
