@@ -28,7 +28,7 @@ from llama_index.core.vector_stores import (
     MetadataFilters,
 )
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 from theflow.settings import settings
 from theflow.utils.modules import import_dotted_string
@@ -648,15 +648,17 @@ class IndexPipeline(BaseComponent):
         extra_info["collection_name"] = self.collection_name
 
         # Include date_created in metadata for search result display
-        with Session(engine) as session:
-            result = session.execute(
-                select(self.Source).where(self.Source.id == file_id)
-            )
-            source = result.scalars().first()
-            if source and source.date_created:
-                extra_info["date_created"] = source.date_created.strftime(
-                    "%d.%m.%Y"
-                )
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    "SELECT date_created FROM {table} WHERE id = :fid".format(
+                        table=self.Source.__tablename__
+                    ),
+                ),
+                {"fid": file_id},
+            ).first()
+            if result and result[0]:
+                extra_info["date_created"] = result[0].strftime("%d.%m.%Y")
 
         yield Document(f" => Converting {file_name} to text", channel="debug")
         docs = self.loader.load_data(file_path, extra_info=extra_info)
