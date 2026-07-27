@@ -1,0 +1,34 @@
+services:
+  kaidoku:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: full
+    container_name: kaidoku-authentik
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: Europe/Berlin
+      GRADIO_SERVER_NAME: 0.0.0.0
+      GRADIO_SERVER_PORT: 7860
+      GRADIO_ALLOW_CORS: "true"
+      GRADIO_SAMESITE: none
+      KH_LOCALE: de
+      KH_FEATURE_USER_MANAGEMENT: "true"
+      AUTHENTICATION_METHOD: AUTHENTIK
+      KH_SSO_ENABLED: "true"
+      SECRET_KEY: change-this-session-secret
+      AUTHENTIK_SERVER_URL: https://auth.example.com
+      AUTHENTIK_SLUG: kaidoku
+      AUTHENTIK_CLIENT_ID: kaidoku
+      AUTHENTIK_CLIENT_SECRET: replace-me
+      ADMIN_GROUPS: kaidoku-admins
+      USER_GROUPS: kaidoku-users
+      UPLOAD_ALLOWED_GROUPS: kaidoku-upload
+      ACCESS_DENIED_GROUPS: ""
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./kaidoku_app_data:/app/ktem_app_data
+      - ./sync-data:/app/sync-data

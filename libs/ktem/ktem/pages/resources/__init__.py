@@ -6,7 +6,6 @@ from ktem.index.ui import IndexManagement
 from ktem.llms.ui import LLMManagement
 from ktem.mcp.ui import MCPManagement
 from ktem.rerankings.ui import RerankingManagement
-from ktem.speech.ui import SpeechManagement
 from ktem.db.models import Settings, engine
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
@@ -38,9 +37,6 @@ class ResourcesTab(BasePage):
 
         with gr.Tab("Embeddings", visible=True) as self.emb_management_tab:
             self.emb_management = EmbeddingManagement(self._app)
-
-        with gr.Tab("Speech", visible=True) as self.speech_management_tab:
-            self.speech_management = SpeechManagement(self._app)
 
         with gr.Tab("Rerankings", visible=show_rerank) as self.rerank_management_tab:
             self.rerank_management = RerankingManagement(self._app)
@@ -88,7 +84,6 @@ class ResourcesTab(BasePage):
             self.index_management_tab,
             self.llm_management_tab,
             self.emb_management_tab,
-            self.speech_management_tab,
             self.rerank_management_tab,
             self.mcp_management_tab,
         ])
@@ -123,7 +118,6 @@ class ResourcesTab(BasePage):
             gr.update(visible=is_admin),                         # Index-Sammlungen
             gr.update(visible=is_admin),                         # LLMs
             gr.update(visible=is_admin),                         # Embeddings
-            gr.update(visible=is_admin),                         # Speech
             gr.update(visible=is_admin and show_rerank),         # Rerankings
             gr.update(visible=is_admin and show_mcp),            # MCP-Server
         ])

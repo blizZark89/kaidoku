@@ -1,0 +1,42 @@
+services:
+  kaidoku:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: full
+    container_name: kaidoku-ldap
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: Europe/Berlin
+      GRADIO_SERVER_NAME: 0.0.0.0
+      GRADIO_SERVER_PORT: 7860
+      GRADIO_ALLOW_CORS: "true"
+      GRADIO_SAMESITE: none
+      KH_LOCALE: de
+      KH_FEATURE_USER_MANAGEMENT: "true"
+      AUTHENTICATION_METHOD: LDAP
+      KH_SSO_ENABLED: "false"
+      LDAP_SERVER_URI: ldap://ldap.example.com:389
+      LDAP_USE_SSL: "false"
+      LDAP_START_TLS: "true"
+      LDAP_BIND_USER_DN: cn=svc-kaidoku,ou=service,dc=example,dc=com
+      LDAP_BIND_PASSWORD: replace-me
+      LDAP_USER_BASE_DN: ou=users,dc=example,dc=com
+      LDAP_USER_FILTER: (uid={username})
+      LDAP_USERNAME_ATTRIBUTE: uid
+      LDAP_EMAIL_ATTRIBUTE: mail
+      LDAP_DISPLAY_NAME_ATTRIBUTE: displayName
+      LDAP_GROUP_BASE_DN: ou=groups,dc=example,dc=com
+      LDAP_GROUP_FILTER: (&(objectClass=groupOfNames)(member={user_dn}))
+      LDAP_GROUP_NAME_ATTRIBUTE: cn
+      ADMIN_GROUPS: kaidoku-admins
+      USER_GROUPS: kaidoku-users
+      UPLOAD_ALLOWED_GROUPS: kaidoku-upload
+      ACCESS_DENIED_GROUPS: ""
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./kaidoku_app_data:/app/ktem_app_data
+      - ./sync-data:/app/sync-data

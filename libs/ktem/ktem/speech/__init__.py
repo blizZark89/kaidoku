@@ -1,1 +1,0 @@
-"""Kaidoku speech-to-text module."""
