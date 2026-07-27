@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import threading
 import time
 import warnings
 from collections import defaultdict
 from copy import deepcopy
+from datetime import datetime
 from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
@@ -75,6 +77,66 @@ def dev_settings():
 
 
 _default_token_func = tiktoken.encoding_for_model("gpt-3.5-turbo").encode
+
+
+def _extract_file_creation_date(file_path: str | Path) -> str | None:
+    """Try to extract the real creation date from file metadata.
+
+    Returns a DD.MM.YYYY string, or None if extraction fails.
+    """
+    if isinstance(file_path, Path):
+        path_str = str(file_path)
+    else:
+        path_str = file_path
+
+    if not os.path.isfile(path_str):
+        return None
+
+    ext = os.path.splitext(path_str)[1].lower()
+
+    # PDF: extract /CreationDate from metadata
+    if ext == ".pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(path_str)
+            meta = reader.metadata
+            if meta:
+                creation = meta.get("/CreationDate", None)
+                if creation:
+                    # Format: "D:20230715143000+02'00'"
+                    raw = str(creation).replace("D:", "").split("+")[0].split("-")[0].split("Z")[0]
+                    if len(raw) >= 8:
+                        try:
+                            dt = datetime.strptime(raw[:14] if len(raw) >= 14 else raw[:8], 
+                                                   "%Y%m%d%H%M%S" if len(raw) >= 14 else "%Y%m%d")
+                            return dt.strftime("%d.%m.%Y")
+                        except ValueError:
+                            pass
+            reader.stream.close()
+        except Exception:
+            pass
+
+    # Image: try EXIF DateTimeOriginal
+    elif ext in (".jpg", ".jpeg", ".png", ".tiff", ".webp", ".bmp"):
+        try:
+            from PIL import Image
+            from PIL.ExifTags import Base as ExifBase
+            img = Image.open(path_str)
+            exif = img._getexif()
+            if exif:
+                # EXIF tag 36867 = DateTimeOriginal
+                dt_orig = exif.get(36867, None)
+                if dt_orig:
+                    try:
+                        dt = datetime.strptime(str(dt_orig), "%Y:%m:%d %H:%M:%S")
+                        return dt.strftime("%d.%m.%Y")
+                    except ValueError:
+                        pass
+            img.close()
+        except Exception:
+            pass
+
+    return None
 
 
 class DocumentRetrievalPipeline(BaseFileIndexRetriever):
@@ -647,22 +709,27 @@ class IndexPipeline(BaseComponent):
         extra_info["file_id"] = file_id
         extra_info["collection_name"] = self.collection_name
 
-        # Include date_created in metadata for search result display
-        with engine.connect() as conn:
-            result = conn.execute(
-                text(
-                    "SELECT date_created FROM {table} WHERE id = :fid".format(
-                        table=self.Source.__tablename__
+        # Try to get the real file creation date from metadata,
+        # falling back to the database upload date.
+        real_date = _extract_file_creation_date(file_path)
+        if real_date:
+            extra_info["date_created"] = real_date
+        else:
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text(
+                        "SELECT date_created FROM {table} WHERE id = :fid".format(
+                            table=self.Source.__tablename__
+                        ),
                     ),
-                ),
-                {"fid": file_id},
-            ).first()
-            if result and result[0]:
-                raw = result[0]
-                if hasattr(raw, "strftime"):
-                    extra_info["date_created"] = raw.strftime("%d.%m.%Y")
-                elif isinstance(raw, str):
-                    extra_info["date_created"] = raw[:10]  # e.g. "2026-07-23"
+                    {"fid": file_id},
+                ).first()
+                if result and result[0]:
+                    raw = result[0]
+                    if hasattr(raw, "strftime"):
+                        extra_info["date_created"] = raw.strftime("%d.%m.%Y")
+                    elif isinstance(raw, str):
+                        extra_info["date_created"] = raw[:10]  # e.g. "2026-07-23"
 
         yield Document(f" => Converting {file_name} to text", channel="debug")
         docs = self.loader.load_data(file_path, extra_info=extra_info)
