@@ -494,14 +494,4 @@ svg.markmap text {
   place-items: center;
 }
 
-/* --- Mikrofon-Button im Chat-Eingabefeld --- */
-#chat-input-row {
-  position: relative;
-}
-
-/* Textfeld rechts schmaler machen — Platz für Mikro + Senden */
-#chat-input textarea {
-  padding-right: 74px !important;
-}
-
 
