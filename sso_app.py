@@ -1,3 +1,4 @@
+import logging
 import os
 import html
 from urllib.parse import urlencode
@@ -17,6 +18,8 @@ from ktem.external_auth import (
     sync_external_user,
 )
 from ktem.main import App
+
+logger = logging.getLogger("kaidoku.auth")
 
 KH_APP_DATA_DIR = getattr(flowsettings, "KH_APP_DATA_DIR", ".")
 GRADIO_TEMP_DIR = os.getenv("GRADIO_TEMP_DIR", None)
@@ -111,11 +114,11 @@ async def auth_callback(request: Request):
             userinfo = await oauth.authentik.userinfo(token=token)
         identity = identity_from_oidc_claims(dict(userinfo))
         # Log basic auth flow without sensitive details
-        print(f"[AUTH] Login successful for user: {identity.username}", flush=True)
+        logger.info("Login successful for user: %s", identity.username)
         result = sync_external_user(identity)
         user_id = result.user_id
         decision = result.decision
-        print(f"[AUTH] Access decision: can_access={decision.can_access}, is_admin={decision.is_admin}", flush=True)
+        logger.info("Access decision: can_access=%s, is_admin=%s", decision.can_access, decision.is_admin)
         if not user_id or not decision.can_access:
             clear_session_user(request)
             params = urlencode({"message": decision.reason or "Zugriff verweigert"})

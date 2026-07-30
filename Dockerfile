@@ -42,7 +42,7 @@ RUN pip install --no-cache-dir "uv"
 # Copy contents
 COPY . /app
 COPY launch.sh /app/launch.sh
-COPY .env.example /app/.env
+COPY .env /app/.env
 
 # Install pip packages
 RUN --mount=type=ssh  \

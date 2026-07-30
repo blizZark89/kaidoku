@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -9,6 +10,8 @@ from theflow.settings import settings as flowsettings
 
 from ktem.authz import ROLE_ADMIN, ROLE_USER, upsert_user_access
 from ktem.db.models import Team, User, engine
+
+logger = logging.getLogger("kaidoku.auth")
 
 AUTH_METHOD_LOCAL = "LOCAL"
 AUTH_METHOD_AUTHENTIK = "AUTHENTIK"
@@ -124,11 +127,6 @@ def derive_group_permissions(groups: list[str]) -> PermissionDecision:
     normalized_groups = {_normalize_group_name(group) for group in groups}
     admin_groups = {_normalize_group_name(group) for group in _parse_csv_env("ADMIN_GROUPS")}
     user_groups = {_normalize_group_name(group) for group in _parse_csv_env("USER_GROUPS")}
-    raw_admin = _parse_csv_env("ADMIN_GROUPS")
-    raw_user = _parse_csv_env("USER_GROUPS")
-    print("[AUTH DEBUG derive] groups_in=" + str(normalized_groups), flush=True)
-    print("[AUTH DEBUG derive] raw_admin=" + str(raw_admin), flush=True)
-    print("[AUTH DEBUG derive] raw_user=" + str(raw_user), flush=True)
     upload_groups = {
         _normalize_group_name(group) for group in _parse_csv_env("UPLOAD_ALLOWED_GROUPS")
     }
@@ -314,7 +312,7 @@ def sync_external_user(
             )
             session.add(user)
             session.commit()
-            session.refresh(user)
+            user = session.get(User, user.id)
         else:
             user.username = identity.username
             user.username_lower = identity.username.lower().strip()
@@ -323,7 +321,7 @@ def sync_external_user(
                 user.password = password_placeholder
             session.add(user)
             session.commit()
-            session.refresh(user)
+            user = session.get(User, user.id)
 
         team_id = _resolve_team_ids_from_groups(session, identity.groups)
 
