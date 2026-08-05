@@ -75,6 +75,7 @@ app = gr.mount_gradio_app(
     allowed_paths=[
         "libs/ktem/ktem/assets",
         GRADIO_TEMP_DIR,
+        str(flowsettings.KH_DOC_DIR),
     ],
 )
 
