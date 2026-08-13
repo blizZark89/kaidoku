@@ -42,6 +42,16 @@ KH_MARKDOWN_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 KH_CHUNKS_OUTPUT_DIR = KH_APP_DATA_DIR / "chunks_cache_dir"
 KH_CHUNKS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Text-splitting defaults for indexing. Smaller chunks improve the precision
+# of page-level citations (each chunk keeps the page_label of its source page),
+# at the cost of more chunks per document.
+FILE_INDEX_PIPELINE_SPLITTER_CHUNK_SIZE = config(
+    "FILE_INDEX_PIPELINE_SPLITTER_CHUNK_SIZE", default=512, cast=int
+)
+FILE_INDEX_PIPELINE_SPLITTER_CHUNK_OVERLAP = config(
+    "FILE_INDEX_PIPELINE_SPLITTER_CHUNK_OVERLAP", default=128, cast=int
+)
+
 # zip output directory
 KH_ZIP_OUTPUT_DIR = KH_APP_DATA_DIR / "zip_cache_dir"
 KH_ZIP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
