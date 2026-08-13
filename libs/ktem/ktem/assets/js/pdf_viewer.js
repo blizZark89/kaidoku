@@ -65,7 +65,13 @@ function onBlockLoad() {
     if (!iframe) return;
 
     if (iframe.src !== pdfUrl) {
-      iframe.src = pdfUrl;
+      // Force a full reload so the PDF viewer actually jumps to the new page.
+      // Setting only the fragment (#page=N) does not re-navigate the iframe,
+      // so the viewer would stay at the last scrolled position.
+      iframe.src = "about:blank";
+      setTimeout(function () {
+        iframe.src = pdfUrl;
+      }, 0);
     }
 
     var scrollableDiv = document.getElementById("chat-info-panel");
