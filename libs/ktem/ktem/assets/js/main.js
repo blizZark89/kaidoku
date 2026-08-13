@@ -13,7 +13,7 @@ function run() {
 
   // setup conversation dropdown placeholder
   let conv_dropdown = document.querySelector("#conversation-dropdown input");
-  conv_dropdown.placeholder = "Browse conversation";
+  conv_dropdown.placeholder = "Chatverläufe";
 
   // move info-expand-button
   let info_expand_button = document.getElementById("info-expand-button");
