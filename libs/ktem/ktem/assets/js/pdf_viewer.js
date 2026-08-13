@@ -64,17 +64,26 @@ function onBlockLoad() {
     var iframe = document.getElementById("pdf-viewer");
     if (!iframe) return;
 
-    // Cache-bust via query param: the browser's built-in PDF viewer caches
-    // the document by URL and ignores a changed #page=N fragment on the same
-    // URL (no re-navigation happens). Appending a unique ?p= query makes the
-    // URL look like a new document, forcing a full reload and a reliable
-    // jump to the requested page. The server ignores unknown query params.
-    if (page) {
-      var busted = src + (src.indexOf("?") === -1 ? "?" : "&") + "p=" + page + "#page=" + page;
-      iframe.src = busted;
-    } else if (iframe.src !== pdfUrl) {
-      iframe.src = pdfUrl;
-    }
+    // Replace the iframe element entirely. The browser's built-in PDF viewer
+    // keeps internal state (scroll position, loaded document) tied to the
+    // iframe element — changing src, using location.replace(), or cache-bust
+    // query params are all unreliable across browsers. Removing the iframe
+    // from the DOM and inserting a fresh one guarantees the PDF viewer starts
+    // clean and honors the #page=N fragment. A cache-bust query is kept as
+    // well so the document itself is re-fetched instead of served from
+    // HTTP cache with stale viewer state.
+    var parent = iframe.parentNode;
+    var fresh = document.createElement("iframe");
+    fresh.id = "pdf-viewer";
+    fresh.style.width = "100%";
+    fresh.style.height = "100%";
+    fresh.style.border = "none";
+    var url = page
+      ? src + (src.indexOf("?") === -1 ? "?" : "&") + "p=" + page + "&t=" + Date.now() + "#page=" + page
+      : pdfUrl;
+    parent.removeChild(iframe);
+    fresh.src = url;
+    parent.appendChild(fresh);
 
     var scrollableDiv = document.getElementById("chat-info-panel");
     infor_panel_scroll_pos = scrollableDiv.scrollTop;
