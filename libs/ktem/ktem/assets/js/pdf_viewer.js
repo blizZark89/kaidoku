@@ -64,15 +64,16 @@ function onBlockLoad() {
     var iframe = document.getElementById("pdf-viewer");
     if (!iframe) return;
 
-    if (iframe.src !== pdfUrl) {
-      // Force a real navigation so the PDF viewer actually jumps to the new
-      // page. Setting only the fragment (#page=N) does not re-navigate the
-      // browser's built-in viewer — it stays at the last scrolled position.
-      try {
-        iframe.contentWindow.location.replace(pdfUrl);
-      } catch (e) {
-        iframe.src = pdfUrl;
-      }
+    // Cache-bust via query param: the browser's built-in PDF viewer caches
+    // the document by URL and ignores a changed #page=N fragment on the same
+    // URL (no re-navigation happens). Appending a unique ?p= query makes the
+    // URL look like a new document, forcing a full reload and a reliable
+    // jump to the requested page. The server ignores unknown query params.
+    if (page) {
+      var busted = src + (src.indexOf("?") === -1 ? "?" : "&") + "p=" + page + "#page=" + page;
+      iframe.src = busted;
+    } else if (iframe.src !== pdfUrl) {
+      iframe.src = pdfUrl;
     }
 
     var scrollableDiv = document.getElementById("chat-info-panel");
