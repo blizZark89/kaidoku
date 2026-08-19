@@ -2720,12 +2720,15 @@ class FileIndexPage(BasePage):
 
         selected_item = list_groups[selected_id]
         selected_group_id = selected_item["id"]
-        actor = None
+        is_admin = False
         if self._app.f_user_management:
             with Session(engine) as session:
                 actor = get_access_context(session, user_id)
+                # Read is_admin INSIDE the session. Accessing the User ORM
+                # attribute after the session closes raises DetachedInstanceError.
+                is_admin = bool(actor and actor.is_admin)
         delete_button_update = gr.update(
-            visible=_group_deletable_by_actor(selected_item, user_id, actor)
+            visible=is_admin or _group_deletable_by_user(selected_item, user_id)
         )
         return (
             "### Group Information",
