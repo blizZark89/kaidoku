@@ -80,8 +80,13 @@ docker ps
 ```shell
 cd ~/kaidoku
 docker compose down
+docker builder prune -a -f
+docker system df
+df -h
 git pull origin main
 docker compose build
 docker compose up -d
 docker ps
+docker compose ps
+df -h
 ```
