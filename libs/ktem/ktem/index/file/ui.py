@@ -256,13 +256,18 @@ def _source_matches_search_team(
     return bool(source_team_ids.intersection(effective_team_ids))
 
 
-def _group_matches_search_team(group, actor, effective_team_ids, team_ref_map=None) -> bool:
+def _group_matches_search_team(group, actor, effective_team_ids, team_ref_map=None, team_filter="") -> bool:
     if effective_team_ids is None:
         return True
 
     group_team_ids = set(_group_team_ids(group, team_ref_map))
     if not group_team_ids:
-        return False
+        # Gruppen ohne Team-Zuordnung sollen für ihren Besitzer sichtbar bleiben,
+        # solange kein expliziter Team-Filter gesetzt ist.
+        if str(team_filter or "").strip():
+            return False
+        actor_user_id = getattr(getattr(actor, "user", None), "id", None)
+        return bool(actor_user_id and getattr(group, "user", None) == actor_user_id)
 
     return bool(group_team_ids.intersection(effective_team_ids))
 
@@ -719,7 +724,7 @@ class FileIndexPage(BasePage):
             gr.update(visible=True),
             gr.update(value=""),
             gr.update(value=[]),
-            self.list_group_team_choices(user_id),
+            self.list_group_team_choices(user_id, []),
             None,
         ]
 
@@ -3057,7 +3062,7 @@ class FileSelector(BasePage):
                     continue
                 if current_mode == "group_select":
                     if self._app.f_user_management:
-                        if not _group_matches_search_team(item, actor, effective_team_ids, team_ref_map):
+                        if not _group_matches_search_team(item, actor, effective_team_ids, team_ref_map, team_filter):
                             continue
                     else:
                         if team_filter and team_filter not in _group_team_ids(item, team_ref_map):
