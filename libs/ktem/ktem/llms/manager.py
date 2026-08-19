@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Type, overload
 
 from sqlalchemy import select
@@ -8,6 +9,8 @@ from theflow.utils.modules import deserialize, import_dotted_string
 from kotaemon.llms import ChatLLM
 
 from .db import LLMTable, engine
+
+logger = logging.getLogger(__name__)
 
 
 class LLMManager:
@@ -125,8 +128,9 @@ class LLMManager:
     def get_default_name(self) -> str:
         """Get the name of default model
 
-        In case there is no default model, choose random model from pool. In
-        case there are multiple default models, choose random from them.
+        In case there is no default model, fall back to the first model in the
+        pool (deterministically) and log a loud warning instead of silently
+        switching models between restarts.
 
         Returns:
             str: model name
@@ -135,7 +139,14 @@ class LLMManager:
             raise ValueError("No models in pool")
 
         if not self._default:
-            return self.get_random_name()
+            fallback = next(iter(self._models))
+            logger.warning(
+                "No default LLM configured; falling back to '%s'. Set a "
+                "default in the LLM settings to avoid unexpected model "
+                "switches.",
+                fallback,
+            )
+            return fallback
 
         return self._default
 

@@ -7,6 +7,7 @@ import shutil
 import threading
 import time
 import warnings
+import atexit
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
@@ -52,6 +53,31 @@ from kotaemon.indices.splitters import BaseSplitter, TokenSplitter
 from .base import BaseFileIndexIndexing, BaseFileIndexRetriever
 
 logger = logging.getLogger(__name__)
+
+# Registry for background embedding threads so they can be joined on shutdown.
+# Without this, a container restart during quick-index could leave files marked
+# as indexed while their vectors were never written (silent data loss).
+_embedding_threads: list[threading.Thread] = []
+_embedding_threads_lock = threading.Lock()
+
+
+def _register_embedding_thread(thread: threading.Thread) -> None:
+    with _embedding_threads_lock:
+        _embedding_threads.append(thread)
+
+
+def _join_embedding_threads(timeout: float = 60.0) -> None:
+    with _embedding_threads_lock:
+        threads = list(_embedding_threads)
+    deadline = time.time() + timeout
+    for thread in threads:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        thread.join(timeout=remaining)
+
+
+atexit.register(_join_embedding_threads)
 
 
 @lru_cache
@@ -474,9 +500,22 @@ class IndexPipeline(BaseComponent):
         # run vector indexing in thread if specified
         if self.run_embedding_in_thread:
             print("Running embedding in thread")
-            threading.Thread(
-                target=lambda: list(insert_chunks_to_vectorstore())
-            ).start()
+            self._set_index_status(file_id, "indexing")
+
+            def _run_embedding() -> None:
+                try:
+                    list(insert_chunks_to_vectorstore())
+                except Exception:
+                    logger.exception(
+                        "Background embedding failed for file_id=%s", file_id
+                    )
+                    self._set_index_status(file_id, "failed")
+                else:
+                    self._set_index_status(file_id, "indexed")
+
+            thread = threading.Thread(target=_run_embedding, daemon=True)
+            _register_embedding_thread(thread)
+            thread.start()
         else:
             yield from insert_chunks_to_vectorstore()
 
@@ -597,6 +636,30 @@ class IndexPipeline(BaseComponent):
             file_id = source.id
 
         return file_id
+
+    def _set_index_status(self, file_id: str, status: str) -> None:
+        """Persist background indexing status in Source.note.
+
+        Values: "indexing" (background embedding running), "indexed" (done),
+        "failed" (thread raised). Lets operators spot files whose vectors were
+        never written (e.g. after a restart mid-indexing).
+        """
+        try:
+            with Session(engine) as session:
+                stmt = select(self.Source).where(self.Source.id == file_id)
+                result = session.execute(stmt).first()
+                if not result:
+                    return
+                item = result[0]
+                note = dict(item.note or {})
+                note["index_status"] = status
+                item.note = note
+                session.add(item)
+                session.commit()
+        except Exception:
+            logger.exception(
+                "Failed to set index_status=%s for file_id=%s", status, file_id
+            )
 
     def finish(self, file_id: str, file_path: str | Path) -> str:
         """Finish the indexing"""

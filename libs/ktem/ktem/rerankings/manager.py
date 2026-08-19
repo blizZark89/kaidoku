@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Type
 
 from sqlalchemy import select
@@ -8,6 +9,8 @@ from theflow.utils.modules import deserialize
 from kotaemon.rerankings.base import BaseReranking
 
 from .db import RerankingTable, engine
+
+logger = logging.getLogger(__name__)
 
 
 class RerankingManager:
@@ -112,7 +115,14 @@ class RerankingManager:
             raise ValueError("No models in pool")
 
         if not self._default:
-            return self.get_random_name()
+            fallback = next(iter(self._models))
+            logger.warning(
+                "No default reranking model configured; falling back to "
+                "'%s'. Set a default in the reranking settings to avoid "
+                "unexpected model switches.",
+                fallback,
+            )
+            return fallback
 
         return self._default
 
