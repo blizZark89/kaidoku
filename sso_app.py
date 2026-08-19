@@ -126,8 +126,6 @@ async def auth_callback(request: Request):
             return RedirectResponse(url=f"/auth/error?{params}", status_code=302)
 
         request.session["user_id"] = user_id
-        if token.get("id_token"):
-            request.session["id_token"] = token["id_token"]
 
         # HTML-Redirect statt 302: stellt sicher, dass der Browser den
         # Session-Cookie speichert, BEVOR er /app anfordert.
