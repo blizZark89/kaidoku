@@ -204,7 +204,7 @@ if config("LOCAL_MODEL", default=""):
             "model": config("LOCAL_MODEL", default="qwen2.5:7b"),
             "api_key": "ollama",
         },
-        "default": False,
+        "default": True,
     }
     KH_LLMS["ollama-long-context"] = {
         "spec": {
@@ -225,13 +225,6 @@ if config("LOCAL_MODEL", default=""):
         },
         "default": False,
     }
-    KH_EMBEDDINGS["fast_embed"] = {
-        "spec": {
-            "__type__": "kotaemon.embeddings.FastEmbedEmbeddings",
-            "model_name": "BAAI/bge-base-en-v1.5",
-        },
-        "default": False,
-    }
 
 # additional LLM configurations
 KH_LLMS["claude"] = {
@@ -248,7 +241,7 @@ KH_LLMS["google"] = {
         "model_name": "gemini-1.5-flash",
         "api_key": GOOGLE_API_KEY,
     },
-    "default": not IS_OPENAI_DEFAULT,
+    "default": False,
 }
 KH_LLMS["groq"] = {
     "spec": {
@@ -293,7 +286,14 @@ KH_EMBEDDINGS["google"] = {
         "model": "models/text-embedding-004",
         "google_api_key": GOOGLE_API_KEY,
     },
-    "default": not IS_OPENAI_DEFAULT,
+    "default": False,
+}
+KH_EMBEDDINGS["fast_embed"] = {
+    "spec": {
+        "__type__": "kotaemon.embeddings.FastEmbedEmbeddings",
+        "model_name": "BAAI/bge-base-en-v1.5",
+    },
+    "default": True,
 }
 KH_EMBEDDINGS["mistral"] = {
     "spec": {
