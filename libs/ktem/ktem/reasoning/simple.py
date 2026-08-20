@@ -239,6 +239,13 @@ class FullQAPipeline(BaseReasoning):
             # clear previous info
             yield Document(channel="info", content=None)
 
+            # Treffer mit Scores zuerst (zitierte + nicht-zitierte)
+            yield from with_citation
+            if without_citation:
+                yield from without_citation
+
+            # Addons ohne Trefferquote danach
+
             # yield mindmap output
             if mindmap_output:
                 yield mindmap_output
@@ -268,10 +275,6 @@ class FullQAPipeline(BaseReasoning):
                     channel="info",
                     content=f"<h5>Answer confidence: {qa_score}</h5>",
                 )
-
-            yield from with_citation
-            if without_citation:
-                yield from without_citation
 
     async def ainvoke(  # type: ignore
         self, message: str, conv_id: str, history: list, **kwargs  # type: ignore
