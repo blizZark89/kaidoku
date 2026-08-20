@@ -1536,7 +1536,13 @@ class ChatPage(BasePage):
 
         # check if this is a newly created conversation
         if len(chat_history) == 1:
-            suggested_name = suggest_pipeline(chat_history).text
+            try:
+                suggested_name = suggest_pipeline(chat_history).text
+            except Exception as e:
+                error_str = str(e)
+                if "insufficient_quota" in error_str or "credit_balance_exhausted" in error_str:
+                    raise gr.Error("OpenAI Guthaben leer. Bitte Guthaben unter https://platform.openai.com/settings/organization/billing/ aufladen oder in den Einstellungen ein anderes Modell wählen.")
+                raise
             suggested_name = strip_think_tag(suggested_name)
             suggested_name = suggested_name.replace('"', "").replace("'", "")[:40]
             new_name = gr.update(value=suggested_name)
@@ -1564,7 +1570,13 @@ class ChatPage(BasePage):
             suggested_questions = [[each] for each in ChatSuggestion.CHAT_SAMPLES]
 
             if len(chat_history) >= 1:
-                suggested_resp = suggest_pipeline(chat_history).text
+                try:
+                    suggested_resp = suggest_pipeline(chat_history).text
+                except Exception as e:
+                    error_str = str(e)
+                    if "insufficient_quota" in error_str or "credit_balance_exhausted" in error_str:
+                        raise gr.Error("OpenAI Guthaben leer. Bitte Guthaben unter https://platform.openai.com/settings/organization/billing/ aufladen oder in den Einstellungen ein anderes Modell wählen.")
+                    raise
                 if ques_res := re.search(
                     r"\[(.*?)\]", re.sub("\n", "", suggested_resp)
                 ):
