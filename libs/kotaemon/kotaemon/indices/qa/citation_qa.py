@@ -337,8 +337,24 @@ class AnswerWithContextPipeline(BaseComponent):
         id2docs = {doc.doc_id: doc for doc in docs}
         not_detected = set(id2docs.keys()) - set(spans.keys())
 
+        # sort cited docs by effective score (highest first)
+        def _effective_score(doc):
+            llm = doc.metadata.get("llm_trulens_score", None)
+            if llm is not None and llm > 0:
+                return llm
+            rr = doc.metadata.get("reranking_score", None)
+            if rr is not None and rr > 0:
+                return rr
+            return doc.score if doc.score > 0 else 0.0
+
+        sorted_spans = sorted(
+            spans.items(),
+            key=lambda item: _effective_score(id2docs[item[0]]),
+            reverse=True,
+        )
+
         # render highlight spans
-        for _id, ss in spans.items():
+        for _id, ss in sorted_spans:
             if not ss:
                 not_detected.add(_id)
                 continue
