@@ -136,6 +136,24 @@ def _group_team_ids(group, team_ref_map=None) -> list[str]:
     return _normalize_source_team_ids(data.get("team_ids"), team_ref_map)
 
 
+def _build_group_team_map(session, FileGroup, team_ref_map=None) -> dict[str, set[str]]:
+    """Map file_id -> set of team_ids derived from file groups.
+
+    Dateien erben die Team-Zuordnung ihrer Dateigruppe. Diese Map wird
+    benoetigt, damit die Team-Suche im Chat auch Dateien findet, die nur
+    ueber ihre Gruppe einem Team zugeordnet sind (nicht direkt).
+    """
+    mapping: dict[str, set[str]] = {}
+    for result in session.execute(select(FileGroup)).all():
+        group = result[0]
+        team_ids = set(_group_team_ids(group, team_ref_map))
+        if not team_ids:
+            continue
+        for file_id in group.data.get("files") or []:
+            mapping.setdefault(str(file_id), set()).update(team_ids)
+    return mapping
+
+
 def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None) -> bool:
     if actor is None:
         return True
@@ -240,11 +258,17 @@ def _source_matches_search_team(
     effective_team_ids,
     team_ref_map=None,
     team_filter="",
+    group_team_map=None,
 ) -> bool:
     if effective_team_ids is None:
         return True
 
     source_team_ids = set(_source_team_ids(source, team_ref_map))
+    if group_team_map:
+        source_team_ids = source_team_ids.union(
+            group_team_map.get(str(source.id), set())
+        )
+
     if not source_team_ids:
         # Ohne Team-Zuordnung sollen eigene Uploads weiterhin auffindbar sein,
         # solange kein expliziter Team-Filter gesetzt ist.
@@ -2936,6 +2960,8 @@ class FileSelector(BasePage):
                     actor, team_filter, visible_global_team_ids
                 )
                 team_ref_map = _team_ref_map(session)
+                FileGroup = self._index._resources["FileGroup"]
+                group_team_map = _build_group_team_map(session, FileGroup, team_ref_map)
                 for result in results:
                     source = result[0]
                     if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map):
@@ -2946,6 +2972,7 @@ class FileSelector(BasePage):
                         effective_team_ids,
                         team_ref_map,
                         team_filter,
+                        group_team_map,
                     ):
                         continue
                     file_ids.append(source.id)
@@ -3026,6 +3053,8 @@ class FileSelector(BasePage):
                 actor, team_filter, visible_global_team_ids
             )
             team_ref_map = _team_ref_map(session)
+            FileGroup = self._index._resources["FileGroup"]
+            group_team_map = _build_group_team_map(session, FileGroup, team_ref_map)
             visible_sources = []
             for result in results:
                 source = result[0]
@@ -3042,6 +3071,7 @@ class FileSelector(BasePage):
                             effective_team_ids,
                             team_ref_map,
                             team_filter,
+                            group_team_map,
                         ):
                             continue
                     else:
@@ -3051,7 +3081,6 @@ class FileSelector(BasePage):
                 group_available_ids.append(source.id)
             group_available_ids_set = set(group_available_ids)
 
-            FileGroup = self._index._resources["FileGroup"]
             statement = select(FileGroup)
             if scope_ids is not None and not self._app.f_user_management:
                 statement = statement.where(FileGroup.user.in_(scope_ids))
