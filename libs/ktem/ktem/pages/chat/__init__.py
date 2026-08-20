@@ -1510,6 +1510,11 @@ class ChatPage(BasePage):
                 )
         except ValueError as e:
             print(e)
+        except Exception as e:
+            error_str = str(e)
+            if "insufficient_quota" in error_str or "credit_balance_exhausted" in error_str:
+                raise gr.Error("OpenAI Guthaben leer. Bitte Guthaben unter https://platform.openai.com/settings/organization/billing/ aufladen oder in den Einstellungen ein anderes Modell wählen.")
+            raise
 
         if not text:
             empty_msg = getattr(
