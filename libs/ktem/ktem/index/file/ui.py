@@ -650,7 +650,7 @@ class FileIndexPage(BasePage):
             default_team_ids = selected_team_ids
         else:
             allowed_team_ids = set(actor.team_ids)
-            default_team_ids = selected_team_ids or list(actor.team_ids)
+            default_team_ids = selected_team_ids
 
         if any(team_id not in existing_team_ids for team_id in default_team_ids):
             return [], "Mindestens ein ausgewähltes Team existiert nicht"
@@ -711,7 +711,7 @@ class FileIndexPage(BasePage):
                 allowed_ids = {team_id for _, team_id in choices}
                 selected = [
                     team_id
-                    for team_id in (selected_team_ids or list(actor.team_ids))
+                    for team_id in (selected_team_ids if selected_team_ids is not None else list(actor.team_ids))
                     if team_id in allowed_ids
                 ]
 
