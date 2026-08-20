@@ -314,13 +314,23 @@ def sync_external_user(
             session.commit()
             user = session.get(User, user.id)
         else:
-            user.username = identity.username
-            user.username_lower = identity.username.lower().strip()
-            user.admin = decision.is_admin
+            changed = False
+            if user.username != identity.username:
+                user.username = identity.username
+                changed = True
+            new_username_lower = identity.username.lower().strip()
+            if user.username_lower != new_username_lower:
+                user.username_lower = new_username_lower
+                changed = True
+            if user.admin != decision.is_admin:
+                user.admin = decision.is_admin
+                changed = True
             if not user.password:
                 user.password = password_placeholder
-            session.add(user)
-            session.commit()
+                changed = True
+            if changed:
+                session.add(user)
+                session.commit()
             user = session.get(User, user.id)
 
         team_id = _resolve_team_ids_from_groups(session, identity.groups)

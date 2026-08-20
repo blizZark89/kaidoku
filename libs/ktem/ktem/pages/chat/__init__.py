@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 from copy import deepcopy
 from typing import Optional
@@ -40,6 +41,7 @@ from .report import ReportIssue
 
 KH_DEMO_MODE = getattr(flowsettings, "KH_DEMO_MODE", False)
 KH_SSO_ENABLED = getattr(flowsettings, "KH_SSO_ENABLED", False)
+logger = logging.getLogger(__name__)
 KH_WEB_SEARCH_BACKEND = getattr(flowsettings, "KH_WEB_SEARCH_BACKEND", None)
 WebSearch = None
 if KH_WEB_SEARCH_BACKEND:
@@ -1027,7 +1029,7 @@ class ChatPage(BasePage):
             print("User ID:", sso_user_id)
 
         if not chat_input:
-            raise ValueError("Eingabe ist leer")
+            raise gr.Error("Eingabe ist leer")
 
         chat_input_text = chat_input.get("text", "")
         file_ids = []
@@ -1347,24 +1349,19 @@ class ChatPage(BasePage):
             - the pipeline objects
         """
         # override reasoning_mode by temporary chat page state
-        print(
-            "Session reasoning type",
-            session_reasoning_type,
-            "use mindmap",
-            session_use_mindmap,
-            "use citation",
-            session_use_citation,
-            "language",
-            session_language,
+        logger.debug(
+            "Session reasoning_type=%s use_mindmap=%s use_citation=%s language=%s",
+            session_reasoning_type, session_use_mindmap,
+            session_use_citation, session_language,
         )
-        print("Session LLM", session_llm)
+        logger.debug("Session LLM: %s", session_llm)
         reasoning_mode = (
             settings["reasoning.use"]
             if session_reasoning_type in (DEFAULT_SETTING, None)
             else session_reasoning_type
         )
         reasoning_cls = reasonings[reasoning_mode]
-        print("Reasoning class", reasoning_cls)
+        logger.debug("Reasoning class: %s", reasoning_cls)
         reasoning_id = reasoning_cls.get_info()["id"]
 
         settings = deepcopy(settings)
@@ -1458,14 +1455,14 @@ class ChatPage(BasePage):
             user_id,
             *selecteds,
         )
-        print("Reasoning state", reasoning_state)
+        logger.debug("Reasoning state: %s", reasoning_state)
         pipeline.set_output_queue(queue)
 
         text, refs, plot, plot_gr = "", "", None, gr.update(visible=False)
         msg_placeholder = getattr(
             flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Thinking ..."
         )
-        print(msg_placeholder)
+        logger.debug("msg_placeholder: %s", msg_placeholder)
         yield (
             chat_history + [(chat_input, text or msg_placeholder)],
             refs,
@@ -1509,7 +1506,7 @@ class ChatPage(BasePage):
                     chat_state,
                 )
         except ValueError as e:
-            print(e)
+            logger.debug("ValueError in pipeline.stream: %s", e)
         except Exception as e:
             error_str = str(e)
             if "insufficient_quota" in error_str or "credit_balance_exhausted" in error_str:

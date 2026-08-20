@@ -224,7 +224,7 @@ class DocumentRetrievalPipeline(BaseFileIndexRetriever):
                     flatten_doc_ids.append(doc_id)
             doc_ids = flatten_doc_ids
 
-        print("searching in doc_ids", doc_ids)
+        logger.debug("searching in doc_ids %s", doc_ids)
         if not doc_ids:
             logger.info(f"Skip retrieval because of no selected files: {self}")
             return []
@@ -259,9 +259,9 @@ class DocumentRetrievalPipeline(BaseFileIndexRetriever):
 
         # rerank
         s_time = time.time()
-        print(f"retrieval_kwargs: {retrieval_kwargs.keys()}")
+        logger.debug("retrieval_kwargs: %s", list(retrieval_kwargs.keys()))
         docs = self.vector_retrieval(text=text, top_k=self.top_k, **retrieval_kwargs)
-        print("retrieval step took", time.time() - s_time)
+        logger.debug("retrieval step took %.2fs", time.time() - s_time)
 
         if not self.get_extra_table:
             return docs
@@ -294,7 +294,7 @@ class DocumentRetrievalPipeline(BaseFileIndexRetriever):
                     if doc.doc_id not in retrieved_id:
                         docs.append(doc)
             except Exception:
-                print("Error retrieving additional tables")
+                logger.warning("Error retrieving additional tables")
 
         return docs
 

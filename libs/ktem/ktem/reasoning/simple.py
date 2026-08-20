@@ -285,14 +285,14 @@ class FullQAPipeline(BaseReasoning):
         self, message: str, conv_id: str, history: list, **kwargs  # type: ignore
     ) -> Generator[Document, None, Document]:
         if self.use_rewrite and self.rewrite_pipeline:
-            print("Chosen rewrite pipeline", self.rewrite_pipeline)
+            logger.debug("Chosen rewrite pipeline %s", self.rewrite_pipeline)
             message = self.rewrite_pipeline(question=message).text
-            print("Rewrite result", message)
+            logger.debug("Rewrite result: %s", message)
 
-        print(f"Retrievers {self.retrievers}")
+        logger.debug("Retrievers %s", self.retrievers)
         # should populate the context
         docs, infos = self.retrieve(message, history)
-        print(f"Got {len(docs)} retrieved documents")
+        logger.debug("Got %d retrieved documents", len(docs))
         yield from infos
 
         evidence_mode, evidence, images = self.evidence_pipeline(docs).content

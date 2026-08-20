@@ -241,8 +241,10 @@ class Render:
             relevant_score = llm_reranking_score
         elif reranking_score > 0:
             relevant_score = reranking_score
-        elif not is_close(doc.score, -1.0) and doc.score > 0:
-            relevant_score = doc.score
+        elif not is_close(doc.score, -1.0) and doc.score >= 0:
+            # ChromaDB doc.score ist eine Cosin-Distanz (0 = identisch,
+            # 2 = gegensaetzlich). In Similaritaet umrechnen.
+            relevant_score = max(0.0, 1.0 - doc.score)
         else:
             relevant_score = 0.0
 
