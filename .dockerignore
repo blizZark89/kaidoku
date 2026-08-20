@@ -4,6 +4,8 @@
 .mypy_cache/
 __pycache__/
 ktem_app_data/
+kaidoku_app_data/
+sync-data/
 env/
 .pre-commit-config.yaml
 .commitlintrc
