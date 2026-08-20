@@ -287,9 +287,14 @@ def _encode_group_selector_value(group_id: str, file_ids: list[str]) -> str:
 
 
 def _decode_group_selector_value(group_value) -> tuple[str | None, list[str]]:
-    try:
-        parsed = json.loads(group_value)
-    except (TypeError, json.JSONDecodeError):
+    if isinstance(group_value, dict):
+        parsed = group_value
+    elif isinstance(group_value, str):
+        try:
+            parsed = json.loads(group_value)
+        except (TypeError, json.JSONDecodeError):
+            return None, []
+    else:
         return None, []
 
     if isinstance(parsed, dict):
