@@ -764,6 +764,7 @@ class SettingsPage(BasePage):
     def _populate_chat_default_choices(self, user_id):
         team_choices = [("Alle Teams", "")]
         group_choices = []
+        from ktem.authz import globally_visible_team_ids
         if user_id and self._app.f_user_management:
             try:
                 with Session(engine) as s:
@@ -775,11 +776,32 @@ class SettingsPage(BasePage):
                             for t in teams:
                                 team_choices.append((t.name, t.id))
                         else:
-                            from ktem.authz import globally_visible_team_ids
                             gids = globally_visible_team_ids(s)
                             for tid in list(actor.team_ids) + list(gids):
                                 if tid in team_map:
                                     team_choices.append((team_map[tid], tid))
+                        # Fetch file groups visible to the user
+                        try:
+                            from ktem.index.file.ui import (
+                                _display_group_name, _encode_group_selector_value,
+                                _group_visible_to_actor, _team_ref_map,
+                            )
+                            visible_global = globally_visible_team_ids(s)
+                            team_ref = _team_ref_map(s)
+                            for idx in self._app.index_manager.indices:
+                                FileGroup = idx._resources["FileGroup"]
+                                groups = s.exec(select(FileGroup)).all()
+                                for item in groups:
+                                    grp = item[0]
+                                    if not _group_visible_to_actor(grp, actor, visible_global, None, team_ref):
+                                        continue
+                                    group_files = grp.data.get("files", [])
+                                    group_value = _encode_group_selector_value(grp.id, group_files)
+                                    group_choices.append((_display_group_name(grp.name), group_value))
+                                group_choices.sort(key=lambda x: (x[0] or "").casefold())
+                                break  # only first index
+                        except Exception:
+                            pass
             except Exception:
                 pass
         return gr.update(choices=team_choices), gr.update(choices=group_choices)

@@ -3025,6 +3025,15 @@ class FileSelector(BasePage):
         group_available_ids = []
         team_filter_choices = [("Alle Teams", "")]
         resolved_mode = current_mode
+
+        # Apply per-user chat defaults on initial load (current_mode == "disabled").
+        if resolved_mode == "disabled" and selected_groups == [] and team_filter == "":
+            cdef = _get_user_chat_defaults(user_id)
+            if cdef.get("chat_default_mode") in ("all", "select", "group_select"):
+                resolved_mode = cdef["chat_default_mode"]
+            team_filter = str(cdef.get("chat_default_team", "") or "")
+            selected_groups = list(cdef.get("chat_default_groups") or [])
+
         if user_id is None:
             # not signed in
             return (
@@ -3195,15 +3204,6 @@ class FileSelector(BasePage):
             gr.update(value=resolved_mode),
         )
 
-    def load_chat_defaults(self, user_id):
-        """Reload user chat defaults and apply to UI controls."""
-        cdef = _get_user_chat_defaults(user_id)
-        return [
-            gr.update(value=cdef.get("chat_default_mode", "all")),
-            gr.update(value=cdef.get("chat_default_team", "")),
-            gr.update(value=cdef.get("chat_default_groups", [])),
-        ]
-
     def _on_app_created(self):
         self._app.app.load(
             self.load_files,
@@ -3241,15 +3241,6 @@ class FileSelector(BasePage):
             },
         )
         if self._app.f_user_management:
-            self._app.subscribe_event(
-                name="onSignIn",
-                definition={
-                    "fn": self.load_chat_defaults,
-                    "inputs": [self._app.user_id],
-                    "outputs": [self.mode, self.team_filter, self.group_selector],
-                    "show_progress": "hidden",
-                },
-            )
             for event_name in ["onSignIn", "onSignOut"]:
                 self._app.subscribe_event(
                     name=event_name,
