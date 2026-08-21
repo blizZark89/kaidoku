@@ -2568,6 +2568,7 @@ class FileIndexPage(BasePage):
                 )
 
         if results:
+            results.sort(key=lambda item: (item.get("name") or "").casefold())
             formated_results = deepcopy(results)
             for item in formated_results:
                 team_names = item.pop("teams", [])
@@ -3113,6 +3114,10 @@ class FileSelector(BasePage):
                 available_group_values_by_id[item.id] = group_value
                 available_group_values_by_files[tuple(raw_group_files)] = group_value
                 group_options.append((_display_group_name(item.name), group_value))
+
+            # Sortiere Dateigruppen alphabetisch für Chat-Dropdown + Dateien-Tab
+            group_options.sort(key=lambda entry: (entry[0] or "").casefold())
+            options.sort(key=lambda entry: (entry[0] or "").casefold())
 
             for source in visible_sources:
                 if source.id not in group_available_ids_set:
