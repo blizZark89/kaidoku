@@ -26,6 +26,7 @@ from ktem.authz import (
 )
 from ktem.app import BasePage
 from ktem.db.engine import engine
+from ktem.db.models import Settings
 from ktem.utils.render import Render
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -152,6 +153,24 @@ def _build_group_team_map(session, FileGroup, team_ref_map=None) -> dict[str, se
         for file_id in group.data.get("files") or []:
             mapping.setdefault(str(file_id), set()).update(team_ids)
     return mapping
+
+
+def _get_user_chat_defaults(user_id) -> dict:
+    """Read per-user chat defaults from the Settings table."""
+    defaults = {
+        "chat_default_mode": "all",
+        "chat_default_groups": [],
+        "chat_default_team": "",
+    }
+    if user_id is None or user_id == -1:
+        return defaults
+    with Session(engine) as s:
+        result = s.execute(select(Settings).where(Settings.user == str(user_id))).first()
+        row = result[0] if result else None
+        if row and row.setting:
+            for key in defaults:
+                defaults[key] = row.setting.get(key, defaults[key])
+    return defaults
 
 
 def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None) -> bool:
@@ -2822,7 +2841,19 @@ class FileSelector(BasePage):
 
     def default(self):
         if self._app.f_user_management:
-            return "disabled", [], -1, "", []
+            user_id = -1
+            try:
+                user_id = self._app.user_id.value
+            except Exception:
+                pass
+            cdef = _get_user_chat_defaults(user_id)
+            return (
+                cdef.get("chat_default_mode", "all"),
+                [],
+                user_id,
+                cdef.get("chat_default_team", ""),
+                cdef.get("chat_default_groups", []),
+            )
         return "disabled", [], 1, "", []
 
     def on_building_ui(self):
@@ -3164,6 +3195,15 @@ class FileSelector(BasePage):
             gr.update(value=resolved_mode),
         )
 
+    def load_chat_defaults(self, user_id):
+        """Reload user chat defaults and apply to UI controls."""
+        cdef = _get_user_chat_defaults(user_id)
+        return [
+            gr.update(value=cdef.get("chat_default_mode", "all")),
+            gr.update(value=cdef.get("chat_default_team", "")),
+            gr.update(value=cdef.get("chat_default_groups", [])),
+        ]
+
     def _on_app_created(self):
         self._app.app.load(
             self.load_files,
@@ -3201,6 +3241,15 @@ class FileSelector(BasePage):
             },
         )
         if self._app.f_user_management:
+            self._app.subscribe_event(
+                name="onSignIn",
+                definition={
+                    "fn": self.load_chat_defaults,
+                    "inputs": [self._app.user_id],
+                    "outputs": [self.mode, self.team_filter, self.group_selector],
+                    "show_progress": "hidden",
+                },
+            )
             for event_name in ["onSignIn", "onSignOut"]:
                 self._app.subscribe_event(
                     name=event_name,

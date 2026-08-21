@@ -243,6 +243,15 @@ class SettingsPage(BasePage):
                     "show_progress": "hidden",
                 },
             )
+            self._app.subscribe_event(
+                name="onSignIn",
+                definition={
+                    "fn": self._populate_chat_default_choices,
+                    "inputs": self._user_id,
+                    "outputs": [self._components["chat_default_team"], self._components["chat_default_groups"]],
+                    "show_progress": "hidden",
+                },
+            )
 
             self._app.subscribe_event(
                 name="onSignOut",
@@ -330,6 +339,12 @@ class SettingsPage(BasePage):
                     self.reasoning_settings_tab,
                     self.filesync_settings_tab,
                 ],
+                show_progress="hidden",
+            )
+            self._app.user_id.change(
+                self._populate_chat_default_choices,
+                inputs=[self._user_id],
+                outputs=[self._components["chat_default_team"], self._components["chat_default_groups"]],
                 show_progress="hidden",
             )
 
@@ -489,6 +504,36 @@ class SettingsPage(BasePage):
         self.current_name = gr.Markdown("Aktueller Benutzer: ___")
         self.current_team = gr.Markdown("Aktuelles Team: ___")
         self.signout = gr.Button("Abmelden")
+
+        # Chat-Voreinstellungen
+        gr.Markdown("### Chat-Voreinstellungen")
+        self._components["chat_default_mode"] = gr.Radio(
+            label="Standard-Suchmodus",
+            choices=[
+                ("Alle durchsuchen", "all"),
+                ("Dateien durchsuchen", "select"),
+                ("Dateigruppen durchsuchen", "group_select"),
+            ],
+            value="all",
+            interactive=True,
+        )
+        self._components["chat_default_team"] = gr.Dropdown(
+            label="Standard-Team",
+            choices=[("Alle Teams", "")],
+            value="",
+            interactive=True,
+            allow_custom_value=False,
+        )
+        self._components["chat_default_groups"] = gr.Dropdown(
+            label="Standard-Dateigruppen",
+            choices=[],
+            value=[],
+            multiselect=True,
+            interactive=True,
+        )
+        for key in ["chat_default_mode", "chat_default_team", "chat_default_groups"]:
+            if key not in self._settings_keys:
+                self._settings_keys.append(key)
 
         if can_manage_local_users():
             self.password_change = gr.Textbox(
@@ -707,9 +752,37 @@ class SettingsPage(BasePage):
             if result:
                 settings = result[0].setting
 
+        # Ensure chat default keys exist
+        for key in ("chat_default_mode", "chat_default_team", "chat_default_groups"):
+            if key not in settings:
+                settings[key] = "all" if key == "chat_default_mode" else ("" if key == "chat_default_team" else [])
+
         output = [settings]
-        output += tuple(settings[name] for name in self.component_names())
+        output += tuple(settings.get(name, self._settings_dict.get(name)) for name in self.component_names())
         return output
+
+    def _populate_chat_default_choices(self, user_id):
+        team_choices = [("Alle Teams", "")]
+        group_choices = []
+        if user_id and self._app.f_user_management:
+            try:
+                with Session(engine) as s:
+                    actor = get_access_context(s, user_id)
+                    if actor:
+                        teams = s.exec(select(Team)).all()
+                        team_map = {t.id: t.name for t in teams}
+                        if actor.is_admin:
+                            for t in teams:
+                                team_choices.append((t.name, t.id))
+                        else:
+                            from ktem.authz import globally_visible_team_ids
+                            gids = globally_visible_team_ids(s)
+                            for tid in list(actor.team_ids) + list(gids):
+                                if tid in team_map:
+                                    team_choices.append((team_map[tid], tid))
+            except Exception:
+                pass
+        return gr.update(choices=team_choices), gr.update(choices=group_choices)
 
     def save_setting(self, user_id: int, *args):
         """Save the setting to disk and persist the setting to session state
@@ -765,6 +838,12 @@ class SettingsPage(BasePage):
                     self.reasoning_settings_tab,
                     self.filesync_settings_tab,
                 ],
+                show_progress="hidden",
+            )
+            self._app.app.load(
+                self._populate_chat_default_choices,
+                inputs=[self._user_id],
+                outputs=[self._components["chat_default_team"], self._components["chat_default_groups"]],
                 show_progress="hidden",
             )
             if self._filesync_service:
