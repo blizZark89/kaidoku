@@ -81,21 +81,13 @@ docker ps
 cd ~/kaidoku
 docker compose down
 docker builder prune -a -f
-docker system df
+docker buildx prune -a -f
+docker image prune -a -f
+docker system prune -a -f
 df -h
+docker system df
 git pull origin main
 docker compose build
 docker compose up -d
 docker ps
-docker compose ps
-df -h
-```
-
-```
-    cd ~/kaidoku
-    git pull origin main
-    docker system prune -a -f
-    docker compose down
-    docker compose build
-    docker compose up -d
 ```
