@@ -762,9 +762,10 @@ class SettingsPage(BasePage):
         return output
 
     def _populate_chat_default_choices(self, user_id):
+        """Build team/group dropdown choices for chat defaults UI."""
+        import json
         team_choices = [("Alle Teams", "")]
         group_choices = []
-        from ktem.authz import globally_visible_team_ids
         if user_id and self._app.f_user_management:
             try:
                 with Session(engine) as s:
@@ -772,6 +773,7 @@ class SettingsPage(BasePage):
                     if actor:
                         teams = s.exec(select(Team)).all()
                         team_map = {t.id: t.name for t in teams}
+                        from ktem.authz import globally_visible_team_ids
                         if actor.is_admin:
                             for t in teams:
                                 team_choices.append((t.name, t.id))
@@ -780,32 +782,33 @@ class SettingsPage(BasePage):
                             for tid in list(actor.team_ids) + list(gids):
                                 if tid in team_map:
                                     team_choices.append((team_map[tid], tid))
-                        # Fetch file groups visible to the user
+                        # Dateigruppen aus FileGroup-Tabelle direkt lesen
                         try:
-                            from ktem.index.file.ui import (
-                                _display_group_name, _encode_group_selector_value,
-                                _group_visible_to_actor, _team_ref_map,
-                            )
-                            visible_global = globally_visible_team_ids(s)
-                            team_ref = _team_ref_map(s)
                             for idx in self._app.index_manager.indices:
-                                FileGroup = idx._resources["FileGroup"]
-                                groups = s.exec(select(FileGroup)).all()
-                                for item in groups:
-                                    grp = item[0]
-                                    if not _group_visible_to_actor(grp, actor, visible_global, None, team_ref):
+                                FG = idx._resources.get("FileGroup")
+                                if FG is None:
+                                    continue
+                                items = s.exec(select(FG)).all()
+                                for row in items:
+                                    grp = row[0]
+                                    # Nur Gruppen des Users oder ohne User-Filter zeigen
+                                    grp_user = getattr(grp, "user", None)
+                                    if grp_user and grp_user != str(user_id) and not actor.is_admin:
                                         continue
-                                    group_files = grp.data.get("files", [])
-                                    group_value = _encode_group_selector_value(grp.id, group_files)
-                                    group_choices.append((_display_group_name(grp.name), group_value))
+                                    name = getattr(grp, "name", "") or ""
+                                    if name.startswith("FileSync / "):
+                                        name = name[len("FileSync / "):]
+                                    files = (getattr(grp, "data", None) or {}).get("files", [])
+                                    group_choices.append(
+                                        (name, json.dumps({"group_id": grp.id, "files": files}))
+                                    )
                                 group_choices.sort(key=lambda x: (x[0] or "").casefold())
-                                break  # only first index
+                                break
                         except Exception:
                             pass
             except Exception:
                 pass
         return gr.update(choices=team_choices), gr.update(choices=group_choices)
-
     def save_setting(self, user_id: int, *args):
         """Save the setting to disk and persist the setting to session state
 

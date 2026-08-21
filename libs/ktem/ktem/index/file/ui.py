@@ -2840,20 +2840,10 @@ class FileSelector(BasePage):
         self.on_building_ui()
 
     def default(self):
+        # Always return "disabled" so load_files detects the initial-load
+        # state and applies per-user chat defaults from the Settings DB.
         if self._app.f_user_management:
-            user_id = -1
-            try:
-                user_id = self._app.user_id.value
-            except Exception:
-                pass
-            cdef = _get_user_chat_defaults(user_id)
-            return (
-                cdef.get("chat_default_mode", "all"),
-                [],
-                user_id,
-                cdef.get("chat_default_team", ""),
-                cdef.get("chat_default_groups", []),
-            )
+            return "disabled", [], -1, "", []
         return "disabled", [], 1, "", []
 
     def on_building_ui(self):
