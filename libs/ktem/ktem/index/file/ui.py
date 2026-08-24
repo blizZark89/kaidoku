@@ -3017,7 +3017,7 @@ class FileSelector(BasePage):
         resolved_mode = current_mode
 
         # Apply per-user chat defaults on initial load (current_mode == "disabled").
-        if resolved_mode == "disabled" and selected_groups == [] and team_filter == "":
+        if resolved_mode == "disabled" and not selected_groups and not team_filter:
             cdef = _get_user_chat_defaults(user_id)
             if cdef.get("chat_default_mode") in ("all", "select", "group_select"):
                 resolved_mode = cdef["chat_default_mode"]
