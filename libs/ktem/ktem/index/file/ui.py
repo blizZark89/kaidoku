@@ -3024,14 +3024,14 @@ class FileSelector(BasePage):
             team_filter = str(cdef.get("chat_default_team", "") or "")
             selected_groups = list(cdef.get("chat_default_groups") or [])
 
-        if user_id is None:
-            # not signed in
+        if user_id is None or (isinstance(user_id, (int, float)) and user_id < 0):
+            # not signed in — keep mode as "disabled" so onSignIn can apply defaults
             return (
                 gr.update(value=selected_files, choices=options),
                 options,
                 gr.update(value=selected_groups, choices=group_options),
                 gr.update(value="", choices=team_filter_choices),
-                gr.update(value=resolved_mode),
+                gr.update(value="disabled"),
             )
 
         # Auto-activate mode on sign-in: promote "disabled" → "all"

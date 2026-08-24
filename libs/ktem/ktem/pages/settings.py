@@ -790,7 +790,7 @@ class SettingsPage(BasePage):
                                     continue
                                 items = s.exec(select(FG)).all()
                                 for row in items:
-                                    grp = row[0]
+                                    grp = row  # s.exec() returns model instances directly, not (obj,) tuples
                                     # Nur Gruppen des Users oder ohne User-Filter zeigen
                                     grp_user = getattr(grp, "user", None)
                                     if grp_user and grp_user != str(user_id) and not actor.is_admin:
