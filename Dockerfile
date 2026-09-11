@@ -50,10 +50,6 @@ RUN --mount=type=ssh  \
     uv sync --frozen --no-cache \
     && uv pip install --python .venv "pdfservices-sdk@git+https://github.com/niallcm/pdfservices-python-sdk.git@bump-and-unfreeze-requirements"
 
-RUN --mount=type=ssh  \
-    --mount=type=cache,target=/root/.cache/uv  \
-    if [ "$TARGETARCH" = "amd64" ]; then uv pip install --python .venv "graphrag>=0.3.6,<0.5.0" future; fi
-
 ENTRYPOINT ["sh", "/app/launch.sh"]
 
 # Full version
