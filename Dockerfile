@@ -52,7 +52,7 @@ RUN --mount=type=ssh  \
 
 RUN --mount=type=ssh  \
     --mount=type=cache,target=/root/.cache/uv  \
-    if [ "$TARGETARCH" = "amd64" ]; then uv pip install --python .venv "graphrag<=0.3.6" future; fi
+    if [ "$TARGETARCH" = "amd64" ]; then uv pip install --python .venv "graphrag>=0.3.6,<0.5.0" future; fi
 
 ENTRYPOINT ["sh", "/app/launch.sh"]
 
