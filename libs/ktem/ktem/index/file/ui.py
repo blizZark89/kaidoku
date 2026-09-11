@@ -173,12 +173,15 @@ def _get_user_chat_defaults(user_id) -> dict:
     return defaults
 
 
-def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None) -> bool:
+def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None, group_team_map=None) -> bool:
     if actor is None:
         return True
     if actor.is_admin:
         return True
     source_team_ids = set(_source_team_ids(source, team_ref_map))
+    # Dateien ohne direkte Team-Zuordnung erben Teams von ihrer Dateigruppe
+    if group_team_map and not source_team_ids:
+        source_team_ids = group_team_map.get(str(source.id), set())
     global_team_ids = set(global_team_ids or [])
     if source_team_ids and source_team_ids.intersection(global_team_ids):
         return True
@@ -2986,7 +2989,7 @@ class FileSelector(BasePage):
                 group_team_map = _build_group_team_map(session, FileGroup, team_ref_map)
                 for result in results:
                     source = result[0]
-                    if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map):
+                    if not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map, group_team_map):
                         continue
                     if not _source_matches_search_team(
                         source,
@@ -3089,7 +3092,7 @@ class FileSelector(BasePage):
             visible_sources = []
             for result in results:
                 source = result[0]
-                if actor and not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map):
+                if actor and not _source_visible_to_actor(source, actor, visible_global_team_ids, scope_ids, team_ref_map, group_team_map):
                     continue
                 visible_sources.append(source)
 
