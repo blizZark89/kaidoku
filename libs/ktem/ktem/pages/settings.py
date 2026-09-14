@@ -791,10 +791,13 @@ class SettingsPage(BasePage):
                                 items = s.exec(select(FG)).all()
                                 for row in items:
                                     grp = row  # s.exec() returns model instances directly, not (obj,) tuples
-                                    # Nur Gruppen des Users oder ohne User-Filter zeigen
                                     grp_user = getattr(grp, "user", None)
                                     if grp_user and grp_user != str(user_id) and not actor.is_admin:
-                                        continue
+                                        # Gruppe gehört anderem User — nur zeigen bei Team-Überschneidung
+                                        grp_teams = set((getattr(grp, "data", None) or {}).get("team_ids", []))
+                                        actor_teams = set(list(actor.team_ids) + list(gids))
+                                        if not grp_teams.intersection(actor_teams):
+                                            continue
                                     name = getattr(grp, "name", "") or ""
                                     if name.startswith("FileSync / "):
                                         name = name[len("FileSync / "):]
