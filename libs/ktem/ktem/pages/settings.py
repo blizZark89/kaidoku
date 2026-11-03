@@ -353,6 +353,15 @@ class SettingsPage(BasePage):
                 self.save_setting,
                 inputs=[self._user_id] + self.components(),
                 outputs=self._settings_state,
+            ).then(
+                self._refresh_chat_defaults,
+                inputs=[self._settings_state],
+                outputs=[
+                    self._components["chat_default_mode"],
+                    self._components["chat_default_team"],
+                    self._components["chat_default_groups"],
+                ],
+                show_progress="hidden",
             )
             if hasattr(self._app, "update_graph_collection_tabs") and hasattr(
                 self._app, "graph_index_tabs"
@@ -837,6 +846,14 @@ class SettingsPage(BasePage):
 
         gr.Info("Einstellungen gespeichert")
         return setting
+
+    def _refresh_chat_defaults(self, settings):
+        """Refresh chat default UI components from settings state."""
+        return (
+            settings.get("chat_default_mode", "all"),
+            settings.get("chat_default_team", ""),
+            settings.get("chat_default_groups", []),
+        )
 
     def components(self) -> list:
         """Get the setting components"""
