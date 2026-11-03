@@ -265,7 +265,7 @@ def can_create_role(session: Session, actor: AccessContext, role: str, team_id: 
 
 def allowed_user_ids_for_scope(session: Session, actor: AccessContext) -> list[str]:
     if actor.is_admin:
-        return [u.id for u in _all(session, select(User))]
+        return [actor.user.id]
 
     actor_team_ids = managed_team_ids(session, actor)
     if not actor_team_ids:

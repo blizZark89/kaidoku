@@ -38,11 +38,8 @@ USERNAME_RULE = """**Benutzername-Regeln:**
 PASSWORD_RULE = """**Passwort-Regeln:**
 
 - Mindestens 8 Zeichen
-- Mindestens ein Großbuchstabe
-- Mindestens ein Kleinbuchstabe
+- Mindestens ein Buchstabe (Groß- oder Kleinbuchstabe)
 - Mindestens eine Ziffer
-- Mindestens ein Sonderzeichen aus dieser Liste:
-    ^ $ * . [ ] { } ( ) ? - " ! @ # % & / \\ , > < ' : ; | _ ~  + =
 """
 
 
@@ -65,18 +62,10 @@ def validate_password(pwd, pwd_cnf):
         errors.append("Die Passwörter stimmen nicht überein")
     if len(pwd) < 8:
         errors.append("Das Passwort muss mindestens 8 Zeichen lang sein")
-    if not any(c.isupper() for c in pwd):
-        errors.append("Das Passwort muss mindestens einen Großbuchstaben enthalten")
-    if not any(c.islower() for c in pwd):
-        errors.append("Das Passwort muss mindestens einen Kleinbuchstaben enthalten")
+    if not any(c.isalpha() for c in pwd):
+        errors.append("Das Passwort muss mindestens einen Buchstaben enthalten")
     if not any(c.isdigit() for c in pwd):
         errors.append("Das Passwort muss mindestens eine Ziffer enthalten")
-    special_chars = "^$*.[]{}()?-\"!@#%&/\\,><':;|_~+="
-    if not any(c in special_chars for c in pwd):
-        errors.append(
-            "Das Passwort muss mindestens ein Sonderzeichen aus dieser "
-            f"Liste enthalten: {special_chars}"
-        )
     return "; ".join(errors) if errors else ""
 
 

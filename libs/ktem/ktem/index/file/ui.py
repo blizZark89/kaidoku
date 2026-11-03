@@ -176,8 +176,6 @@ def _get_user_chat_defaults(user_id) -> dict:
 def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None, group_team_map=None) -> bool:
     if actor is None:
         return True
-    if actor.is_admin:
-        return True
     source_team_ids = set(_source_team_ids(source, team_ref_map))
     # Dateien ohne direkte Team-Zuordnung erben Teams von ihrer Dateigruppe
     if group_team_map and not source_team_ids:
@@ -195,8 +193,6 @@ def _source_visible_to_actor(source, actor, global_team_ids=None, scope_user_ids
 
 def _group_visible_to_actor(group, actor, global_team_ids=None, scope_user_ids=None, team_ref_map=None) -> bool:
     if actor is None:
-        return True
-    if actor.is_admin:
         return True
     group_team_ids = set(_group_team_ids(group, team_ref_map))
     global_team_ids = set(global_team_ids or [])
@@ -226,8 +222,6 @@ def _source_deletable_by_actor(
 ) -> bool:
     if source is None:
         return False
-    if actor and actor.is_admin:
-        return True
     if _source_deletable_by_user(source, user_id):
         return True
     if not actor or not actor.is_key_user:
@@ -254,8 +248,6 @@ def _group_deletable_by_user(group, user_id) -> bool:
 def _group_deletable_by_actor(group, user_id, actor=None) -> bool:
     if group is None:
         return False
-    if actor and actor.is_admin:
-        return True
     return _group_deletable_by_user(group, user_id)
 
 
@@ -264,7 +256,7 @@ def _effective_search_team_ids(actor, team_filter="", global_team_ids=None) -> s
     if normalized_team_filter:
         return {normalized_team_filter}
 
-    if actor is None or actor.is_admin:
+    if actor is None:
         return None
 
     actor_team_ids = {team_id for team_id in actor.team_ids if str(team_id).strip()}
@@ -471,7 +463,7 @@ class FileIndexPage(BasePage):
         )
         scope_ids = (
             allowed_user_ids_for_scope(session, actor)
-            if actor and not actor.is_admin
+            if actor
             else None
         )
         team_ref_map = _team_ref_map(session) if actor else None
@@ -2778,6 +2770,7 @@ class FileIndexPage(BasePage):
         selected_item = list_groups[selected_id]
         selected_group_id = selected_item["id"]
         is_admin = False
+        actor = None
         if self._app.f_user_management:
             with Session(engine) as session:
                 actor = get_access_context(session, user_id)
@@ -2785,7 +2778,7 @@ class FileIndexPage(BasePage):
                 # attribute after the session closes raises DetachedInstanceError.
                 is_admin = bool(actor and actor.is_admin)
         delete_button_update = gr.update(
-            visible=is_admin or _group_deletable_by_user(selected_item, user_id)
+            visible=_group_deletable_by_actor(selected_item, user_id, actor)
         )
         return (
             "### Group Information",
