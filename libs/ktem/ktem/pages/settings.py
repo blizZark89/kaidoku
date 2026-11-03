@@ -759,7 +759,8 @@ class SettingsPage(BasePage):
             statement = select(Settings).where(Settings.user == user_id)
             result = session.exec(statement).all()
             if result:
-                settings = result[0].setting
+                # Use the most recent settings row
+                settings = result[-1].setting
 
         # Ensure chat default keys exist
         for key in ("chat_default_mode", "chat_default_team", "chat_default_groups"):
@@ -835,9 +836,13 @@ class SettingsPage(BasePage):
 
         with Session(engine) as session:
             statement = select(Settings).where(Settings.user == user_id)
-            try:
-                user_setting = session.exec(statement).one()
-            except Exception:
+            results = session.exec(statement).all()
+            if results:
+                # Use the last (most recent) row and remove stale duplicates
+                user_setting = results[-1]
+                for stale in results[:-1]:
+                    session.delete(stale)
+            else:
                 user_setting = Settings()
                 user_setting.user = user_id
             user_setting.setting = setting
