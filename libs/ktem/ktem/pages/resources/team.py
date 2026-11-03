@@ -44,6 +44,7 @@ class TeamManagement(BasePage):
         self.btn_team_save = gr.Button("Global-Status speichern")
         with gr.Row():
             self.btn_team_create = gr.Button("Team erstellen")
+            self.btn_team_rename = gr.Button("Team umbenennen")
             self.btn_team_delete = gr.Button("Team löschen")
 
     def on_register_events(self):
@@ -82,6 +83,17 @@ class TeamManagement(BasePage):
             self.save_team_global_status,
             inputs=[self._app.user_id, self.selected_team_id, self.team_global_edit],
             outputs=[self.team_global_edit],
+            show_progress="hidden",
+        ).then(
+            self.list_teams_ui,
+            inputs=[self._app.user_id],
+            outputs=[self.team_state, self.team_list],
+        )
+
+        self.btn_team_rename.click(
+            self.rename_team,
+            inputs=[self._app.user_id, self.selected_team_id, self.team_name_new],
+            outputs=[self.team_name_new],
             show_progress="hidden",
         ).then(
             self.list_teams_ui,
@@ -207,6 +219,48 @@ class TeamManagement(BasePage):
                 )
                 session.commit()
             gr.Info(f'Team "{team_name}" erstellt')
+            return ""
+
+    def rename_team(self, actor_user_id, team_id, new_name):
+        new_name = (new_name or "").strip()
+        if not team_id:
+            gr.Warning("Kein Team ausgewählt")
+            return new_name
+        if not new_name:
+            gr.Warning("Teamname darf nicht leer sein")
+            return new_name
+        with Session(engine) as session:
+            actor = _resolve_actor(session, actor_user_id)
+            if not actor or not actor.is_admin:
+                gr.Warning("Nur Admin darf Teams umbenennen")
+                return new_name
+
+            team = session.exec(select(Team).where(Team.id == team_id)).first()
+            if not team:
+                gr.Warning("Team nicht gefunden")
+                return new_name
+
+            if team.owner_user_id and team.owner_user_id != actor.user.id:
+                gr.Warning("Nur der Ersteller darf dieses Team umbenennen")
+                return new_name
+
+            exists = session.exec(
+                select(Team).where(Team.id != team_id, Team.name == new_name)
+            ).first()
+            if exists:
+                gr.Warning(f'Team "{new_name}" existiert bereits')
+                return new_name
+
+            old_name = team.name
+            team.name = new_name
+            if _team_table_has_name_lower(session):
+                session.exec(
+                    text("UPDATE team SET name_lower = :name_lower WHERE id = :id")
+                    .bindparams(name_lower=new_name.lower(), id=team_id)
+                )
+            session.add(team)
+            session.commit()
+            gr.Info(f'Team "{old_name}" umbenannt in "{new_name}"')
             return ""
 
     def save_team_global_status(self, actor_user_id, team_id, is_global):
