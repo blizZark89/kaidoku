@@ -28,6 +28,42 @@ def toggle_first_setup_visibility():
     return gr.update(visible=is_first_setup), gr.update(visible=not is_first_setup)
 
 
+# One-time initial JS that:
+# 1. Immediately hides all tabs except Willkommen
+# 2. Sets up MutationObserver on data-state div for subsequent updates
+_INIT_TAB_JS = """<div id="kaidoku-tab-vis" data-state="logged-out"></div>
+<script>
+(function() {
+    var KNOWN = ['Willkommen', 'Chat', 'Dateien', 'Ressourcen', 'Einstellungen', 'Hilfe'];
+    function getBtns() { return document.querySelectorAll('.tabs > .tab-nav button[role="tab"]'); }
+    function setTab(name, display) {
+        getBtns().forEach(function(b) { if (b.textContent.trim() === name) b.style.display = display; });
+    }
+    function apply(state) {
+        if (state === 'logged-out') {
+            setTab('Willkommen', '');
+            KNOWN.forEach(function(t) { if (t !== 'Willkommen') setTab(t, 'none'); });
+        } else {
+            setTab('Willkommen', 'none');
+            KNOWN.forEach(function(t) { if (t !== 'Willkommen' && t !== 'Ressourcen') setTab(t, ''); });
+            setTab('Ressourcen', state === 'logged-in-admin' ? '' : 'none');
+        }
+        getBtns().forEach(function(b) {
+            var t = b.textContent.trim();
+            if (KNOWN.indexOf(t) === -1) b.style.display = (state === 'logged-out') ? 'none' : '';
+        });
+    }
+    apply('logged-out');
+    var target = document.getElementById('kaidoku-tab-vis');
+    if (target) { new MutationObserver(function() { apply(target.getAttribute('data-state')); }).observe(target, {attributes: true}); }
+})();
+</script>"""
+
+_LOGGED_OUT_HTML = '<div id="kaidoku-tab-vis" data-state="logged-out"></div>'
+_LOGGED_IN_ADMIN_HTML = '<div id="kaidoku-tab-vis" data-state="logged-in-admin"></div>'
+_LOGGED_IN_USER_HTML = '<div id="kaidoku-tab-vis" data-state="logged-in-user"></div>'
+
+
 class App(BaseApp):
     """The main app of Kotaemon"""
 
@@ -37,33 +73,23 @@ class App(BaseApp):
         self._graph_index_tabs = []
         self.file_sync_service = FileSyncService(self)
 
-        # Hidden HTML component for dynamic tab-visibility JS
-        self._tab_visibility_js = gr.HTML(
-            value="<script>window.__kaidoku_tabs_init=false;</script>",
-            visible=False,
-        )
+        # HTML component: initial JS hides tabs + sets up MutationObserver
+        self._tab_visibility_js = gr.HTML(value=_INIT_TAB_JS, visible=True)
 
         with gr.Tabs() as self.tabs:
             if self.f_user_management:
                 from ktem.pages.login import LoginPage
 
-                with gr.Tab(
-                    "Willkommen", elem_id="login-tab", id="login-tab"
-                ) as self._tabs["login-tab"]:
+                with gr.Tab("Willkommen", elem_id="login-tab", id="login-tab") as self._tabs["login-tab"]:
                     self.login_page = LoginPage(self)
 
-            with gr.Tab(
-                "Chat",
-                elem_id="chat-tab",
-                id="chat-tab",
-            ) as self._tabs["chat-tab"]:
+            with gr.Tab("Chat", elem_id="chat-tab", id="chat-tab") as self._tabs["chat-tab"]:
                 self.chat_page = ChatPage(self)
 
             if len(self.index_manager.indices) == 1:
                 for index in self.index_manager.indices:
                     with gr.Tab(
-                        f"{index.name}",
-                        elem_id="indices-tab",
+                        f"{index.name}", elem_id="indices-tab",
                         elem_classes=["fill-main-area-height", "scrollable", "indices-tab"],
                         id="indices-tab",
                     ) as self._tabs[f"{index.id}-tab"]:
@@ -71,8 +97,7 @@ class App(BaseApp):
                         setattr(self, f"_index_{index.id}", page)
             elif len(self.index_manager.indices) > 1:
                 with gr.Tab(
-                    "Dateien",
-                    elem_id="indices-tab",
+                    "Dateien", elem_id="indices-tab",
                     elem_classes=["fill-main-area-height", "scrollable", "indices-tab"],
                     id="indices-tab",
                 ) as self._tabs["indices-tab"]:
@@ -86,11 +111,7 @@ class App(BaseApp):
                         elif index_name_lower == "lightrag sammlung":
                             graph_setting_key = "application.show_lightrag_collection"
                             graph_roles_setting_key = "application.show_lightrag_collection_roles"
-                        with gr.Tab(
-                            index.name,
-                            elem_id=f"{index.id}-tab",
-                            visible=graph_setting_key is None,
-                        ) as self._tabs[f"{index.id}-tab"]:
+                        with gr.Tab(index.name, elem_id=f"{index.id}-tab", visible=graph_setting_key is None) as self._tabs[f"{index.id}-tab"]:
                             page = index.get_index_page_ui()
                             setattr(self, f"_index_{index.id}", page)
                         if graph_setting_key is not None:
@@ -101,27 +122,15 @@ class App(BaseApp):
                             })
 
             if not KH_DEMO_MODE:
-                with gr.Tab(
-                    "Ressourcen",
-                    elem_id="resources-tab",
-                    id="resources-tab",
-                    elem_classes=["fill-main-area-height", "scrollable"],
-                ) as self._tabs["resources-tab"]:
+                with gr.Tab("Ressourcen", elem_id="resources-tab", id="resources-tab",
+                            elem_classes=["fill-main-area-height", "scrollable"]) as self._tabs["resources-tab"]:
                     self.resources_page = ResourcesTab(self)
 
-                with gr.Tab(
-                    "Einstellungen",
-                    elem_id="settings-tab",
-                    id="settings-tab",
-                    elem_classes=["fill-main-area-height", "scrollable"],
-                ) as self._tabs["settings-tab"]:
+                with gr.Tab("Einstellungen", elem_id="settings-tab", id="settings-tab",
+                            elem_classes=["fill-main-area-height", "scrollable"]) as self._tabs["settings-tab"]:
                     self.settings_page = SettingsPage(self)
 
-            with gr.Tab(
-                "Hilfe",
-                elem_id="help-tab",
-                id="help-tab",
-            ) as self._tabs["help-tab"]:
+            with gr.Tab("Hilfe", elem_id="help-tab", id="help-tab") as self._tabs["help-tab"]:
                 self.help_page = HelpPage(self)
 
         if KH_ENABLE_FIRST_SETUP:
@@ -137,23 +146,17 @@ class App(BaseApp):
     def _is_graph_tab_visible(self, *args, **kwargs):
         return False
 
-    def _build_tab_visibility_js(self, user_id):
-        """Return JS string that hides/shows tab buttons based on login state and role."""
+    def _build_tab_visibility_html(self, user_id):
+        """Return HTML div with data-state for the MutationObserver."""
         if not user_id:
-            return _TAB_JS_LOGGED_OUT
-
-        is_admin = False
+            return _LOGGED_OUT_HTML
         is_key_user_or_admin = False
         if self.f_user_management:
             with Session(engine) as session:
                 actor = get_access_context(session, user_id)
                 if actor:
-                    is_admin = actor.is_admin
                     is_key_user_or_admin = actor.is_admin or actor.is_key_user
-
-        return _TAB_JS_LOGGED_IN_TEMPLATE.format(
-            resources_visible="true" if is_key_user_or_admin else "false"
-        )
+        return _LOGGED_IN_ADMIN_HTML if is_key_user_or_admin else _LOGGED_IN_USER_HTML
 
     def on_subscribe_public_events(self):
         if self.f_user_management:
@@ -162,9 +165,7 @@ class App(BaseApp):
                 name="onSignIn",
                 definition={
                     "fn": lambda user_id: gr.Tabs(selected="chat-tab") if user_id else gr.update(),
-                    "inputs": [self.user_id],
-                    "outputs": [self.tabs],
-                    "show_progress": "hidden",
+                    "inputs": [self.user_id], "outputs": [self.tabs], "show_progress": "hidden",
                 },
             )
 
@@ -172,29 +173,23 @@ class App(BaseApp):
                 name="onSignOut",
                 definition={
                     "fn": lambda: gr.Tabs(selected="login-tab"),
-                    "inputs": [],
-                    "outputs": [self.tabs],
-                    "show_progress": "hidden",
+                    "inputs": [], "outputs": [self.tabs], "show_progress": "hidden",
                 },
             )
 
             self.subscribe_event(
                 name="onSignIn",
                 definition={
-                    "fn": self._build_tab_visibility_js,
-                    "inputs": [self.user_id],
-                    "outputs": [self._tab_visibility_js],
-                    "show_progress": "hidden",
+                    "fn": self._build_tab_visibility_html,
+                    "inputs": [self.user_id], "outputs": [self._tab_visibility_js], "show_progress": "hidden",
                 },
             )
 
             self.subscribe_event(
                 name="onSignOut",
                 definition={
-                    "fn": lambda: _TAB_JS_LOGGED_OUT,
-                    "inputs": [],
-                    "outputs": [self._tab_visibility_js],
-                    "show_progress": "hidden",
+                    "fn": lambda: _LOGGED_OUT_HTML,
+                    "inputs": [], "outputs": [self._tab_visibility_js], "show_progress": "hidden",
                 },
             )
 
@@ -203,81 +198,11 @@ class App(BaseApp):
                 name="onFirstSetupComplete",
                 definition={
                     "fn": toggle_first_setup_visibility,
-                    "inputs": [],
-                    "outputs": [self.setup_page_wrapper, self.tabs],
-                    "show_progress": "hidden",
+                    "inputs": [], "outputs": [self.setup_page_wrapper, self.tabs], "show_progress": "hidden",
                 },
             )
 
     def _on_app_created(self):
-        """Called when the app is created"""
         self.file_sync_service.start()
-
         if KH_ENABLE_FIRST_SETUP:
-            self.app.load(
-                toggle_first_setup_visibility,
-                inputs=[],
-                outputs=[self.setup_page_wrapper, self.tabs],
-            )
-
-
-# JS snippets for tab visibility
-_TAB_JS_LOGGED_OUT = """<script>
-(function() {
-    function showTab(name) { setTabDisplay(name, ''); }
-    function hideTab(name) { setTabDisplay(name, 'none'); }
-    function setTabDisplay(name, display) {
-        var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
-        for (var i = 0; i < btns.length; i++) {
-            if (btns[i].textContent.trim() === name) {
-                btns[i].style.display = display;
-            }
-        }
-    }
-    showTab('Willkommen');
-    hideTab('Chat');
-    hideTab('Dateien');
-    hideTab('Ressourcen');
-    hideTab('Einstellungen');
-    hideTab('Hilfe');
-    // Also hide indices tabs
-    var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
-    for (var i = 0; i < btns.length; i++) {
-        var t = btns[i].textContent.trim();
-        var known = ['Willkommen','Chat','Dateien','Ressourcen','Einstellungen','Hilfe'];
-        if (known.indexOf(t) === -1) btns[i].style.display = 'none';
-    }
-})();
-</script>"""
-
-_TAB_JS_LOGGED_IN_TEMPLATE = """<script>
-(function() {{
-    function showTab(name) {{ setTabDisplay(name, ''); }}
-    function hideTab(name) {{ setTabDisplay(name, 'none'); }}
-    function setTabDisplay(name, display) {{
-        var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
-        for (var i = 0; i < btns.length; i++) {{
-            if (btns[i].textContent.trim() === name) {{
-                btns[i].style.display = display;
-            }}
-        }}
-    }}
-    hideTab('Willkommen');
-    showTab('Chat');
-    showTab('Dateien');
-    showTab('Einstellungen');
-    showTab('Hilfe');
-    if ({resources_visible}) {{
-        showTab('Ressourcen');
-    }} else {{
-        hideTab('Ressourcen');
-    }}
-    // Show indices tabs
-    var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
-    for (var i = 0; i < btns.length; i++) {{
-        var t = btns[i].textContent.trim();
-        var known = ['Willkommen','Chat','Dateien','Ressourcen','Einstellungen','Hilfe'];
-        if (known.indexOf(t) === -1) btns[i].style.display = '';
-    }}
-}})();
-</script>"""
+            self.app.load(toggle_first_setup_visibility, inputs=[], outputs=[self.setup_page_wrapper, self.tabs])
