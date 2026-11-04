@@ -78,6 +78,17 @@ class LoginPage(BasePage):
             )
 
     def on_register_events(self):
+        hide_login_tab_js = """
+        function() {
+            var loginTab = document.getElementById('login-tab');
+            if (loginTab) loginTab.style.display = 'none';
+            ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.style.display = '';
+            });
+            return [];
+        }
+        """
         onSignIn = gr.on(
             triggers=[self.btn_login.click, self.pwd.submit],
             fn=self.login,
@@ -92,6 +103,7 @@ class LoginPage(BasePage):
         )
         for event in self._app.get_event("onSignIn"):
             onSignIn = onSignIn.success(**event)
+        onSignIn = onSignIn.then(fn=None, js=hide_login_tab_js)
 
     def toggle_login_visibility(self, user_id):
         return (
@@ -102,6 +114,17 @@ class LoginPage(BasePage):
 
     def _on_app_created(self):
         load_js = clear_storage_oauth_js if self._is_oidc else fetch_creds
+        hide_login_tab_js = """
+        function() {
+            var loginTab = document.getElementById('login-tab');
+            if (loginTab) loginTab.style.display = 'none';
+            ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.style.display = '';
+            });
+            return [];
+        }
+        """
         onSignIn = self._app.app.load(
             self.login,
             inputs=[self.usn, self.pwd],
@@ -115,6 +138,7 @@ class LoginPage(BasePage):
         )
         for event in self._app.get_event("onSignIn"):
             onSignIn = onSignIn.success(**event)
+        onSignIn = onSignIn.then(fn=None, js=hide_login_tab_js)
 
     def on_subscribe_public_events(self):
         self._app.subscribe_event(

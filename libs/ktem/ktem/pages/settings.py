@@ -400,6 +400,20 @@ class SettingsPage(BasePage):
             )
             for event in self._app.get_event("onSignOut"):
                 onSignOutClick = onSignOutClick.then(**event)
+            onSignOutClick = onSignOutClick.then(
+                fn=None,
+                js="""
+                function() {
+                    var loginTab = document.getElementById('login-tab');
+                    if (loginTab) loginTab.style.display = '';
+                    ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) el.style.display = 'none';
+                    });
+                    return [];
+                }
+                """,
+            )
         elif self._app.f_user_management and is_oidc_auth():
             self.signout.click(
                 fn=None,
@@ -426,6 +440,20 @@ class SettingsPage(BasePage):
             )
             for event in self._app.get_event("onSignOut"):
                 onSignOutClick = onSignOutClick.then(**event)
+            onSignOutClick = onSignOutClick.then(
+                fn=None,
+                js="""
+                function() {
+                    var loginTab = document.getElementById('login-tab');
+                    if (loginTab) loginTab.style.display = '';
+                    ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) el.style.display = 'none';
+                    });
+                    return [];
+                }
+                """,
+            )
 
         if self._filesync_service:
             self.filesync_folder_selector.change(
