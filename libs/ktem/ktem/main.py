@@ -211,19 +211,25 @@ class App(BaseApp):
                     "inputs": [self.user_id],
                     "outputs": [self.tabs],
                     "show_progress": "hidden",
+                    "js": """
+                    function(user_id) {
+                        if (user_id) {
+                            var btns = document.querySelectorAll('.tabs > .tab-nav button');
+                            for (var i = 0; i < btns.length; i++) {
+                                if (btns[i].textContent.trim() === 'Willkommen') {
+                                    btns[i].style.display = 'none';
+                                }
+                            }
+                        }
+                        return [user_id];
+                    }
+                    """,
                 },
             )
 
             if self._graph_index_tabs:
-                self.subscribe_event(
-                    name="onSignIn",
-                    definition={
-                        "fn": self.update_graph_collection_tabs,
-                        "inputs": [self.user_id],
-                        "outputs": self.graph_index_tabs(),
-                        "show_progress": "hidden",
-                    },
-                )
+                # Graph tabs start hidden, visibility managed via onSignIn js
+                pass
 
             self.subscribe_event(
                 name="onSignOut",
@@ -232,6 +238,17 @@ class App(BaseApp):
                     "inputs": [],
                     "outputs": [self.tabs],
                     "show_progress": "hidden",
+                    "js": """
+                    function() {
+                        var btns = document.querySelectorAll('.tabs > .tab-nav button');
+                        for (var i = 0; i < btns.length; i++) {
+                            if (btns[i].textContent.trim() === 'Willkommen') {
+                                btns[i].style.display = '';
+                            }
+                        }
+                        return [];
+                    }
+                    """,
                 },
             )
 
@@ -249,14 +266,6 @@ class App(BaseApp):
     def _on_app_created(self):
         """Called when the app is created"""
         self.file_sync_service.start()
-
-        if self._graph_index_tabs:
-            self.app.load(
-                self.update_graph_collection_tabs,
-                inputs=[self.user_id],
-                outputs=self.graph_index_tabs(),
-                show_progress="hidden",
-            )
 
         if KH_ENABLE_FIRST_SETUP:
             self.app.load(
