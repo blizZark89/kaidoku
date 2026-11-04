@@ -363,24 +363,6 @@ class SettingsPage(BasePage):
                 ],
                 show_progress="hidden",
             )
-            if hasattr(self._app, "update_graph_collection_tabs") and hasattr(
-                self._app, "graph_index_tabs"
-            ):
-                save_chain = save_chain.then(
-                    self._app.update_graph_collection_tabs,
-                    inputs=[self._user_id, self._settings_state],
-                    outputs=self._app.graph_index_tabs(),
-                )
-            save_chain = save_chain.then(
-                lambda: gr.Tabs(selected="chat-tab"),
-                outputs=self._app.tabs,
-            )
-            if hasattr(self._app, "resources_page"):
-                save_chain = save_chain.then(
-                    self._app.resources_page.toggle_management_tabs,
-                    inputs=[self._user_id],
-                    outputs=self._app.resources_page._management_columns(),
-                )
         self._components["reasoning.use"].change(
             self.change_reasoning_mode,
             inputs=[self._components["reasoning.use"]],
