@@ -114,17 +114,6 @@ class LoginPage(BasePage):
 
     def _on_app_created(self):
         load_js = clear_storage_oauth_js if self._is_oidc else fetch_creds
-        hide_login_tab_js = """
-        function() {
-            var loginTab = document.getElementById('login-tab');
-            if (loginTab) loginTab.style.display = 'none';
-            ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.style.display = '';
-            });
-            return [];
-        }
-        """
         onSignIn = self._app.app.load(
             self.login,
             inputs=[self.usn, self.pwd],
@@ -138,7 +127,6 @@ class LoginPage(BasePage):
         )
         for event in self._app.get_event("onSignIn"):
             onSignIn = onSignIn.success(**event)
-        onSignIn = onSignIn.then(fn=None, js=hide_login_tab_js)
 
     def on_subscribe_public_events(self):
         self._app.subscribe_event(
@@ -196,5 +184,4 @@ class LoginPage(BasePage):
             if result:
                 return result[0].id, "", ""
 
-            gr.Warning("Ung?ltiger Benutzername oder Passwort")
-            return None, usn, pwd
+            raise gr.Error("Ungültiger Benutzername oder Passwort")

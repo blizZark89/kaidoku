@@ -217,6 +217,19 @@ class App(BaseApp):
                     "inputs": [self.user_id],
                     "outputs": [self.tabs],
                     "show_progress": "hidden",
+                    "js": """
+                    function(user_id) {
+                        if (user_id) {
+                            var loginTab = document.getElementById('login-tab');
+                            if (loginTab) loginTab.style.display = 'none';
+                            ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
+                                var el = document.getElementById(id);
+                                if (el) el.style.display = '';
+                            });
+                        }
+                        return [user_id];
+                    }
+                    """,
                 },
             )
 
@@ -238,6 +251,17 @@ class App(BaseApp):
                     "inputs": [],
                     "outputs": [self.tabs],
                     "show_progress": "hidden",
+                    "js": """
+                    function() {
+                        var loginTab = document.getElementById('login-tab');
+                        if (loginTab) loginTab.style.display = '';
+                        ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
+                            var el = document.getElementById(id);
+                            if (el) el.style.display = 'none';
+                        });
+                        return [];
+                    }
+                    """,
                 },
             )
 
