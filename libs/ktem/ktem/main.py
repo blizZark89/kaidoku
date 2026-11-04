@@ -17,7 +17,6 @@ KH_SSO_ENABLED = getattr(flowsettings, "KH_SSO_ENABLED", False)
 KH_ENABLE_FIRST_SETUP = getattr(flowsettings, "KH_ENABLE_FIRST_SETUP", False)
 KH_APP_DATA_EXISTS = getattr(flowsettings, "KH_APP_DATA_EXISTS", True)
 
-# override first setup setting
 if config("KH_FIRST_SETUP", default=False, cast=bool):
     KH_APP_DATA_EXISTS = False
 
@@ -30,24 +29,19 @@ def toggle_first_setup_visibility():
 
 
 class App(BaseApp):
-    """The main app of Kotaemon
-
-    The main application contains app-level information:
-        - setting state
-        - user id
-
-    App life-cycle:
-        - Render
-        - Declare public events
-        - Subscribe public events
-        - Register events
-    """
+    """The main app of Kotaemon"""
 
     def ui(self):
         """Render the UI"""
         self._tabs = {}
         self._graph_index_tabs = []
         self.file_sync_service = FileSyncService(self)
+
+        # Hidden HTML component for dynamic tab-visibility JS
+        self._tab_visibility_js = gr.HTML(
+            value="<script>window.__kaidoku_tabs_init=false;</script>",
+            visible=False,
+        )
 
         with gr.Tabs() as self.tabs:
             if self.f_user_management:
@@ -70,11 +64,7 @@ class App(BaseApp):
                     with gr.Tab(
                         f"{index.name}",
                         elem_id="indices-tab",
-                        elem_classes=[
-                            "fill-main-area-height",
-                            "scrollable",
-                            "indices-tab",
-                        ],
+                        elem_classes=["fill-main-area-height", "scrollable", "indices-tab"],
                         id="indices-tab",
                     ) as self._tabs[f"{index.id}-tab"]:
                         page = index.get_index_page_ui()
@@ -92,14 +82,10 @@ class App(BaseApp):
                         graph_roles_setting_key = None
                         if index_name_lower == "graphrag sammlung":
                             graph_setting_key = "application.show_graphrag_collection"
-                            graph_roles_setting_key = (
-                                "application.show_graphrag_collection_roles"
-                            )
+                            graph_roles_setting_key = "application.show_graphrag_collection_roles"
                         elif index_name_lower == "lightrag sammlung":
                             graph_setting_key = "application.show_lightrag_collection"
-                            graph_roles_setting_key = (
-                                "application.show_lightrag_collection_roles"
-                            )
+                            graph_roles_setting_key = "application.show_lightrag_collection_roles"
                         with gr.Tab(
                             index.name,
                             elem_id=f"{index.id}-tab",
@@ -108,13 +94,11 @@ class App(BaseApp):
                             page = index.get_index_page_ui()
                             setattr(self, f"_index_{index.id}", page)
                         if graph_setting_key is not None:
-                            self._graph_index_tabs.append(
-                                {
-                                    "tab_key": f"{index.id}-tab",
-                                    "setting_key": graph_setting_key,
-                                    "roles_setting_key": graph_roles_setting_key,
-                                }
-                            )
+                            self._graph_index_tabs.append({
+                                "tab_key": f"{index.id}-tab",
+                                "setting_key": graph_setting_key,
+                                "roles_setting_key": graph_roles_setting_key,
+                            })
 
             if not KH_DEMO_MODE:
                 with gr.Tab(
@@ -145,61 +129,31 @@ class App(BaseApp):
                 self.setup_page = SetupPage(self)
 
     def graph_index_tabs(self):
-        return [self._tabs[item["tab_key"]] for item in self._graph_index_tabs]
+        return []
 
-    def update_graph_collection_tabs(self, user_id=None, settings_state=None):
-        if settings_state is None:
-            settings_state = self.default_settings.flatten()
-            with Session(engine) as session:
-                statement = select(Settings).where(Settings.user == user_id)
-                result = session.exec(statement).first()
-                if result:
-                    settings_state = result.setting
+    def update_graph_collection_tabs(self, *args, **kwargs):
+        return []
 
-        actor_role = None
-        if self.f_user_management and user_id:
+    def _is_graph_tab_visible(self, *args, **kwargs):
+        return False
+
+    def _build_tab_visibility_js(self, user_id):
+        """Return JS string that hides/shows tab buttons based on login state and role."""
+        if not user_id:
+            return _TAB_JS_LOGGED_OUT
+
+        is_admin = False
+        is_key_user_or_admin = False
+        if self.f_user_management:
             with Session(engine) as session:
                 actor = get_access_context(session, user_id)
                 if actor:
-                    if actor.is_admin:
-                        actor_role = "admin"
-                    elif actor.is_key_user:
-                        actor_role = "key_user"
-                    elif actor.is_user:
-                        actor_role = "user"
+                    is_admin = actor.is_admin
+                    is_key_user_or_admin = actor.is_admin or actor.is_key_user
 
-        return [
-            gr.update(
-                visible=self._is_graph_tab_visible(
-                    settings_state=settings_state,
-                    enabled_setting_key=item["setting_key"],
-                    roles_setting_key=item["roles_setting_key"],
-                    actor_role=actor_role,
-                )
-            )
-            for item in self._graph_index_tabs
-        ]
-
-    def _is_graph_tab_visible(
-        self,
-        settings_state,
-        enabled_setting_key: str,
-        roles_setting_key: str | None,
-        actor_role: str | None,
-    ) -> bool:
-        if not bool(settings_state.get(enabled_setting_key, False)):
-            return False
-
-        if not self.f_user_management:
-            return True
-
-        if not actor_role:
-            return False
-
-        allowed_roles = settings_state.get(roles_setting_key, []) if roles_setting_key else []
-        if not isinstance(allowed_roles, list):
-            return False
-        return actor_role in allowed_roles
+        return _TAB_JS_LOGGED_IN_TEMPLATE.format(
+            resources_visible="true" if is_key_user_or_admin else "false"
+        )
 
     def on_subscribe_public_events(self):
         if self.f_user_management:
@@ -220,6 +174,26 @@ class App(BaseApp):
                     "fn": lambda: gr.Tabs(selected="login-tab"),
                     "inputs": [],
                     "outputs": [self.tabs],
+                    "show_progress": "hidden",
+                },
+            )
+
+            self.subscribe_event(
+                name="onSignIn",
+                definition={
+                    "fn": self._build_tab_visibility_js,
+                    "inputs": [self.user_id],
+                    "outputs": [self._tab_visibility_js],
+                    "show_progress": "hidden",
+                },
+            )
+
+            self.subscribe_event(
+                name="onSignOut",
+                definition={
+                    "fn": lambda: _TAB_JS_LOGGED_OUT,
+                    "inputs": [],
+                    "outputs": [self._tab_visibility_js],
                     "show_progress": "hidden",
                 },
             )
@@ -245,3 +219,65 @@ class App(BaseApp):
                 inputs=[],
                 outputs=[self.setup_page_wrapper, self.tabs],
             )
+
+
+# JS snippets for tab visibility
+_TAB_JS_LOGGED_OUT = """<script>
+(function() {
+    function showTab(name) { setTabDisplay(name, ''); }
+    function hideTab(name) { setTabDisplay(name, 'none'); }
+    function setTabDisplay(name, display) {
+        var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
+        for (var i = 0; i < btns.length; i++) {
+            if (btns[i].textContent.trim() === name) {
+                btns[i].style.display = display;
+            }
+        }
+    }
+    showTab('Willkommen');
+    hideTab('Chat');
+    hideTab('Dateien');
+    hideTab('Ressourcen');
+    hideTab('Einstellungen');
+    hideTab('Hilfe');
+    // Also hide indices tabs
+    var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
+    for (var i = 0; i < btns.length; i++) {
+        var t = btns[i].textContent.trim();
+        var known = ['Willkommen','Chat','Dateien','Ressourcen','Einstellungen','Hilfe'];
+        if (known.indexOf(t) === -1) btns[i].style.display = 'none';
+    }
+})();
+</script>"""
+
+_TAB_JS_LOGGED_IN_TEMPLATE = """<script>
+(function() {{
+    function showTab(name) {{ setTabDisplay(name, ''); }}
+    function hideTab(name) {{ setTabDisplay(name, 'none'); }}
+    function setTabDisplay(name, display) {{
+        var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
+        for (var i = 0; i < btns.length; i++) {{
+            if (btns[i].textContent.trim() === name) {{
+                btns[i].style.display = display;
+            }}
+        }}
+    }}
+    hideTab('Willkommen');
+    showTab('Chat');
+    showTab('Dateien');
+    showTab('Einstellungen');
+    showTab('Hilfe');
+    if ({resources_visible}) {{
+        showTab('Ressourcen');
+    }} else {{
+        hideTab('Ressourcen');
+    }}
+    // Show indices tabs
+    var btns = document.querySelectorAll('.tabs > .tab-nav button[role=\"tab\"]');
+    for (var i = 0; i < btns.length; i++) {{
+        var t = btns[i].textContent.trim();
+        var known = ['Willkommen','Chat','Dateien','Ressourcen','Einstellungen','Hilfe'];
+        if (known.indexOf(t) === -1) btns[i].style.display = '';
+    }}
+}})();
+</script>"""
