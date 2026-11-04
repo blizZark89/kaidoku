@@ -62,7 +62,6 @@ class App(BaseApp):
                 "Chat",
                 elem_id="chat-tab",
                 id="chat-tab",
-                visible=not self.f_user_management,
             ) as self._tabs["chat-tab"]:
                 self.chat_page = ChatPage(self)
 
@@ -77,7 +76,6 @@ class App(BaseApp):
                             "indices-tab",
                         ],
                         id="indices-tab",
-                        visible=not self.f_user_management and not KH_DEMO_MODE,
                     ) as self._tabs[f"{index.id}-tab"]:
                         page = index.get_index_page_ui()
                         setattr(self, f"_index_{index.id}", page)
@@ -87,7 +85,6 @@ class App(BaseApp):
                     elem_id="indices-tab",
                     elem_classes=["fill-main-area-height", "scrollable", "indices-tab"],
                     id="indices-tab",
-                    visible=not self.f_user_management and not KH_DEMO_MODE,
                 ) as self._tabs["indices-tab"]:
                     for index in self.index_manager.indices:
                         index_name_lower = index.name.lower()
@@ -124,7 +121,6 @@ class App(BaseApp):
                     "Ressourcen",
                     elem_id="resources-tab",
                     id="resources-tab",
-                    visible=not self.f_user_management,
                     elem_classes=["fill-main-area-height", "scrollable"],
                 ) as self._tabs["resources-tab"]:
                     self.resources_page = ResourcesTab(self)
@@ -133,7 +129,6 @@ class App(BaseApp):
                     "Einstellungen",
                     elem_id="settings-tab",
                     id="settings-tab",
-                    visible=not self.f_user_management,
                     elem_classes=["fill-main-area-height", "scrollable"],
                 ) as self._tabs["settings-tab"]:
                     self.settings_page = SettingsPage(self)
@@ -142,7 +137,6 @@ class App(BaseApp):
                 "Hilfe",
                 elem_id="help-tab",
                 id="help-tab",
-                visible=not self.f_user_management,
             ) as self._tabs["help-tab"]:
                 self.help_page = HelpPage(self)
 
@@ -217,19 +211,6 @@ class App(BaseApp):
                     "inputs": [self.user_id],
                     "outputs": [self.tabs],
                     "show_progress": "hidden",
-                    "js": """
-                    function(user_id) {
-                        if (user_id) {
-                            var loginTab = document.getElementById('login-tab');
-                            if (loginTab) loginTab.style.display = 'none';
-                            ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
-                                var el = document.getElementById(id);
-                                if (el) el.style.display = '';
-                            });
-                        }
-                        return [user_id];
-                    }
-                    """,
                 },
             )
 
@@ -251,17 +232,6 @@ class App(BaseApp):
                     "inputs": [],
                     "outputs": [self.tabs],
                     "show_progress": "hidden",
-                    "js": """
-                    function() {
-                        var loginTab = document.getElementById('login-tab');
-                        if (loginTab) loginTab.style.display = '';
-                        ['chat-tab', 'resources-tab', 'settings-tab', 'help-tab', 'indices-tab'].forEach(function(id) {
-                            var el = document.getElementById(id);
-                            if (el) el.style.display = 'none';
-                        });
-                        return [];
-                    }
-                    """,
                 },
             )
 
