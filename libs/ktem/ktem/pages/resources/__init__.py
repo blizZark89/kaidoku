@@ -23,26 +23,33 @@ class ResourcesTab(BasePage):
         show_mcp = self._get_setting("show_mcp_tab", False)
 
         if self._app.f_user_management:
-            with gr.Tab("Benutzer", visible=True) as self.user_management_tab:
-                self.user_management = UserManagement(self._app)
+            with gr.Tab("Benutzer") as self.user_management_tab:
+                with gr.Column(visible=True) as self.user_management_column:
+                    self.user_management = UserManagement(self._app)
 
-            with gr.Tab("Teams", visible=True) as self.team_management_tab:
-                self.team_management = TeamManagement(self._app)
+            with gr.Tab("Teams") as self.team_management_tab:
+                with gr.Column(visible=True) as self.team_management_column:
+                    self.team_management = TeamManagement(self._app)
 
-        with gr.Tab("Index-Sammlungen", visible=True) as self.index_management_tab:
-            self.index_management = IndexManagement(self._app)
+        with gr.Tab("Index-Sammlungen") as self.index_management_tab:
+            with gr.Column(visible=True) as self.index_management_column:
+                self.index_management = IndexManagement(self._app)
 
-        with gr.Tab("LLMs", visible=True) as self.llm_management_tab:
-            self.llm_management = LLMManagement(self._app)
+        with gr.Tab("LLMs") as self.llm_management_tab:
+            with gr.Column(visible=True) as self.llm_management_column:
+                self.llm_management = LLMManagement(self._app)
 
-        with gr.Tab("Embeddings", visible=True) as self.emb_management_tab:
-            self.emb_management = EmbeddingManagement(self._app)
+        with gr.Tab("Embeddings") as self.emb_management_tab:
+            with gr.Column(visible=True) as self.emb_management_column:
+                self.emb_management = EmbeddingManagement(self._app)
 
-        with gr.Tab("Rerankings", visible=show_rerank) as self.rerank_management_tab:
-            self.rerank_management = RerankingManagement(self._app)
+        with gr.Tab("Rerankings") as self.rerank_management_tab:
+            with gr.Column(visible=True) as self.rerank_management_column:
+                self.rerank_management = RerankingManagement(self._app)
 
-        with gr.Tab("MCP-Server", visible=show_mcp) as self.mcp_management_tab:
-            self.mcp_management = MCPManagement(self._app)
+        with gr.Tab("MCP-Server") as self.mcp_management_tab:
+            with gr.Column(visible=True) as self.mcp_management_column:
+                self.mcp_management = MCPManagement(self._app)
 
     def on_subscribe_public_events(self):
         if self._app.f_user_management:
@@ -51,7 +58,7 @@ class ResourcesTab(BasePage):
                 definition={
                     "fn": self.toggle_management_tabs,
                     "inputs": [self._app.user_id],
-                    "outputs": self._management_tabs(),
+                    "outputs": self._management_columns(),
                     "show_progress": "hidden",
                 },
             )
@@ -61,7 +68,7 @@ class ResourcesTab(BasePage):
                 definition={
                     "fn": self.toggle_management_tabs,
                     "inputs": [self._app.user_id],
-                    "outputs": self._management_tabs(),
+                    "outputs": self._management_columns(),
                     "show_progress": "hidden",
                 },
             )
@@ -71,23 +78,24 @@ class ResourcesTab(BasePage):
             self._app.user_id.change(
                 self.toggle_management_tabs,
                 inputs=[self._app.user_id],
-                outputs=self._management_tabs(),
+                outputs=self._management_columns(),
                 show_progress="hidden",
             )
 
-    def _management_tabs(self):
-        tabs = []
+    def _management_columns(self):
+        """Return Column components (not Tab) for use as Gradio outputs."""
+        cols = []
         if self._app.f_user_management:
-            tabs.append(self.user_management_tab)
-            tabs.append(self.team_management_tab)
-        tabs.extend([
-            self.index_management_tab,
-            self.llm_management_tab,
-            self.emb_management_tab,
-            self.rerank_management_tab,
-            self.mcp_management_tab,
+            cols.append(self.user_management_column)
+            cols.append(self.team_management_column)
+        cols.extend([
+            self.index_management_column,
+            self.llm_management_column,
+            self.emb_management_column,
+            self.rerank_management_column,
+            self.mcp_management_column,
         ])
-        return tabs
+        return cols
 
     def _get_setting(self, key, default=False):
         # Prüfe zuerst die im Speicher gehaltenen Default-Settings der App
@@ -128,7 +136,7 @@ class ResourcesTab(BasePage):
             self._app.app.load(
                 self._sso_initial_visibility,
                 inputs=[],
-                outputs=self._management_tabs(),
+                outputs=self._management_columns(),
                 show_progress="hidden",
             )
 
@@ -142,4 +150,4 @@ class ResourcesTab(BasePage):
             pass
         # No active SSO session: do nothing, keep current state (local login
         # flow via onSignIn events will set visibility correctly).
-        return [gr.update() for _ in self._management_tabs()]
+        return [gr.update() for _ in self._management_columns()]
