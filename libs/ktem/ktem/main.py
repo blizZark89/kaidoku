@@ -62,7 +62,6 @@ class App(BaseApp):
                 "Chat",
                 elem_id="chat-tab",
                 id="chat-tab",
-                visible=not self.f_user_management,
             ) as self._tabs["chat-tab"]:
                 self.chat_page = ChatPage(self)
 
@@ -77,7 +76,6 @@ class App(BaseApp):
                             "indices-tab",
                         ],
                         id="indices-tab",
-                        visible=not self.f_user_management and not KH_DEMO_MODE,
                     ) as self._tabs[f"{index.id}-tab"]:
                         page = index.get_index_page_ui()
                         setattr(self, f"_index_{index.id}", page)
@@ -87,7 +85,6 @@ class App(BaseApp):
                     elem_id="indices-tab",
                     elem_classes=["fill-main-area-height", "scrollable", "indices-tab"],
                     id="indices-tab",
-                    visible=not self.f_user_management and not KH_DEMO_MODE,
                 ) as self._tabs["indices-tab"]:
                     for index in self.index_manager.indices:
                         index_name_lower = index.name.lower()
@@ -124,7 +121,6 @@ class App(BaseApp):
                     "Ressourcen",
                     elem_id="resources-tab",
                     id="resources-tab",
-                    visible=True,
                     elem_classes=["fill-main-area-height", "scrollable"],
                 ) as self._tabs["resources-tab"]:
                     self.resources_page = ResourcesTab(self)
@@ -133,7 +129,6 @@ class App(BaseApp):
                     "Einstellungen",
                     elem_id="settings-tab",
                     id="settings-tab",
-                    visible=not self.f_user_management,
                     elem_classes=["fill-main-area-height", "scrollable"],
                 ) as self._tabs["settings-tab"]:
                     self.settings_page = SettingsPage(self)
@@ -142,7 +137,6 @@ class App(BaseApp):
                 "Hilfe",
                 elem_id="help-tab",
                 id="help-tab",
-                visible=not self.f_user_management,
             ) as self._tabs["help-tab"]:
                 self.help_page = HelpPage(self)
 
@@ -151,7 +145,7 @@ class App(BaseApp):
                 self.setup_page = SetupPage(self)
 
     def graph_index_tabs(self):
-        return [self._tabs[item["tab_key"]] for item in self._graph_index_tabs]
+        return []
 
     def update_graph_collection_tabs(self, user_id=None, settings_state=None):
         if settings_state is None:
@@ -209,53 +203,13 @@ class App(BaseApp):
 
     def on_subscribe_public_events(self):
         if self.f_user_management:
-            from ktem.db.engine import engine
-            from sqlmodel import Session
-
-            def toggle_login_visibility(user_id):
-                if not user_id:
-                    return list(
-                        (
-                            gr.update(visible=True)
-                            if k == "login-tab"
-                            else gr.update(visible=False)
-                        )
-                        for k in self._tabs.keys()
-                    ) + [gr.update(selected="login-tab")]
-
-                with Session(engine) as session:
-                    actor = get_access_context(session, user_id)
-                    if actor is None:
-                        return list(
-                            (
-                                gr.update(visible=True)
-                                if k == "login-tab"
-                                else gr.update(visible=False)
-                            )
-                            for k in self._tabs.keys()
-                        )
-
-                    can_see_resources = actor.is_admin or actor.is_key_user
-
-                tabs_update = []
-                for k in self._tabs.keys():
-                    if k == "login-tab":
-                        tabs_update.append(gr.update(visible=False))
-                    elif k == "resources-tab":
-                        tabs_update.append(gr.update(visible=can_see_resources))
-                    else:
-                        tabs_update.append(gr.update(visible=True))
-
-                tabs_update.append(gr.update(selected="chat-tab"))
-
-                return tabs_update
 
             self.subscribe_event(
                 name="onSignIn",
                 definition={
-                    "fn": toggle_login_visibility,
-                    "inputs": [self.user_id],
-                    "outputs": list(self._tabs.values()) + [self.tabs],
+                    "fn": lambda: gr.Tabs(selected="chat-tab"),
+                    "inputs": [],
+                    "outputs": [self.tabs],
                     "show_progress": "hidden",
                 },
             )
@@ -274,9 +228,9 @@ class App(BaseApp):
             self.subscribe_event(
                 name="onSignOut",
                 definition={
-                    "fn": toggle_login_visibility,
-                    "inputs": [self.user_id],
-                    "outputs": list(self._tabs.values()) + [self.tabs],
+                    "fn": lambda: gr.Tabs(selected="login-tab"),
+                    "inputs": [],
+                    "outputs": [self.tabs],
                     "show_progress": "hidden",
                 },
             )
