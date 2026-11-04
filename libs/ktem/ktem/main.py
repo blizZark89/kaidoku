@@ -145,7 +145,7 @@ class App(BaseApp):
                 self.setup_page = SetupPage(self)
 
     def graph_index_tabs(self):
-        return []
+        return [self._tabs[item["tab_key"]] for item in self._graph_index_tabs]
 
     def update_graph_collection_tabs(self, user_id=None, settings_state=None):
         if settings_state is None:
