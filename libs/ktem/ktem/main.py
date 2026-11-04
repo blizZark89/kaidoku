@@ -46,7 +46,9 @@ class App(BaseApp):
     def ui(self):
         """Render the UI"""
         self._tabs = {}
+        self._tab_columns = {}
         self._graph_index_tabs = []
+        self._graph_index_columns = []
         self.file_sync_service = FileSyncService(self)
 
         with gr.Tabs() as self.tabs:
@@ -56,15 +58,16 @@ class App(BaseApp):
                 with gr.Tab(
                     "Willkommen", elem_id="login-tab", id="login-tab"
                 ) as self._tabs["login-tab"]:
-                    self.login_page = LoginPage(self)
+                    with gr.Column(visible=True) as self._tab_columns["login-tab"]:
+                        self.login_page = LoginPage(self)
 
             with gr.Tab(
                 "Chat",
                 elem_id="chat-tab",
                 id="chat-tab",
-                visible=not self.f_user_management,
             ) as self._tabs["chat-tab"]:
-                self.chat_page = ChatPage(self)
+                with gr.Column(visible=not self.f_user_management) as self._tab_columns["chat-tab"]:
+                    self.chat_page = ChatPage(self)
 
             if len(self.index_manager.indices) == 1:
                 for index in self.index_manager.indices:
@@ -77,81 +80,84 @@ class App(BaseApp):
                             "indices-tab",
                         ],
                         id="indices-tab",
-                        visible=not self.f_user_management and not KH_DEMO_MODE,
                     ) as self._tabs[f"{index.id}-tab"]:
-                        page = index.get_index_page_ui()
-                        setattr(self, f"_index_{index.id}", page)
+                        with gr.Column(visible=not self.f_user_management and not KH_DEMO_MODE) as col:
+                            self._tab_columns[f"{index.id}-tab"] = col
+                            page = index.get_index_page_ui()
+                            setattr(self, f"_index_{index.id}", page)
             elif len(self.index_manager.indices) > 1:
                 with gr.Tab(
                     "Dateien",
                     elem_id="indices-tab",
                     elem_classes=["fill-main-area-height", "scrollable", "indices-tab"],
                     id="indices-tab",
-                    visible=not self.f_user_management and not KH_DEMO_MODE,
                 ) as self._tabs["indices-tab"]:
-                    for index in self.index_manager.indices:
-                        index_name_lower = index.name.lower()
-                        graph_setting_key = None
-                        graph_roles_setting_key = None
-                        if index_name_lower == "graphrag sammlung":
-                            graph_setting_key = "application.show_graphrag_collection"
-                            graph_roles_setting_key = (
-                                "application.show_graphrag_collection_roles"
-                            )
-                        elif index_name_lower == "lightrag sammlung":
-                            graph_setting_key = "application.show_lightrag_collection"
-                            graph_roles_setting_key = (
-                                "application.show_lightrag_collection_roles"
-                            )
-                        with gr.Tab(
-                            index.name,
-                            elem_id=f"{index.id}-tab",
-                            visible=graph_setting_key is None,
-                        ) as self._tabs[f"{index.id}-tab"]:
-                            page = index.get_index_page_ui()
-                            setattr(self, f"_index_{index.id}", page)
-                        if graph_setting_key is not None:
-                            self._graph_index_tabs.append(
-                                {
-                                    "tab_key": f"{index.id}-tab",
-                                    "setting_key": graph_setting_key,
-                                    "roles_setting_key": graph_roles_setting_key,
-                                }
-                            )
+                    with gr.Column(visible=not self.f_user_management and not KH_DEMO_MODE) as self._tab_columns["indices-tab"]:
+                        for index in self.index_manager.indices:
+                            index_name_lower = index.name.lower()
+                            graph_setting_key = None
+                            graph_roles_setting_key = None
+                            if index_name_lower == "graphrag sammlung":
+                                graph_setting_key = "application.show_graphrag_collection"
+                                graph_roles_setting_key = (
+                                    "application.show_graphrag_collection_roles"
+                                )
+                            elif index_name_lower == "lightrag sammlung":
+                                graph_setting_key = "application.show_lightrag_collection"
+                                graph_roles_setting_key = (
+                                    "application.show_lightrag_collection_roles"
+                                )
+                            with gr.Tab(
+                                index.name,
+                                elem_id=f"{index.id}-tab",
+                            ) as self._tabs[f"{index.id}-tab"]:
+                                with gr.Column(visible=graph_setting_key is None) as col:
+                                    self._tab_columns[f"{index.id}-tab"] = col
+                                    page = index.get_index_page_ui()
+                                    setattr(self, f"_index_{index.id}", page)
+                            if graph_setting_key is not None:
+                                self._graph_index_tabs.append(
+                                    {
+                                        "tab_key": f"{index.id}-tab",
+                                        "setting_key": graph_setting_key,
+                                        "roles_setting_key": graph_roles_setting_key,
+                                    }
+                                )
+                                self._graph_index_columns.append(col)
 
             if not KH_DEMO_MODE:
                 with gr.Tab(
                     "Ressourcen",
                     elem_id="resources-tab",
                     id="resources-tab",
-                    visible=True,
                     elem_classes=["fill-main-area-height", "scrollable"],
                 ) as self._tabs["resources-tab"]:
-                    self.resources_page = ResourcesTab(self)
+                    with gr.Column(visible=True) as self._tab_columns["resources-tab"]:
+                        self.resources_page = ResourcesTab(self)
 
                 with gr.Tab(
                     "Einstellungen",
                     elem_id="settings-tab",
                     id="settings-tab",
-                    visible=not self.f_user_management,
                     elem_classes=["fill-main-area-height", "scrollable"],
                 ) as self._tabs["settings-tab"]:
-                    self.settings_page = SettingsPage(self)
+                    with gr.Column(visible=not self.f_user_management) as self._tab_columns["settings-tab"]:
+                        self.settings_page = SettingsPage(self)
 
             with gr.Tab(
                 "Hilfe",
                 elem_id="help-tab",
                 id="help-tab",
-                visible=not self.f_user_management,
             ) as self._tabs["help-tab"]:
-                self.help_page = HelpPage(self)
+                with gr.Column(visible=not self.f_user_management) as self._tab_columns["help-tab"]:
+                    self.help_page = HelpPage(self)
 
         if KH_ENABLE_FIRST_SETUP:
             with gr.Column(visible=False) as self.setup_page_wrapper:
                 self.setup_page = SetupPage(self)
 
     def graph_index_tabs(self):
-        return [self._tabs[item["tab_key"]] for item in self._graph_index_tabs]
+        return self._graph_index_columns
 
     def update_graph_collection_tabs(self, user_id=None, settings_state=None):
         if settings_state is None:
@@ -220,7 +226,7 @@ class App(BaseApp):
                             if k == "login-tab"
                             else gr.update(visible=False)
                         )
-                        for k in self._tabs.keys()
+                        for k in self._tab_columns.keys()
                     ) + [gr.update(selected="login-tab")]
 
                 with Session(engine) as session:
@@ -232,13 +238,13 @@ class App(BaseApp):
                                 if k == "login-tab"
                                 else gr.update(visible=False)
                             )
-                            for k in self._tabs.keys()
+                            for k in self._tab_columns.keys()
                         )
 
                     can_see_resources = actor.is_admin or actor.is_key_user
 
                 tabs_update = []
-                for k in self._tabs.keys():
+                for k in self._tab_columns.keys():
                     if k == "login-tab":
                         tabs_update.append(gr.update(visible=False))
                     elif k == "resources-tab":
@@ -255,7 +261,7 @@ class App(BaseApp):
                 definition={
                     "fn": toggle_login_visibility,
                     "inputs": [self.user_id],
-                    "outputs": list(self._tabs.values()) + [self.tabs],
+                    "outputs": list(self._tab_columns.values()) + [self.tabs],
                     "show_progress": "hidden",
                 },
             )
@@ -276,7 +282,7 @@ class App(BaseApp):
                 definition={
                     "fn": toggle_login_visibility,
                     "inputs": [self.user_id],
-                    "outputs": list(self._tabs.values()) + [self.tabs],
+                    "outputs": list(self._tab_columns.values()) + [self.tabs],
                     "show_progress": "hidden",
                 },
             )
