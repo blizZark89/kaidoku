@@ -203,74 +203,23 @@ class App(BaseApp):
 
     def on_subscribe_public_events(self):
         if self.f_user_management:
-            from ktem.db.engine import engine
-            from sqlmodel import Session
-
-            def toggle_login_visibility(user_id):
-                if not user_id:
-                    return list(
-                        (
-                            gr.update(visible=True)
-                            if k == "login-tab"
-                            else gr.update(visible=False)
-                        )
-                        for k in self._tabs.keys()
-                    ) + [gr.update(selected="login-tab")]
-
-                with Session(engine) as session:
-                    actor = get_access_context(session, user_id)
-                    if actor is None:
-                        return list(
-                            (
-                                gr.update(visible=True)
-                                if k == "login-tab"
-                                else gr.update(visible=False)
-                            )
-                            for k in self._tabs.keys()
-                        )
-
-                    can_see_resources = actor.is_admin or actor.is_key_user
-
-                tabs_update = []
-                for k in self._tabs.keys():
-                    if k == "login-tab":
-                        tabs_update.append(gr.update(visible=False))
-                    elif k == "resources-tab":
-                        tabs_update.append(gr.update(visible=can_see_resources))
-                    else:
-                        tabs_update.append(gr.update(visible=True))
-
-                tabs_update.append(gr.update(selected="chat-tab"))
-
-                return tabs_update
 
             self.subscribe_event(
                 name="onSignIn",
                 definition={
-                    "fn": toggle_login_visibility,
+                    "fn": lambda user_id: gr.Tabs(selected="chat-tab") if user_id else gr.update(),
                     "inputs": [self.user_id],
-                    "outputs": list(self._tabs.values()) + [self.tabs],
+                    "outputs": [self.tabs],
                     "show_progress": "hidden",
                 },
             )
 
-            if self._graph_index_tabs:
-                self.subscribe_event(
-                    name="onSignIn",
-                    definition={
-                        "fn": self.update_graph_collection_tabs,
-                        "inputs": [self.user_id],
-                        "outputs": self.graph_index_tabs(),
-                        "show_progress": "hidden",
-                    },
-                )
-
             self.subscribe_event(
                 name="onSignOut",
                 definition={
-                    "fn": toggle_login_visibility,
-                    "inputs": [self.user_id],
-                    "outputs": list(self._tabs.values()) + [self.tabs],
+                    "fn": lambda: gr.Tabs(selected="login-tab"),
+                    "inputs": [],
+                    "outputs": [self.tabs],
                     "show_progress": "hidden",
                 },
             )
@@ -289,14 +238,6 @@ class App(BaseApp):
     def _on_app_created(self):
         """Called when the app is created"""
         self.file_sync_service.start()
-
-        if self._graph_index_tabs:
-            self.app.load(
-                self.update_graph_collection_tabs,
-                inputs=[self.user_id],
-                outputs=self.graph_index_tabs(),
-                show_progress="hidden",
-            )
 
         if KH_ENABLE_FIRST_SETUP:
             self.app.load(

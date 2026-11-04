@@ -232,20 +232,6 @@ class SettingsPage(BasePage):
             self._app.subscribe_event(
                 name="onSignIn",
                 definition={
-                    "fn": self._advanced_settings_tab_updates,
-                    "inputs": self._user_id,
-                    "outputs": [
-                        self.general_settings_tab,
-                        self.retrieval_settings_tab,
-                        self.reasoning_settings_tab,
-                        self.filesync_settings_tab,
-                    ],
-                    "show_progress": "hidden",
-                },
-            )
-            self._app.subscribe_event(
-                name="onSignIn",
-                definition={
                     "fn": self._populate_chat_default_choices,
                     "inputs": self._user_id,
                     "outputs": [self._components["chat_default_team"], self._components["chat_default_groups"]],
@@ -253,20 +239,6 @@ class SettingsPage(BasePage):
                 },
             )
 
-            self._app.subscribe_event(
-                name="onSignOut",
-                definition={
-                    "fn": self._advanced_settings_tab_updates,
-                    "inputs": self._user_id,
-                    "outputs": [
-                        self.general_settings_tab,
-                        self.retrieval_settings_tab,
-                        self.reasoning_settings_tab,
-                        self.filesync_settings_tab,
-                    ],
-                    "show_progress": "hidden",
-                },
-            )
             if self._filesync_service:
                 self._app.subscribe_event(
                     name="onSignIn",
