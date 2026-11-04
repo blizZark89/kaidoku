@@ -755,8 +755,11 @@ class SettingsPage(BasePage):
 
     def load_setting(self, user_id=None):
         settings = self._settings_dict
+        if user_id is None:
+            return self._empty_settings_output()
+
         with Session(engine) as session:
-            statement = select(Settings).where(Settings.user == user_id)
+            statement = select(Settings).where(Settings.user == str(user_id))
             result = session.exec(statement).all()
             if result:
                 # Use the most recent settings row
@@ -789,8 +792,10 @@ class SettingsPage(BasePage):
                                 team_choices.append((t.name, t.id))
                         else:
                             gids = globally_visible_team_ids(s)
+                            seen = set()
                             for tid in list(actor.team_ids) + list(gids):
-                                if tid in team_map:
+                                if tid in team_map and tid not in seen:
+                                    seen.add(tid)
                                     team_choices.append((team_map[tid], tid))
                         # Dateigruppen aus FileGroup-Tabelle direkt lesen
                         try:
@@ -835,7 +840,7 @@ class SettingsPage(BasePage):
             return setting
 
         with Session(engine) as session:
-            statement = select(Settings).where(Settings.user == user_id)
+            statement = select(Settings).where(Settings.user == str(user_id))
             results = session.exec(statement).all()
             if results:
                 # Use the last (most recent) row and remove stale duplicates
@@ -853,12 +858,21 @@ class SettingsPage(BasePage):
         return setting
 
     def _refresh_chat_defaults(self, settings):
-        """Refresh chat default UI components from settings state."""
+        """Refresh chat default UI components from the saved settings."""
         return (
             settings.get("chat_default_mode", "all"),
             settings.get("chat_default_team", ""),
             settings.get("chat_default_groups", []),
         )
+
+    def _empty_settings_output(self):
+        """Return default settings output for unauthenticated state."""
+        settings = self._settings_dict
+        for key in ("chat_default_mode", "chat_default_team", "chat_default_groups"):
+            settings[key] = "all" if key == "chat_default_mode" else ("" if key == "chat_default_team" else [])
+        output = [settings]
+        output += tuple(settings.get(name, self._settings_dict.get(name)) for name in self.component_names())
+        return output
 
     def components(self) -> list:
         """Get the setting components"""
