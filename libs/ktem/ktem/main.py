@@ -30,17 +30,22 @@ def toggle_first_setup_visibility():
 
 # One-time initial JS that:
 # 1. Immediately hides all tabs except Willkommen
-# 2. Sets up MutationObserver on data-state div for subsequent updates
+# 2. Sets up a setInterval poller on data-state div for subsequent updates
+#    (MutationObserver breaks because Gradio replaces the HTML element on update,
+#     detaching the observed node. setInterval re-queries reliably.)
 _INIT_TAB_JS = """<div id="kaidoku-tab-vis" data-state="logged-out"></div>
 <script>
 (function() {
     var KNOWN = ['Willkommen', 'Chat', 'Dateien', 'Ressourcen', 'Einstellungen', 'Hilfe'];
+    var _lastState = null;
     function getBtns() { return document.querySelectorAll('.tabs > .tab-nav button[role="tab"]'); }
     function setTab(name, display) {
         getBtns().forEach(function(b) { if (b.textContent.trim() === name) b.style.display = display; });
     }
     function apply(state) {
-        if (state === 'logged-out') {
+        if (state === _lastState) return;
+        _lastState = state;
+        if (state ==='logged-out') {
             setTab('Willkommen', '');
             KNOWN.forEach(function(t) { if (t !== 'Willkommen') setTab(t, 'none'); });
         } else {
@@ -54,8 +59,10 @@ _INIT_TAB_JS = """<div id="kaidoku-tab-vis" data-state="logged-out"></div>
         });
     }
     apply('logged-out');
-    var target = document.getElementById('kaidoku-tab-vis');
-    if (target) { new MutationObserver(function() { apply(target.getAttribute('data-state')); }).observe(target, {attributes: true}); }
+    setInterval(function() {
+        var target = document.getElementById('kaidoku-tab-vis');
+        if (target) apply(target.getAttribute('data-state'));
+    }, 300);
 })();
 </script>"""
 
@@ -73,7 +80,7 @@ class App(BaseApp):
         self._graph_index_tabs = []
         self.file_sync_service = FileSyncService(self)
 
-        # HTML component: initial JS hides tabs + sets up MutationObserver
+        # HTML component: initial JS hides tabs + sets up setInterval poller
         self._tab_visibility_js = gr.HTML(value=_INIT_TAB_JS, visible=True)
 
         with gr.Tabs() as self.tabs:
@@ -147,7 +154,7 @@ class App(BaseApp):
         return False
 
     def _build_tab_visibility_html(self, user_id):
-        """Return HTML div with data-state for the MutationObserver."""
+        """Return HTML div with data-state for the setInterval poller."""
         if not user_id:
             return _LOGGED_OUT_HTML
         is_key_user_or_admin = False
