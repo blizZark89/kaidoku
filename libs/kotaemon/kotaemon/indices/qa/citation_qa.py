@@ -328,6 +328,27 @@ class AnswerWithContextPipeline(BaseComponent):
             # print("Matched citation:", quote, matched_excerpts),
         return spans
 
+    def _get_display_score(self, doc):
+        """Compute the score displayed as 'Trefferquote' in the UI.
+        
+        Mirrors the logic in Render.collapsible_with_header_score().
+        """
+        # score -1.0 means full-text search (no vector score)
+        doc_score = doc.score
+        if abs(doc_score - (-1.0)) < 1e-9:
+            doc_score = 0.0
+
+        llm_score = doc.metadata.get("llm_trulens_score")
+        rerank_score = doc.metadata.get("reranking_score")
+
+        if llm_score is not None and llm_score > 0:
+            return llm_score
+        if rerank_score is not None and rerank_score > 0:
+            return rerank_score
+        if doc_score >= 0:
+            return max(0.0, 1.0 - doc_score)
+        return 0.0
+
     def prepare_citations(self, answer, docs) -> tuple[list[Document], list[Document]]:
         """Prepare the citations to show on the UI"""
         with_citation, without_citation = [], []
@@ -337,14 +358,12 @@ class AnswerWithContextPipeline(BaseComponent):
         id2docs = {doc.doc_id: doc for doc in docs}
         not_detected = set(id2docs.keys()) - set(spans.keys())
 
-        # docs sind bereits vom Retrieval-Pipeline nach Relevanz sortiert.
-        # spans (defaultdict) ist dagegen in Zitations-Reihenfolge des LLM
-        # einsortiert. Daher nach der Position in `docs` ordnen, damit die
-        # relevantesten Treffer oben stehen.
-        doc_order = {doc.doc_id: i for i, doc in enumerate(docs)}
+        # Sort by displayed score (Trefferquote) descending, so highest
+        # percentage always appears at the top.
         ordered_spans = sorted(
             spans.items(),
-            key=lambda item: doc_order.get(item[0], len(docs)),
+            key=lambda item: self._get_display_score(id2docs[item[0]]),
+            reverse=True,
         )
 
         # render highlight spans
@@ -397,13 +416,14 @@ class AnswerWithContextPipeline(BaseComponent):
 
         print("Got {} cited docs".format(len(with_citation)))
 
-        sorted_not_detected_items_with_scores = [
-            (id_, id2docs[id_].metadata.get("llm_trulens_score", 0.0))
-            for id_ in not_detected
-        ]
-        sorted_not_detected_items_with_scores.sort(key=lambda x: x[1], reverse=True)
+        # Sort uncited docs by display score as well
+        sorted_not_detected = sorted(
+            [(id_, self._get_display_score(id2docs[id_])) for id_ in not_detected],
+            key=lambda x: x[1],
+            reverse=True,
+        )
 
-        for id_, _ in sorted_not_detected_items_with_scores:
+        for id_, display_score in sorted_not_detected:
             doc = id2docs[id_]
             doc_score = doc.metadata.get("llm_trulens_score", 0.0)
             is_open = not has_llm_score or (
