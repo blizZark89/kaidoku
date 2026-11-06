@@ -151,7 +151,7 @@ class FullQAPipeline(BaseReasoning):
         info = [
             Document(
                 channel="info",
-                content=Render.collapsible_with_header(doc, open_collapsible=True),
+                content=Render.collapsible_with_header_score(doc, open_collapsible=True),
             )
             for doc in docs
         ] + [
