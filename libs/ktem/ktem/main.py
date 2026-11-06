@@ -28,13 +28,14 @@ def toggle_first_setup_visibility():
     return gr.update(visible=is_first_setup), gr.update(visible=not is_first_setup)
 
 
-# One-time initial JS that:
-# 1. Immediately hides all tabs except Willkommen
-# 2. Sets up a setInterval poller on data-state div for subsequent updates
-#    (MutationObserver breaks because Gradio replaces the HTML element on update,
-#     detaching the observed node. setInterval re-queries reliably.)
-_INIT_TAB_JS = """<div id="kaidoku-tab-vis" data-state="logged-out"></div>
-<script>
+# Initial div only (no script). The script lives in _TAB_VIS_SCRIPT injected via <head>.
+_TAB_VIS_DIV = '<div id="kaidoku-tab-vis" data-state="logged-out"></div>'
+
+# Tab visibility JS for <head> injection. gr.HTML does NOT execute <script> tags,
+# so the logic must live in the document <head> via gr.Blocks(head=...).
+# Uses setInterval polling (300ms) instead of MutationObserver because Gradio
+# replaces the entire gr.HTML content on update, detaching observed nodes.
+_TAB_VIS_SCRIPT = """<script>
 (function() {
     var KNOWN = ['Willkommen', 'Chat', 'Dateien', 'Ressourcen', 'Einstellungen', 'Hilfe'];
     var _lastState = null;
@@ -43,9 +44,9 @@ _INIT_TAB_JS = """<div id="kaidoku-tab-vis" data-state="logged-out"></div>
         getBtns().forEach(function(b) { if (b.textContent.trim() === name) b.style.display = display; });
     }
     function apply(state) {
-        if (state === _lastState) return;
+        if (!state || state === _lastState) return;
         _lastState = state;
-        if (state ==='logged-out') {
+        if (state === 'logged-out') {
             setTab('Willkommen', '');
             KNOWN.forEach(function(t) { if (t !== 'Willkommen') setTab(t, 'none'); });
         } else {
@@ -58,11 +59,17 @@ _INIT_TAB_JS = """<div id="kaidoku-tab-vis" data-state="logged-out"></div>
             if (KNOWN.indexOf(t) === -1) b.style.display = (state === 'logged-out') ? 'none' : '';
         });
     }
-    apply('logged-out');
-    setInterval(function() {
+    function poll() {
         var target = document.getElementById('kaidoku-tab-vis');
         if (target) apply(target.getAttribute('data-state'));
-    }, 300);
+    }
+    // First poll after DOM ready, then every 300ms
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { poll(); setInterval(poll, 300); });
+    } else {
+        poll();
+        setInterval(poll, 300);
+    }
 })();
 </script>"""
 
@@ -74,14 +81,19 @@ _LOGGED_IN_USER_HTML = '<div id="kaidoku-tab-vis" data-state="logged-in-user"></
 class App(BaseApp):
     """The main app of Kotaemon"""
 
+    def __init__(self):
+        super().__init__()
+        # Script injected into <head> so it executes reliably (gr.HTML strips <script>)
+        self._extra_head_html = _TAB_VIS_SCRIPT
+
     def ui(self):
         """Render the UI"""
         self._tabs = {}
         self._graph_index_tabs = []
         self.file_sync_service = FileSyncService(self)
 
-        # HTML component: initial JS hides tabs + sets up setInterval poller
-        self._tab_visibility_js = gr.HTML(value=_INIT_TAB_JS, visible=True)
+        # HTML component: initial div with data-state. Script runs from <head>.
+        self._tab_visibility_js = gr.HTML(value=_TAB_VIS_DIV, visible=True)
 
         with gr.Tabs() as self.tabs:
             if self.f_user_management:

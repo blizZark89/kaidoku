@@ -183,6 +183,10 @@ class BaseApp:
             "</script>"
             "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/tributejs/5.1.3/tribute.css'/>"  # noqa
         )
+        # Include extra head HTML from subclass (e.g. tab visibility script)
+        extra_head = getattr(self, '_extra_head_html', '')
+        if extra_head:
+            external_js += extra_head
 
         with gr.Blocks(
             theme=self._theme,
