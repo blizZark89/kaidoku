@@ -337,15 +337,18 @@ class AnswerWithContextPipeline(BaseComponent):
         id2docs = {doc.doc_id: doc for doc in docs}
         not_detected = set(id2docs.keys()) - set(spans.keys())
 
-        # docs sind bereits vom Retrieval-Pipeline nach Relevanz sortiert.
-        # spans (defaultdict) ist dagegen in Zitations-Reihenfolge des LLM
-        # einsortiert. Daher nach der Position in `docs` ordnen, damit die
-        # relevantesten Treffer oben stehen.
-        doc_order = {doc.doc_id: i for i, doc in enumerate(docs)}
-        ordered_spans = sorted(
-            spans.items(),
-            key=lambda item: doc_order.get(item[0], len(docs)),
-        )
+        # Sort cited docs by their citation marker number (【1】 before 【2】).
+        # The LLM assigns lower numbers to more relevant sources.
+        # Previously sorted by retriever position (doc_order), which could
+        # place less relevant docs first when the retriever ranked them higher.
+        def _first_span_idx(_id_ss):
+            _id, ss = _id_ss
+            return min(
+                (s.get("idx", 9999) for s in ss if s.get("idx") is not None),
+                default=9999,
+            )
+
+        ordered_spans = sorted(spans.items(), key=_first_span_idx)
 
         # render highlight spans
         for _id, ss in ordered_spans:
