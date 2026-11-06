@@ -239,17 +239,23 @@ class Render:
 
         if llm_reranking_score > 0:
             relevant_score = llm_reranking_score
+            score_display = f"{relevant_score * 100:.0f}%"
         elif reranking_score > 0:
             relevant_score = reranking_score
+            score_display = f"{relevant_score * 100:.0f}%"
         elif not is_close(doc.score, -1.0) and doc.score >= 0:
             # ChromaDB doc.score ist eine Cosin-Distanz (0 = identisch,
             # 2 = gegensaetzlich). In Similaritaet umrechnen.
             relevant_score = max(0.0, 1.0 - doc.score)
+            score_display = f"{relevant_score * 100:.0f}%"
         else:
+            # Full-text search without LLM/reranker score:
+            # don't show misleading 0%, use em-dash instead
             relevant_score = 0.0
+            score_display = "—"
 
         rendered_score = Render.collapsible(
-            header=f"<b>&emsp;Trefferquote</b>: {relevant_score * 100:.0f}%",
+            header=f"<b>&emsp;Trefferquote</b>: {score_display}",
             content="<b>&emsp;&emsp;Vectorstore score:</b>"
             f" {vectorstore_score}"
             f"{text_search_str}"
