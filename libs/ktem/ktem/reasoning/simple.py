@@ -1,4 +1,5 @@
 import logging
+import re
 import threading
 from textwrap import dedent
 from typing import Generator
@@ -239,10 +240,16 @@ class FullQAPipeline(BaseReasoning):
             # clear previous info
             yield Document(channel="info", content=None)
 
-            # Treffer mit Scores zuerst (zitierte + nicht-zitierte)
-            yield from with_citation
-            if without_citation:
-                yield from without_citation
+            # Merge cited + uncited, sort by Trefferquote descending (1.0 → 0.0)
+            def _extract_pct(doc):
+                m = re.search(r'Trefferquote</b>:\s*(\d+)%', doc.content or '')
+                return int(m.group(1)) if m else 0
+            all_docs = sorted(
+                with_citation + without_citation,
+                key=_extract_pct,
+                reverse=True,
+            )
+            yield from all_docs
 
             # Addons ohne Trefferquote danach
 
@@ -573,8 +580,16 @@ class FullDecomposeQAPipeline(FullQAPipeline):
             yield Document(channel="info", content="<h5><b>No evidence found.</b></h5>")
         else:
             yield Document(channel="info", content=None)
-            yield from with_citation
-            yield from without_citation
+            # Merge cited + uncited, sort by Trefferquote descending (1.0 → 0.0)
+            def _extract_pct(doc):
+                m = re.search(r'Trefferquote</b>:\s*(\d+)%', doc.content or '')
+                return int(m.group(1)) if m else 0
+            all_docs = sorted(
+                with_citation + without_citation,
+                key=_extract_pct,
+                reverse=True,
+            )
+            yield from all_docs
 
         return answer
 
