@@ -6,6 +6,10 @@ from ktem.llms.ui import LLMManagement
 from ktem.mcp.ui import MCPManagement
 from ktem.rerankings.ui import RerankingManagement
 from theflow.settings import settings as flowsettings
+from ktem.authz import get_access_context
+from ktem.db.models import engine
+from sqlmodel import Session
+
 from .team import TeamManagement
 from .user import UserManagement
 
@@ -13,6 +17,7 @@ from .user import UserManagement
 class ResourcesTab(BasePage):
     def __init__(self, app):
         self._app = app
+        self._admin_subtabs = []
         self.on_building_ui()
 
     def on_building_ui(self):
@@ -41,6 +46,14 @@ class ResourcesTab(BasePage):
         with gr.Tab("MCP-Server", visible=show_mcp) as self.mcp_management_tab:
             self.mcp_management = MCPManagement(self._app)
 
+        self._admin_subtabs = [
+            self.index_management_tab,
+            self.llm_management_tab,
+            self.emb_management_tab,
+            self.rerank_management_tab,
+            self.mcp_management_tab,
+        ]
+
     def _get_setting(self, key, default=False):
         try:
             if hasattr(self._app, "default_settings") and self._app.default_settings:
@@ -50,3 +63,37 @@ class ResourcesTab(BasePage):
         except Exception:
             pass
         return getattr(flowsettings, key, default)
+
+    def _update_subtab_visibility(self, user_id):
+        """Show/hide admin-only sub-tabs based on role."""
+        is_admin = False
+        if user_id and self._app.f_user_management:
+            with Session(engine) as session:
+                actor = get_access_context(session, user_id)
+                if actor:
+                    is_admin = actor.is_admin
+        return [gr.update(visible=is_admin) for _ in self._admin_subtabs]
+
+    def on_subscribe_public_events(self):
+        if not self._app.f_user_management:
+            return
+        if not self._admin_subtabs:
+            return
+        self._app.subscribe_event(
+            name="onSignIn",
+            definition={
+                "fn": self._update_subtab_visibility,
+                "inputs": [self._app.user_id],
+                "outputs": self._admin_subtabs,
+                "show_progress": "hidden",
+            },
+        )
+        self._app.subscribe_event(
+            name="onSignOut",
+            definition={
+                "fn": lambda: [gr.update(visible=False)] * len(self._admin_subtabs),
+                "inputs": [],
+                "outputs": self._admin_subtabs,
+                "show_progress": "hidden",
+            },
+        )
