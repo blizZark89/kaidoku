@@ -52,7 +52,8 @@ _TAB_VIS_SCRIPT = """<script>
         } else {
             setTab('Willkommen', 'none');
             KNOWN.forEach(function(t) { if (t !== 'Willkommen' && t !== 'Ressourcen') setTab(t, ''); });
-            setTab('Ressourcen', state === 'logged-in-admin' ? '' : 'none');
+            var showResources = (state === 'logged-in-admin' || state === 'logged-in-keyuser');
+            setTab('Ressourcen', showResources ? '' : 'none');
         }
         getBtns().forEach(function(b) {
             var t = b.textContent.trim();
@@ -75,6 +76,7 @@ _TAB_VIS_SCRIPT = """<script>
 
 _LOGGED_OUT_HTML = '<div id="kaidoku-tab-vis" data-state="logged-out"></div>'
 _LOGGED_IN_ADMIN_HTML = '<div id="kaidoku-tab-vis" data-state="logged-in-admin"></div>'
+_LOGGED_IN_KEYUSER_HTML = '<div id="kaidoku-tab-vis" data-state="logged-in-keyuser"></div>'
 _LOGGED_IN_USER_HTML = '<div id="kaidoku-tab-vis" data-state="logged-in-user"></div>'
 
 
@@ -169,13 +171,15 @@ class App(BaseApp):
         """Return HTML div with data-state for the setInterval poller."""
         if not user_id:
             return _LOGGED_OUT_HTML
-        is_key_user_or_admin = False
         if self.f_user_management:
             with Session(engine) as session:
                 actor = get_access_context(session, user_id)
                 if actor:
-                    is_key_user_or_admin = actor.is_admin or actor.is_key_user
-        return _LOGGED_IN_ADMIN_HTML if is_key_user_or_admin else _LOGGED_IN_USER_HTML
+                    if actor.is_admin:
+                        return _LOGGED_IN_ADMIN_HTML
+                    if actor.is_key_user:
+                        return _LOGGED_IN_KEYUSER_HTML
+        return _LOGGED_IN_USER_HTML
 
     def on_subscribe_public_events(self):
         if self.f_user_management:
