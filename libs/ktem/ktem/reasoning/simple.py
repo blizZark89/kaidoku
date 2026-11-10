@@ -151,9 +151,17 @@ class FullQAPipeline(BaseReasoning):
         info = [
             Document(
                 channel="info",
-                content=Render.collapsible_with_header_score(doc, open_collapsible=True),
+                content=Render.collapsible_with_header_score(
+                    doc, open_collapsible=True
+                ),
             )
             for doc in docs
+            if not (
+                # Skip full-text results without any score
+                doc.metadata.get("llm_trulens_score") is None
+                and doc.metadata.get("reranking_score") is None
+                and doc.score < 0
+            )
         ] + [
             Document(
                 channel="plot",
@@ -240,18 +248,21 @@ class FullQAPipeline(BaseReasoning):
             # clear previous info
             yield Document(channel="info", content=None)
 
-            # Merge cited + uncited, sort by Trefferquote descending.
-            # prepare_citations already sorts each group by _get_sort_score.
-            # Merge and re-sort for final global ordering.
-            # '—' (no score) → -1, stays at bottom.
+            # Merge cited + uncited, filter out docs without Trefferquote,
+            # sort by Trefferquote descending.
             def _extract_pct(doc):
                 content = doc.content or ''
                 if '—' in content:
                     return -1
                 m = re.search(r'Trefferquote</b>:\s*(\d+)%', content)
-                return int(m.group(1)) if m else 0
+                return int(m.group(1)) if m else -1
+
             all_docs = sorted(
-                with_citation + without_citation,
+                [
+                    d
+                    for d in with_citation + without_citation
+                    if _extract_pct(d) >= 0
+                ],
                 key=_extract_pct,
                 reverse=True,
             )
@@ -331,7 +342,7 @@ class FullQAPipeline(BaseReasoning):
             **kwargs,
         )
 
-        # check <think> tag from reasoning models
+        # check  thinking tag from reasoning models
         processed_answer = replace_think_tag_with_details(answer.text)
         if processed_answer != answer.text:
             # clear the chat message and render again
@@ -586,17 +597,21 @@ class FullDecomposeQAPipeline(FullQAPipeline):
             yield Document(channel="info", content="<h5><b>No evidence found.</b></h5>")
         else:
             yield Document(channel="info", content=None)
-            # Merge cited + uncited, sort by Trefferquote descending.
-            # prepare_citations already sorts each group by _get_sort_score.
-            # '—' (no score) → -1, stays at bottom.
+            # Merge cited + uncited, filter out docs without Trefferquote,
+            # sort by Trefferquote descending.
             def _extract_pct(doc):
                 content = doc.content or ''
                 if '—' in content:
                     return -1
                 m = re.search(r'Trefferquote</b>:\s*(\d+)%', content)
-                return int(m.group(1)) if m else 0
+                return int(m.group(1)) if m else -1
+
             all_docs = sorted(
-                with_citation + without_citation,
+                [
+                    d
+                    for d in with_citation + without_citation
+                    if _extract_pct(d) >= 0
+                ],
                 key=_extract_pct,
                 reverse=True,
             )
