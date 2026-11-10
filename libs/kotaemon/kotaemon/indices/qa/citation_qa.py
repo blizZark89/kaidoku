@@ -328,6 +328,24 @@ class AnswerWithContextPipeline(BaseComponent):
             # print("Matched citation:", quote, matched_excerpts),
         return spans
 
+    def _get_sort_score(self, doc):
+        """Compute a unified relevance score for sorting.
+
+        Priority: LLM Trulens > Cohere Reranker > ChromaDB vector similarity.
+        Full-text results (score=-1.0, no LLM/reranker) get -1.0 → bottom.
+        All scores normalized to roughly comparable ranges.
+        """
+        llm = doc.metadata.get("llm_trulens_score")
+        if llm is not None and llm > 0:
+            return llm
+        rerank = doc.metadata.get("reranking_score")
+        if rerank is not None and rerank > 0:
+            return rerank * 0.9
+        if doc.score >= 0:
+            # ChromaDB cosine distance → similarity (0=identical, 2=opposite)
+            return max(0.0, 1.0 - doc.score) * 0.8
+        return -1.0
+
     def prepare_citations(self, answer, docs) -> tuple[list[Document], list[Document]]:
         """Prepare the citations to show on the UI"""
         with_citation, without_citation = [], []
@@ -337,18 +355,12 @@ class AnswerWithContextPipeline(BaseComponent):
         id2docs = {doc.doc_id: doc for doc in docs}
         not_detected = set(id2docs.keys()) - set(spans.keys())
 
-        # Sort cited docs by their citation marker number (【1】 before 【2】).
-        # The LLM assigns lower numbers to more relevant sources.
-        # Previously sorted by retriever position (doc_order), which could
-        # place less relevant docs first when the retriever ranked them higher.
-        def _first_span_idx(_id_ss):
-            _id, ss = _id_ss
-            return min(
-                (s.get("idx", 9999) for s in ss if s.get("idx") is not None),
-                default=9999,
-            )
-
-        ordered_spans = sorted(spans.items(), key=_first_span_idx)
+        # Sort cited docs by unified relevance score (descending)
+        ordered_spans = sorted(
+            spans.items(),
+            key=lambda item: self._get_sort_score(id2docs[item[0]]),
+            reverse=True,
+        )
 
         # render highlight spans
         for _id, ss in ordered_spans:
@@ -400,13 +412,14 @@ class AnswerWithContextPipeline(BaseComponent):
 
         print("Got {} cited docs".format(len(with_citation)))
 
-        sorted_not_detected_items_with_scores = [
-            (id_, id2docs[id_].metadata.get("llm_trulens_score", 0.0))
-            for id_ in not_detected
-        ]
-        sorted_not_detected_items_with_scores.sort(key=lambda x: x[1], reverse=True)
+        # Sort uncited docs by unified relevance score (descending)
+        sorted_not_detected = sorted(
+            [(id_, self._get_sort_score(id2docs[id_])) for id_ in not_detected],
+            key=lambda x: x[1],
+            reverse=True,
+        )
 
-        for id_, _ in sorted_not_detected_items_with_scores:
+        for id_, sort_score in sorted_not_detected:
             doc = id2docs[id_]
             doc_score = doc.metadata.get("llm_trulens_score", 0.0)
             is_open = not has_llm_score or (

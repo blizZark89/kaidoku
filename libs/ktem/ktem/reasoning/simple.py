@@ -151,7 +151,7 @@ class FullQAPipeline(BaseReasoning):
         info = [
             Document(
                 channel="info",
-                content=Render.collapsible_with_header_score(doc, open_collapsible=True),
+                content=Render.collapsible_with_header(doc, open_collapsible=True),
             )
             for doc in docs
         ] + [
@@ -240,9 +240,15 @@ class FullQAPipeline(BaseReasoning):
             # clear previous info
             yield Document(channel="info", content=None)
 
-            # Merge cited + uncited, sort by Trefferquote descending (1.0 → 0.0)
+            # Merge cited + uncited, sort by Trefferquote descending.
+            # prepare_citations already sorts each group by _get_sort_score.
+            # Merge and re-sort for final global ordering.
+            # '—' (no score) → -1, stays at bottom.
             def _extract_pct(doc):
-                m = re.search(r'Trefferquote</b>:\s*(\d+)%', doc.content or '')
+                content = doc.content or ''
+                if '—' in content:
+                    return -1
+                m = re.search(r'Trefferquote</b>:\s*(\d+)%', content)
                 return int(m.group(1)) if m else 0
             all_docs = sorted(
                 with_citation + without_citation,
@@ -580,9 +586,14 @@ class FullDecomposeQAPipeline(FullQAPipeline):
             yield Document(channel="info", content="<h5><b>No evidence found.</b></h5>")
         else:
             yield Document(channel="info", content=None)
-            # Merge cited + uncited, sort by Trefferquote descending (1.0 → 0.0)
+            # Merge cited + uncited, sort by Trefferquote descending.
+            # prepare_citations already sorts each group by _get_sort_score.
+            # '—' (no score) → -1, stays at bottom.
             def _extract_pct(doc):
-                m = re.search(r'Trefferquote</b>:\s*(\d+)%', doc.content or '')
+                content = doc.content or ''
+                if '—' in content:
+                    return -1
+                m = re.search(r'Trefferquote</b>:\s*(\d+)%', content)
                 return int(m.group(1)) if m else 0
             all_docs = sorted(
                 with_citation + without_citation,
