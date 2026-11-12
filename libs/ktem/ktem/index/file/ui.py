@@ -1011,7 +1011,7 @@ class FileIndexPage(BasePage):
                 with gr.Tab("Dateien"):
                     self.render_file_list()
 
-                with gr.Tab("Gruppen"):
+                with gr.Tab("Dateigruppen"):
                     self.render_group_list()
 
     def on_subscribe_public_events(self):
