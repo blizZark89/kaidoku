@@ -583,6 +583,7 @@ class FileIndexPage(BasePage):
     def selected_file_team_choices(self, file_id, user_id):
         if not self._app.f_user_management or user_id is None or not file_id:
             return (
+                gr.update(visible=False),
                 gr.update(choices=[], value=[], visible=False),
                 gr.update(visible=False),
             )
@@ -592,6 +593,7 @@ class FileIndexPage(BasePage):
             actor = get_access_context(session, user_id)
             if not actor or not has_upload_access(actor):
                 return (
+                    gr.update(visible=False),
                     gr.update(choices=[], value=[], visible=False),
                     gr.update(visible=False),
                 )
@@ -599,6 +601,7 @@ class FileIndexPage(BasePage):
             source = session.query(Source).filter_by(id=file_id).first()
             if not source:
                 return (
+                    gr.update(visible=False),
                     gr.update(choices=[], value=[], visible=False),
                     gr.update(visible=False),
                 )
@@ -607,6 +610,7 @@ class FileIndexPage(BasePage):
             team_ref_map = _team_ref_map(session)
             if not _source_visible_to_actor(source, actor, globally_visible_team_ids(session), scope_ids, team_ref_map):
                 return (
+                    gr.update(visible=False),
                     gr.update(choices=[], value=[], visible=False),
                     gr.update(visible=False),
                 )
@@ -625,6 +629,7 @@ class FileIndexPage(BasePage):
                 team_id for team_id in _source_team_ids(source, team_ref_map) if any(team_id == tid for _, tid in choices)
             ]
             return (
+                gr.update(visible=True),
                 gr.update(choices=choices, value=selected, visible=True),
                 gr.update(visible=True),
             )
@@ -842,6 +847,10 @@ class FileIndexPage(BasePage):
             with gr.Column(scale=2):
                 self.selected_panel = gr.Markdown(self.selected_panel_false)
                 if self._app.f_user_management:
+                    self.file_team_hint = gr.Markdown(
+                        "**Dokument-Teams zuweisen:**",
+                        visible=False,
+                    )
                     self.file_team_ids = gr.Dropdown(
                         label="Dokument-Teams",
                         choices=[],
@@ -1568,7 +1577,7 @@ class FileIndexPage(BasePage):
             onDeselected = onDeselected.then(
                 fn=self.selected_file_team_choices,
                 inputs=[self.selected_file_id, self._app.user_id],
-                outputs=[self.file_team_ids, self.file_team_save_button],
+                outputs=[self.file_team_hint, self.file_team_ids, self.file_team_save_button],
                 show_progress="hidden",
             )
 
@@ -1715,7 +1724,7 @@ class FileIndexPage(BasePage):
             onFileSelected = onFileSelected.then(
                 fn=self.selected_file_team_choices,
                 inputs=[self.selected_file_id, self._app.user_id],
-                outputs=[self.file_team_ids, self.file_team_save_button],
+                outputs=[self.file_team_hint, self.file_team_ids, self.file_team_save_button],
                 show_progress="hidden",
             )
             onFileTeamSaved = self.file_team_save_button.click(
