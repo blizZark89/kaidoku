@@ -848,7 +848,7 @@ class FileIndexPage(BasePage):
                 self.selected_panel = gr.Markdown(self.selected_panel_false)
                 if self._app.f_user_management:
                     self.file_team_hint = gr.Markdown(
-                        "**Team der ausgewählten Datei zuordnen:**",
+                        "**<span style='color:#f97316'>Team der ausgewählten Datei zuordnen:</span>**",
                         visible=False,
                     )
                     self.file_team_ids = gr.Dropdown(
