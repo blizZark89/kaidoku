@@ -173,7 +173,6 @@ def _compute_user_storage_mb(session):
 
 class UserManagement(BasePage):
     USER_LIST_COLUMNS = [
-        "id",
         "username",
         "role",
         "team",
@@ -181,6 +180,7 @@ class UserManagement(BasePage):
         "can_read",
         "can_upload",
         "storage_mb",
+        "id",
     ]
 
     def __init__(self, app):
@@ -663,7 +663,6 @@ class UserManagement(BasePage):
                 default_team_label = teams.get(access.default_team_id, access.default_team_id) if access.default_team_id else "-"
                 results.append(
                     {
-                        "id": user.id,
                         "username": user.username,
                         "role": access.role,
                         "team": team_label,
@@ -671,6 +670,7 @@ class UserManagement(BasePage):
                         "can_read": access.can_read,
                         "can_upload": access.can_upload,
                         "storage_mb": storage_mb.get(user.id, 0),
+                        "id": user.id,
                     }
                 )
 

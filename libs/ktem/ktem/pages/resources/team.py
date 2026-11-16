@@ -36,7 +36,7 @@ class TeamManagement(BasePage):
     def on_building_ui(self):
         self.team_state = gr.State(value=None)
         self.team_list = gr.DataFrame(
-            headers=["id", "name", "global"], interactive=False
+            headers=["name", "global", "id"], interactive=False
         )
         self.selected_team_id = gr.State(value=None)
         self.team_name_new = gr.Textbox(label="Teamname")
@@ -146,20 +146,20 @@ class TeamManagement(BasePage):
             actor = _resolve_actor(session, actor_user_id)
             if not actor or not actor.is_admin:
                 return [], pd.DataFrame.from_records(
-                    [{"id": "-", "name": "-", "global": "-"}]
+                    [{"name": "-", "global": "-", "id": "-"}]
                 )
 
             teams = list_teams(session)
             rows = [
                 {
-                    "id": t.id,
                     "name": t.name,
                     "global": bool(getattr(t, "is_global", False)),
+                    "id": t.id,
                 }
                 for t in teams
             ]
             if not rows:
-                rows = [{"id": "-", "name": "-", "global": "-"}]
+                rows = [{"name": "-", "global": "-", "id": "-"}]
             return rows, pd.DataFrame.from_records(rows)
 
     def on_selected_team_change(self, team_rows, selected_team_id):
