@@ -23,6 +23,7 @@ from ktem.authz import (
     upsert_user_access,
 )
 from ktem.db.models import Team, User, UserAccess, engine
+from sqlalchemy import inspect, text
 from sqlmodel import Session, select
 from theflow.settings import settings as flowsettings
 
@@ -148,6 +149,28 @@ def ensure_admin_user(usn: str, pwd: str) -> bool:
         return changed
 
 
+def _compute_user_storage_mb(session):
+    """Summiere Dateigrößen pro Benutzer über alle Index-Source-Tabellen.
+
+    Returns dict: {user_id: total_mb}
+    """
+    inspector = inspect(session.get_bind())
+    storage = {}
+    for table_name in inspector.get_table_names():
+        if not table_name.endswith("__source"):
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table_name)}
+        if "user" not in columns or "size" not in columns:
+            continue
+        result = session.exec(
+            text(f'SELECT "user", COALESCE(SUM("size"), 0) FROM "{table_name}" GROUP BY "user"')
+        ).all()
+        for user_id, total_bytes in result:
+            storage[user_id] = storage.get(user_id, 0) + total_bytes
+    # Bytes → MB
+    return {uid: round(total / 1_000_000, 1) for uid, total in storage.items()}
+
+
 class UserManagement(BasePage):
     USER_LIST_COLUMNS = [
         "id",
@@ -157,6 +180,7 @@ class UserManagement(BasePage):
         "standardteam",
         "can_read",
         "can_upload",
+        "storage_mb",
     ]
 
     def __init__(self, app):
@@ -609,6 +633,7 @@ class UserManagement(BasePage):
             if not actor:
                 return []
 
+            storage_mb = _compute_user_storage_mb(session)
             teams = {t.id: t.name for t in list_teams(session)}
             users = session.exec(select(User)).all()
             results = []
@@ -645,6 +670,7 @@ class UserManagement(BasePage):
                         "standardteam": default_team_label,
                         "can_read": access.can_read,
                         "can_upload": access.can_upload,
+                        "storage_mb": storage_mb.get(user.id, 0),
                     }
                 )
 
