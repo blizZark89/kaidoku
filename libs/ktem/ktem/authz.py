@@ -253,12 +253,14 @@ def can_create_role(session: Session, actor: AccessContext, role: str, team_id: 
         return True
     if actor.is_key_user:
         actor_team_ids = managed_team_ids(session, actor)
+        # Globale Teams darf jeder Key-User zuweisen
+        allowed_team_ids = actor_team_ids | global_team_ids(session)
         target_team_ids = set(parse_team_ids(team_id))
         return (
             role == ROLE_USER
-            and bool(actor_team_ids)
+            and bool(allowed_team_ids)
             and bool(target_team_ids)
-            and target_team_ids.issubset(actor_team_ids)
+            and target_team_ids.issubset(allowed_team_ids)
         )
     return False
 
