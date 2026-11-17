@@ -735,13 +735,14 @@ class FileIndexPage(BasePage):
         return visible_source_ids, actor, scope_ids
 
     def list_group_team_choices(self, user_id, selected_team_ids=None):
+        hide = gr.update(visible=False)
         if not self._app.f_user_management or user_id is None:
-            return gr.update(choices=[], value=[], visible=False)
+            return hide, gr.update(choices=[], value=[], visible=False)
 
         with Session(engine) as session:
             actor = get_access_context(session, user_id)
             if not actor or not has_read_access(actor):
-                return gr.update(choices=[], value=[], visible=False)
+                return hide, gr.update(choices=[], value=[], visible=False)
 
             teams = list_teams(session)
             team_map = {team.id: team.name for team in teams}
@@ -763,16 +764,18 @@ class FileIndexPage(BasePage):
                     if team_id in allowed_ids
                 ]
 
-        return gr.update(choices=choices, value=selected, visible=True)
+        return gr.update(visible=True), gr.update(choices=choices, value=selected, visible=True)
 
     def prepare_new_group(self, user_id):
+        team_hint, team_dropdown = self.list_group_team_choices(user_id, [])
         return [
             gr.update(visible=False),
             gr.update(value="### Add new group"),
             gr.update(visible=True),
             gr.update(value=""),
             gr.update(value=[]),
-            self.list_group_team_choices(user_id, []),
+            team_hint,
+            team_dropdown,
             None,
         ]
 
@@ -935,6 +938,10 @@ class FileIndexPage(BasePage):
                 multiselect=True,
             )
             if self._app.f_user_management:
+                self.group_team_hint = gr.Markdown(
+                    "**<span style='color:#f97316'>Team der ausgewählten Dateigruppe zuordnen:</span>**",
+                    visible=False,
+                )
                 self.group_team_ids = gr.Dropdown(
                     label="Gruppen-Teams",
                     choices=[],
@@ -1749,6 +1756,7 @@ class FileIndexPage(BasePage):
                 self.selected_group_id,
                 self.group_name,
                 self.group_files,
+                self.group_team_hint,
                 self.group_team_ids,
                 self.group_delete_button,
             ],
@@ -1823,6 +1831,7 @@ class FileIndexPage(BasePage):
                 self._group_info_panel,
                 self.group_name,
                 self.group_files,
+                self.group_team_hint,
                 self.group_team_ids,
                 self.selected_group_id,
             ],
@@ -2789,12 +2798,14 @@ class FileIndexPage(BasePage):
         delete_button_update = gr.update(
             visible=_group_deletable_by_actor(selected_item, user_id, actor)
         )
+        team_hint, team_dropdown = self.list_group_team_choices(user_id, selected_item.get("team_ids", []))
         return (
             "### Group Information",
             selected_group_id,
             selected_item["name"],
             selected_item["files"],
-            self.list_group_team_choices(user_id, selected_item.get("team_ids", [])),
+            team_hint,
+            team_dropdown,
             delete_button_update,
         )
 
