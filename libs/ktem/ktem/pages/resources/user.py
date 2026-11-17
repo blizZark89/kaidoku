@@ -77,8 +77,6 @@ def _normalize_role_permissions(role: str, can_read: bool, can_upload: bool) -> 
 
 
 def _validate_role_team_constraints(role: str, team_ids: list[str]) -> Optional[str]:
-    if role in {ROLE_KEY_USER, ROLE_USER} and not team_ids:
-        return "Diese Rolle muss mindestens einem Team zugeordnet sein"
     if role == ROLE_ADMIN and team_ids:
         return "Admin darf keinem Team fest zugeordnet sein"
     return None
