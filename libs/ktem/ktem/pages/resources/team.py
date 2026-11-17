@@ -144,12 +144,26 @@ class TeamManagement(BasePage):
     def list_teams_ui(self, actor_user_id):
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
-            if not actor or not actor.is_admin:
+            if not actor:
                 return [], pd.DataFrame.from_records(
                     [{"name": "-", "global": "-", "id": "-"}]
                 )
 
-            teams = list_teams(session)
+            if actor.is_admin:
+                teams = list_teams(session)
+            elif actor.is_key_user:
+                actor_team_ids = set(actor.team_ids)
+                all_teams = list_teams(session)
+                teams = [
+                    t for t in all_teams
+                    if getattr(t, "owner_user_id", None) == actor.user.id
+                    or t.id in actor_team_ids
+                ]
+            else:
+                return [], pd.DataFrame.from_records(
+                    [{"name": "-", "global": "-", "id": "-"}]
+                )
+
             rows = [
                 {
                     "name": t.name,
@@ -183,8 +197,11 @@ class TeamManagement(BasePage):
             return team_name
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
-            if not actor or not actor.is_admin:
-                gr.Warning("Nur Admin darf Teams erstellen")
+            if not actor:
+                gr.Warning("Nicht angemeldet")
+                return team_name
+            if not actor.is_admin and not actor.is_key_user:
+                gr.Warning("Keine Berechtigung zum Erstellen von Teams")
                 return team_name
 
             exists = session.exec(
@@ -231,8 +248,11 @@ class TeamManagement(BasePage):
             return new_name
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
-            if not actor or not actor.is_admin:
-                gr.Warning("Nur Admin darf Teams umbenennen")
+            if not actor:
+                gr.Warning("Nicht angemeldet")
+                return new_name
+            if not actor.is_admin and not actor.is_key_user:
+                gr.Warning("Keine Berechtigung zum Umbenennen von Teams")
                 return new_name
 
             team = session.exec(select(Team).where(Team.id == team_id)).first()
@@ -240,8 +260,8 @@ class TeamManagement(BasePage):
                 gr.Warning("Team nicht gefunden")
                 return new_name
 
-            if team.owner_user_id and team.owner_user_id != actor.user.id:
-                gr.Warning("Nur der Ersteller darf dieses Team umbenennen")
+            if team.owner_user_id and team.owner_user_id != actor.user.id and not actor.is_admin:
+                gr.Warning("Nur der Ersteller oder Admin darf dieses Team umbenennen")
                 return new_name
 
             exists = session.exec(
@@ -290,16 +310,19 @@ class TeamManagement(BasePage):
             return None
         with Session(engine) as session:
             actor = _resolve_actor(session, actor_user_id)
-            if not actor or not actor.is_admin:
-                gr.Warning("Nur Admin darf Teams löschen")
+            if not actor:
+                gr.Warning("Nicht angemeldet")
+                return team_id
+            if not actor.is_admin and not actor.is_key_user:
+                gr.Warning("Keine Berechtigung zum Löschen von Teams")
                 return team_id
 
             team = session.exec(select(Team).where(Team.id == team_id)).first()
             if not team:
                 gr.Warning("Team nicht gefunden")
                 return None
-            if team.owner_user_id and team.owner_user_id != actor.user.id:
-                gr.Warning("Nur der Ersteller darf dieses Team löschen")
+            if team.owner_user_id and team.owner_user_id != actor.user.id and not actor.is_admin:
+                gr.Warning("Nur der Ersteller oder Admin darf dieses Team löschen")
                 return team_id
 
             accesses = session.exec(select(UserAccess)).all()
