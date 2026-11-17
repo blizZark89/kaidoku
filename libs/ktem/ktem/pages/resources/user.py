@@ -15,6 +15,7 @@ from ktem.authz import (
     encode_team_ids,
     ensure_user_access,
     get_access_context,
+    global_team_ids,
     list_teams,
     managed_team_ids,
     normalize_default_team_id,
@@ -577,7 +578,13 @@ class UserManagement(BasePage):
             if actor.is_key_user and not managed_team_ids(session, actor):
                 gr.Warning("Du bist keinem Team zugeordnet. Bitte wende dich an deinen Administrator.")
                 return usn, pwd, pwd_cnf
-            if not can_create_role(session, actor, role, encoded_team_ids):
+
+            # Globales Team als Standardteam erlauben, auch ohne team_ids
+            check_team_ids = encoded_team_ids
+            if not check_team_ids and default_team_id and default_team_id in global_team_ids(session):
+                check_team_ids = encode_team_ids([default_team_id])
+
+            if not can_create_role(session, actor, role, check_team_ids):
                 gr.Warning("Du darfst diesen Benutzer/Rolle-Team nicht anlegen")
                 return usn, pwd, pwd_cnf
 
@@ -808,9 +815,14 @@ class UserManagement(BasePage):
                 if role != target_access.role or encoded_team_ids != target_access.team_id or bool(can_read) != bool(target_access.can_read) or bool(can_upload) != bool(target_access.can_upload):
                     gr.Warning("Du darfst für dich selbst nur das Standardteam ändern")
                     return pwd, pwd_cnf
-            elif not can_create_role(session, actor, role, encoded_team_ids):
-                gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
-                return pwd, pwd_cnf
+            else:
+                # Globales Team als Standardteam erlauben, auch ohne team_ids
+                check_team_ids = encoded_team_ids
+                if not check_team_ids and default_team_id and default_team_id in global_team_ids(session):
+                    check_team_ids = encode_team_ids([default_team_id])
+                if not can_create_role(session, actor, role, check_team_ids):
+                    gr.Warning("Keine Berechtigung für diese Rolle/Team-Zuordnung")
+                    return pwd, pwd_cnf
 
             for team_id in team_ids:
                 if not team_exists(session, team_id):
