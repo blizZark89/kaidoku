@@ -7,6 +7,7 @@ from ktem.app import BasePage
 from sqlalchemy import inspect
 
 from ktem.authz import (
+    encode_team_ids,
     get_access_context,
     list_teams,
     parse_team_ids,
@@ -325,19 +326,18 @@ class TeamManagement(BasePage):
                 gr.Warning("Nur der Ersteller oder Admin darf dieses Team löschen")
                 return team_id
 
+            # Entferne Team aus allen Benutzer-Zuordnungen
             accesses = session.exec(select(UserAccess)).all()
-            in_membership_use = any(
-                team_id in parse_team_ids(access.team_id)
-                for access in accesses
-            )
-            in_default_use = any(
-                access.default_team_id == team_id for access in accesses
-            )
-            if in_membership_use or in_default_use:
-                gr.Warning(
-                    "Team kann nicht gelöscht werden, solange Benutzer zugeordnet sind oder es als Standardteam verwendet wird"
-                )
-                return team_id
+            for access in accesses:
+                team_list = parse_team_ids(access.team_id or "")
+                if team_id in team_list:
+                    team_list.remove(team_id)
+                    access.team_id = encode_team_ids(team_list)
+                    session.add(access)
+                if access.default_team_id == team_id:
+                    access.default_team_id = None
+                    session.add(access)
+            session.flush()
 
             session.delete(team)
             session.commit()
