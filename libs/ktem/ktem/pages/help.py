@@ -24,23 +24,49 @@ HELP_IMAGE_LIGHTBOX = """
     width: 100%; height: 100%;
     background: rgba(0,0,0,0.85);
     z-index: 9999;
-    cursor: pointer;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
 }
-#help-lightbox img {
+#help-lightbox-close {
+    position: absolute;
+    top: 16px; right: 24px;
+    color: #fff;
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10001;
+    line-height: 1;
+    user-select: none;
+}
+#help-lightbox-close:hover {
+    color: #f97316;
+}
+#help-lightbox-hint {
+    color: #aaa;
+    font-size: 14px;
+    margin-bottom: 12px;
+    user-select: none;
+}
+#help-lightbox-img {
     max-width: 90vw;
-    max-height: 90vh;
+    max-height: 80vh;
     object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    cursor: default;
 }
 </style>
-<div id="help-lightbox"><img id="help-lightbox-img" src=""></div>
+<div id="help-lightbox">
+    <span id="help-lightbox-close" title="Schließen">&times;</span>
+    <span id="help-lightbox-hint">Zum Schließen ESC oder X drücken</span>
+    <img id="help-lightbox-img" src="">
+</div>
 <script>
 (function() {
     var lb = document.getElementById('help-lightbox');
     var lbImg = document.getElementById('help-lightbox-img');
+    var lbClose = document.getElementById('help-lightbox-close');
     if (!lb || !lbImg) return;
 
     function show(src) {
@@ -52,12 +78,14 @@ HELP_IMAGE_LIGHTBOX = """
         lbImg.src = '';
     }
 
-    lb.addEventListener('click', hide);
+    lb.addEventListener('click', function(e) {
+        if (e.target === lb) hide();
+    });
+    lbClose.addEventListener('click', hide);
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && lb.style.display === 'flex') hide();
     });
 
-    // Delegate clicks on help images
     var idSet = setInterval(function() {
         var tabs = document.querySelectorAll('#tab-help .tabitem, [id^="component-"]');
         for (var i = 0; i < tabs.length; i++) {
