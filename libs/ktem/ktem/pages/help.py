@@ -15,6 +15,67 @@ KH_DEMO_MODE = getattr(settings, "KH_DEMO_MODE", False)
 HF_SPACE_URL = config("HF_SPACE_URL", default="")
 BASE_PATH = os.environ.get("GR_FILE_ROOT_PATH", "")
 
+HELP_IMAGE_LIGHTBOX = """
+<style>
+#help-lightbox {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    cursor: pointer;
+    justify-content: center;
+    align-items: center;
+}
+#help-lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+}
+</style>
+<div id="help-lightbox"><img id="help-lightbox-img" src=""></div>
+<script>
+(function() {
+    var lb = document.getElementById('help-lightbox');
+    var lbImg = document.getElementById('help-lightbox-img');
+    if (!lb || !lbImg) return;
+
+    function show(src) {
+        lbImg.src = src;
+        lb.style.display = 'flex';
+    }
+    function hide() {
+        lb.style.display = 'none';
+        lbImg.src = '';
+    }
+
+    lb.addEventListener('click', hide);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && lb.style.display === 'flex') hide();
+    });
+
+    // Delegate clicks on help images
+    var idSet = setInterval(function() {
+        var tabs = document.querySelectorAll('#tab-help .tabitem, [id^="component-"]');
+        for (var i = 0; i < tabs.length; i++) {
+            var imgs = tabs[i].querySelectorAll('img');
+            for (var j = 0; j < imgs.length; j++) {
+                if (imgs[j]._helpLightboxBound) continue;
+                imgs[j]._helpLightboxBound = true;
+                imgs[j].style.cursor = 'zoom-in';
+                imgs[j].addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    show(this.src);
+                });
+            }
+        }
+    }, 500);
+})();
+</script>"""
+
 
 def get_remote_doc(url: str) -> str:
     try:
@@ -46,6 +107,8 @@ class HelpPage:
         self.user_guide_md = self._load_local_doc("user_doku.md")
         self.key_user_guide_md = self._load_local_doc("keyuser_doku.md")
         self.admin_guide_md = self._load_local_doc("admin_doku.md")
+
+        gr.HTML(HELP_IMAGE_LIGHTBOX)
 
         about_md_dir = self.doc_dir / "about.md"
         if about_md_dir.exists():
