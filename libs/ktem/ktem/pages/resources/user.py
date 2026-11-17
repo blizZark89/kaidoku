@@ -652,7 +652,7 @@ class UserManagement(BasePage):
                 if actor.is_admin:
                     allowed = True
                 elif actor.is_key_user:
-                    actor_team_ids = managed_team_ids(session, actor)
+                    actor_team_ids = managed_team_ids(session, actor) | global_team_ids(session)
                     target_team_ids = set(parse_team_ids(access.team_id))
                     allowed = (
                         bool(actor_team_ids.intersection(target_team_ids))
