@@ -73,10 +73,6 @@ HELP_IMAGE_LIGHTBOX_JS = """
         var lbClose = document.getElementById('help-lightbox-close');
         if (!lb || !lbImg) return false;
 
-        function show(src) {
-            lbImg.src = src;
-            lb.style.display = 'flex';
-        }
         function hide() {
             lb.style.display = 'none';
             lbImg.src = '';
@@ -94,32 +90,26 @@ HELP_IMAGE_LIGHTBOX_JS = """
 
     // Wait for lightbox DOM
     var pollLb = setInterval(function() {
-        if (initLightbox()) {
-            clearInterval(pollLb);
-        }
+        if (initLightbox()) clearInterval(pollLb);
     }, 200);
 
-    // Bind click handlers on help images
-    var idSet = setInterval(function() {
-        var tabs = document.querySelectorAll('#tab-help .tabitem, [id^="component-"]');
-        for (var i = 0; i < tabs.length; i++) {
-            var imgs = tabs[i].querySelectorAll('img');
-            for (var j = 0; j < imgs.length; j++) {
-                if (imgs[j]._helpLightboxBound) continue;
-                imgs[j]._helpLightboxBound = true;
-                imgs[j].style.cursor = 'zoom-in';
-                imgs[j].addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    var lbImg = document.getElementById('help-lightbox-img');
-                    var lb = document.getElementById('help-lightbox');
-                    if (lb && lbImg) {
-                        lbImg.src = this.src;
-                        lb.style.display = 'flex';
-                    }
-                });
-            }
+    // Bind click on ALL images — simple and reliable
+    document.addEventListener('click', function(e) {
+        var img = e.target.closest ? e.target.closest('img') : null;
+        if (!img) return;
+        if (img._helpLightboxBound) return;
+        img._helpLightboxBound = true;
+        img.style.cursor = 'zoom-in';
+
+        var lb = document.getElementById('help-lightbox');
+        var lbImg = document.getElementById('help-lightbox-img');
+        if (lb && lbImg) {
+            e.stopPropagation();
+            e.preventDefault();
+            lbImg.src = img.src;
+            lb.style.display = 'flex';
         }
-    }, 500);
+    }, true);
 })();
 </script>"""
 
