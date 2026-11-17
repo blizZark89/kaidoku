@@ -303,6 +303,7 @@ def upsert_user_access(
     can_read: bool,
     can_upload: bool,
     default_team_id: Optional[str] = None,
+    created_by: Optional[str] = None,
 ) -> UserAccess:
     access = _first(session, select(UserAccess).where(UserAccess.user_id == user_id))
     if not access:
@@ -312,6 +313,8 @@ def upsert_user_access(
     access.can_read = can_read
     access.can_upload = can_upload
     access.default_team_id = default_team_id
+    if created_by is not None:
+        access.created_by = created_by
     session.add(access)
     session.commit()
     session.refresh(access)

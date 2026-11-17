@@ -126,3 +126,4 @@ class BaseUserAccess(SQLModel):
     default_team_id: Optional[str] = Field(default=None, index=True)
     can_read: bool = Field(default=True)
     can_upload: bool = Field(default=False)
+    created_by: Optional[str] = Field(default=None, index=True)

@@ -128,3 +128,20 @@ if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
     _ensure_team_global_schema()
     _ensure_team_owner_schema()
     _ensure_user_access_default_team_schema()
+    _ensure_user_access_created_by_schema()
+
+
+def _ensure_user_access_created_by_schema():
+    inspector = inspect(engine)
+    table_name = UserAccess.__tablename__
+    if not inspector.has_table(table_name):
+        return
+
+    columns = {column["name"] for column in inspector.get_columns(table_name)}
+    if "created_by" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(f'ALTER TABLE "{table_name}" ADD COLUMN created_by VARCHAR')
+        )

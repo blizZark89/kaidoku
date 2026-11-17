@@ -627,6 +627,7 @@ class UserManagement(BasePage):
                 can_read=can_read_norm,
                 can_upload=can_upload_norm,
                 default_team_id=normalized_default_team_id,
+                created_by=actor.user.id,
             )
 
             gr.Info(f'Benutzer "{usn}" erfolgreich erstellt')
@@ -652,11 +653,11 @@ class UserManagement(BasePage):
                 if actor.is_admin:
                     allowed = True
                 elif actor.is_key_user:
-                    actor_team_ids = managed_team_ids(session, actor) | global_team_ids(session)
+                    actor_team_ids = managed_team_ids(session, actor)
                     target_team_ids = set(parse_team_ids(access.team_id))
                     allowed = (
                         bool(actor_team_ids.intersection(target_team_ids))
-                    ) or user.id == actor.user.id
+                    ) or user.id == actor.user.id or access.created_by == actor.user.id
                 else:
                     allowed = user.id == actor.user.id
 
