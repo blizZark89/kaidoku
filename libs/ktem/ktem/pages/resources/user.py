@@ -574,6 +574,9 @@ class UserManagement(BasePage):
                 return usn, pwd, pwd_cnf
 
             encoded_team_ids = encode_team_ids(team_ids)
+            if actor.is_key_user and not managed_team_ids(session, actor):
+                gr.Warning("Du bist keinem Team zugeordnet. Bitte wende dich an deinen Administrator.")
+                return usn, pwd, pwd_cnf
             if not can_create_role(session, actor, role, encoded_team_ids):
                 gr.Warning("Du darfst diesen Benutzer/Rolle-Team nicht anlegen")
                 return usn, pwd, pwd_cnf
