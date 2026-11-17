@@ -62,30 +62,44 @@ HELP_IMAGE_LIGHTBOX = """
     <span id="help-lightbox-hint">Zum Schließen ESC oder X drücken</span>
     <img id="help-lightbox-img" src="">
 </div>
+"""
+
+HELP_IMAGE_LIGHTBOX_JS = """
 <script>
 (function() {
-    var lb = document.getElementById('help-lightbox');
-    var lbImg = document.getElementById('help-lightbox-img');
-    var lbClose = document.getElementById('help-lightbox-close');
-    if (!lb || !lbImg) return;
+    function initLightbox() {
+        var lb = document.getElementById('help-lightbox');
+        var lbImg = document.getElementById('help-lightbox-img');
+        var lbClose = document.getElementById('help-lightbox-close');
+        if (!lb || !lbImg) return false;
 
-    function show(src) {
-        lbImg.src = src;
-        lb.style.display = 'flex';
+        function show(src) {
+            lbImg.src = src;
+            lb.style.display = 'flex';
+        }
+        function hide() {
+            lb.style.display = 'none';
+            lbImg.src = '';
+        }
+
+        lb.addEventListener('click', function(e) {
+            if (e.target === lb) hide();
+        });
+        if (lbClose) lbClose.addEventListener('click', hide);
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && lb.style.display === 'flex') hide();
+        });
+        return true;
     }
-    function hide() {
-        lb.style.display = 'none';
-        lbImg.src = '';
-    }
 
-    lb.addEventListener('click', function(e) {
-        if (e.target === lb) hide();
-    });
-    lbClose.addEventListener('click', hide);
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && lb.style.display === 'flex') hide();
-    });
+    // Wait for lightbox DOM
+    var pollLb = setInterval(function() {
+        if (initLightbox()) {
+            clearInterval(pollLb);
+        }
+    }, 200);
 
+    // Bind click handlers on help images
     var idSet = setInterval(function() {
         var tabs = document.querySelectorAll('#tab-help .tabitem, [id^="component-"]');
         for (var i = 0; i < tabs.length; i++) {
@@ -96,7 +110,12 @@ HELP_IMAGE_LIGHTBOX = """
                 imgs[j].style.cursor = 'zoom-in';
                 imgs[j].addEventListener('click', function(e) {
                     e.stopPropagation();
-                    show(this.src);
+                    var lbImg = document.getElementById('help-lightbox-img');
+                    var lb = document.getElementById('help-lightbox');
+                    if (lb && lbImg) {
+                        lbImg.src = this.src;
+                        lb.style.display = 'flex';
+                    }
                 });
             }
         }
@@ -137,6 +156,9 @@ class HelpPage:
         self.admin_guide_md = self._load_local_doc("admin_doku.md")
 
         gr.HTML(HELP_IMAGE_LIGHTBOX)
+
+        # Script muss via <head> laufen, gr.HTML führt <script> nicht aus
+        self._app._extra_head_html += HELP_IMAGE_LIGHTBOX_JS
 
         about_md_dir = self.doc_dir / "about.md"
         if about_md_dir.exists():
