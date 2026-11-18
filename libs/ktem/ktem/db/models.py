@@ -123,14 +123,6 @@ def _ensure_user_access_default_team_schema():
         )
 
 
-if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
-    SQLModel.metadata.create_all(engine)
-    _ensure_team_global_schema()
-    _ensure_team_owner_schema()
-    _ensure_user_access_default_team_schema()
-    _ensure_user_access_created_by_schema()
-
-
 def _ensure_user_access_created_by_schema():
     inspector = inspect(engine)
     table_name = UserAccess.__tablename__
@@ -145,3 +137,11 @@ def _ensure_user_access_created_by_schema():
         connection.execute(
             text(f'ALTER TABLE "{table_name}" ADD COLUMN created_by VARCHAR')
         )
+
+
+if not getattr(settings, "KH_ENABLE_ALEMBIC", False):
+    SQLModel.metadata.create_all(engine)
+    _ensure_team_global_schema()
+    _ensure_team_owner_schema()
+    _ensure_user_access_default_team_schema()
+    _ensure_user_access_created_by_schema()
