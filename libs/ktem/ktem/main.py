@@ -5,7 +5,7 @@ from ktem.authz import get_access_context
 from ktem.db.models import Settings, engine
 from ktem.filesync import FileSyncService
 from ktem.pages.chat import ChatPage
-from ktem.pages.help import HelpPage
+from ktem.pages.help import HELP_IMAGE_LIGHTBOX_JS, HelpPage
 from ktem.pages.resources import ResourcesTab
 from ktem.pages.settings import SettingsPage
 from ktem.pages.setup import SetupPage
@@ -86,7 +86,7 @@ class App(BaseApp):
     def __init__(self):
         super().__init__()
         # Script injected into <head> so it executes reliably (gr.HTML strips <script>)
-        self._extra_head_html = _TAB_VIS_SCRIPT
+        self._extra_head_html = _TAB_VIS_SCRIPT + HELP_IMAGE_LIGHTBOX_JS
 
     def ui(self):
         """Render the UI"""

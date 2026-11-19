@@ -147,9 +147,6 @@ class HelpPage:
 
         gr.HTML(HELP_IMAGE_LIGHTBOX)
 
-        # Script muss via <head> laufen, gr.HTML führt <script> nicht aus
-        self._app._extra_head_html += HELP_IMAGE_LIGHTBOX_JS
-
         about_md_dir = self.doc_dir / "about.md"
         if about_md_dir.exists():
             with (self.doc_dir / "about.md").open(encoding="utf-8") as fi:
