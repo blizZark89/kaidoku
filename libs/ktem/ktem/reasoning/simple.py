@@ -238,7 +238,13 @@ class FullQAPipeline(BaseReasoning):
         citation_plot_output = self.prepare_citation_viz(answer, question, docs)
 
         if not with_citation and not without_citation:
-            yield Document(channel="info", content="<h5><b>No evidence found.</b></h5>")
+            yield Document(channel="info", content=(
+                "<h5><b>Keine Treffer gefunden.</b></h5>"
+                "<p>Mögliche Ursachen:<br>"
+                "– Suchmodus prüfen (nur ausgewählte Dateien durchsucht?)<br>"
+                "– Andere Suchbegriffe versuchen<br>"
+                "– Dateien noch nicht vollständig indiziert?</p>"
+            ))
         else:
             # clear the Info panel
             max_llm_rerank_score = max(
@@ -594,7 +600,13 @@ class FullDecomposeQAPipeline(FullQAPipeline):
             answer, docs
         )
         if not with_citation and not without_citation:
-            yield Document(channel="info", content="<h5><b>No evidence found.</b></h5>")
+            yield Document(channel="info", content=(
+                "<h5><b>Keine Treffer gefunden.</b></h5>"
+                "<p>Mögliche Ursachen:<br>"
+                "– Suchmodus prüfen (nur ausgewählte Dateien durchsucht?)<br>"
+                "– Andere Suchbegriffe versuchen<br>"
+                "– Dateien noch nicht vollständig indiziert?</p>"
+            ))
         else:
             yield Document(channel="info", content=None)
             # Merge cited + uncited, filter out docs without Trefferquote,

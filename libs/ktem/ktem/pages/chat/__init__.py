@@ -1460,7 +1460,7 @@ class ChatPage(BasePage):
 
         text, refs, plot, plot_gr = "", "", None, gr.update(visible=False)
         msg_placeholder = getattr(
-            flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Thinking ..."
+            flowsettings, "KH_CHAT_MSG_PLACEHOLDER", "Denke nach …"
         )
         logger.debug("msg_placeholder: %s", msg_placeholder)
         yield (
@@ -1515,7 +1515,7 @@ class ChatPage(BasePage):
 
         if not text:
             empty_msg = getattr(
-                flowsettings, "KH_CHAT_EMPTY_MSG_PLACEHOLDER", "(Sorry, I don't know)"
+                flowsettings, "KH_CHAT_EMPTY_MSG_PLACEHOLDER", "Keine Antwort gefunden."
             )
             print(f"Generate nothing: {empty_msg}")
             yield (

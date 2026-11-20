@@ -2810,7 +2810,7 @@ class FileIndexPage(BasePage):
         )
 
     def validate_files(self, files: list[str]):
-        """Validate if the files are valid"""
+        """Prüft ob die Dateien gültig sind."""
         paths = [Path(file) for file in files]
         errors = []
         if max_file_size := self._index.config.get("max_file_size", 0):
@@ -2823,7 +2823,7 @@ class FileIndexPage(BasePage):
                 if len(str_errors) > 60:
                     str_errors = str_errors[:55] + "..."
                 errors.append(
-                    f"Maximum file size ({max_file_size} MB) exceeded: {str_errors}"
+                    f"Datei zu groß (max. {max_file_size} MB): {str_errors}"
                 )
 
         if max_number_of_files := self._index.config.get("max_number_of_files", 0):
@@ -2833,17 +2833,18 @@ class FileIndexPage(BasePage):
                 ).count()
             if len(paths) + current_num_files > max_number_of_files:
                 errors.append(
-                    f"Maximum number of files ({max_number_of_files}) will be exceeded"
+                    f"Maximale Anzahl an Dateien erreicht ({max_number_of_files}). "
+                    f"Derzeit {current_num_files} Dateien, du versuchst {len(paths)} hochzuladen."
                 )
 
         return errors
 
     def validate_urls(self, urls: list[str]):
-        """Validate if the urls are valid"""
+        """Prüft ob die URLs gültig sind."""
         errors = []
         for url in urls:
             if not url.startswith("http") and not url.startswith("https"):
-                errors.append(f"Invalid url `{url}`")
+                errors.append(f"Ungültige URL (muss mit http:// oder https:// beginnen): {url}")
         return errors
 
 
