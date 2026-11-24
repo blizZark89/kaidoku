@@ -24,6 +24,17 @@ Die Anwendung läuft lokal und kann ohne Cloud-Abhängigkeit betrieben werden.
 
 Tipp: Nach dem Upload kurz warten bis die Datei als "fertig" markiert ist — dann ist sie durchsuchbar.
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/schnellstart.PNG" alt="Schnellstart" />
+    </td>
+    <td valign="top">
+⚠️ **Platzhalter** — bitte durch echten Screenshot ersetzen.
+    </td>
+  </tr>
+</table>
+
 ---
 
 ## Zentrale Funktionen
@@ -82,12 +93,23 @@ Typischer Ablauf:
 
 ### 1.2 Mindmap
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/mindmap.PNG" alt="Mindmap" />
+    </td>
+    <td valign="top">
+
 Nach jeder Antwort erscheint ein **Mindmap**-Button. Ein Klick darauf erstellt eine visuelle Wissenslandkarte aus der Antwort:
 
 - Zeigt die wichtigsten Konzepte und Zusammenhänge als Baumdiagramm
 - Hilft komplexe Themen schnell zu überblicken
 - Ideal für Präsentationen oder zum Teilen mit Kollegen
 - Jeder Knoten kann ein- und ausgeklappt werden
+
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -263,6 +285,17 @@ Was bedeutet das praktisch?
 - Löschst du die Quelle, ist der Inhalt endgültig weg
 - Zum vollständigen Entfernen: erst Quelle löschen, dann Datei löschen
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/quellen_vs_dateien.PNG" alt="Quellen vs. Dateien" />
+    </td>
+    <td valign="top">
+⚠️ **Platzhalter** — bitte durch echten Screenshot ersetzen.
+    </td>
+  </tr>
+</table>
+
 **4.4 Team-Zuordnung beim Upload**
 - Dateien können direkt einem oder mehreren Teams zugewiesen werden
 - ohne Zuordnung bleibt die Datei nur für den Ersteller sichtbar
@@ -283,6 +316,13 @@ Was bedeutet das praktisch?
 
 ### 6. Team-Konzept
 
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/team_konzept.PNG" alt="Team-Konzept" />
+    </td>
+    <td valign="top">
+
 **Was ist ein Team?**
 Ein Team ist eine Gruppe von Benutzern, die gemeinsame Dokumente sehen und bearbeiten. Teams steuern, wer welche Dateien und Dateigruppen sehen kann.
 
@@ -294,6 +334,10 @@ Ein globales Team ist für ALLE Benutzer sichtbar — unabhängig von ihrer Team
 - **Team-Filter** (im Chat): Schränkt die Suche temporär auf ein bestimmtes Team ein. Ändert nichts an deinen Einstellungen.
 
 **Sichtbarkeits-Matrix**
+
+    </td>
+  </tr>
+</table>
 
 |  | Admin | Key-User (eigenes Team) | Key-User (fremdes Team) | User (Mitglied) | User (nicht Mitglied) |
 |--|-------|------------------------|------------------------|----------------|----------------------|
@@ -395,6 +439,17 @@ Keine externe Cloud-Abhängigkeit.
 ---
 
 ## Häufige Fehlermeldungen
+
+<table>
+  <tr>
+    <td valign="top" width="42%">
+      <img src="images/fehlermeldungen.PNG" alt="Fehlermeldungen" />
+    </td>
+    <td valign="top">
+⚠️ **Platzhalter** — bitte durch echten Screenshot ersetzen.
+    </td>
+  </tr>
+</table>
 
 | Meldung | Bedeutung | Lösung |
 |---------|-----------|--------|
