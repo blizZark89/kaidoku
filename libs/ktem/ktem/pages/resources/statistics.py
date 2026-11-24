@@ -3,7 +3,7 @@ import gradio as gr
 import pandas as pd
 from ktem.app import BasePage
 from ktem.authz import get_access_context, managed_team_ids
-from ktem.db.models import Conversation, User, UserAccess, engine
+from ktem.db.models import Conversation, Team, User, UserAccess, engine
 from sqlalchemy import inspect, text
 from sqlmodel import Session, select
 
@@ -67,6 +67,15 @@ class StatisticsPage(BasePage):
     def on_building_ui(self):
         # Scope label
         self.scope_label = gr.Markdown("", elem_id="stats-scope")
+
+        # Team filter dropdown (admin/keyuser)
+        self.filter_team = gr.Dropdown(
+            label="Team filtern",
+            choices=[],
+            value=None,
+            visible=False,
+            interactive=True,
+        )
 
         # User filter dropdown (admin/keyuser)
         self.filter_user = gr.Dropdown(
@@ -205,6 +214,16 @@ class StatisticsPage(BasePage):
             show_progress="hidden",
         )
 
+    def _build_team_choices(self, session: Session, actor) -> list:
+        """Build dropdown choices for team filter."""
+        if actor.is_admin:
+            teams = session.exec(select(Team)).all()
+            return [(t.name, t.id) for t in teams]
+        if actor.is_key_user:
+            teams = session.exec(select(Team)).all()
+            return [(t.name, t.id) for t in teams if getattr(t, "owner_user_id", None) == actor.user.id]
+        return []
+
     def _build_filter_choices(self, session: Session, actor, visible_ids: set[str]):
         """Build dropdown choices for user filter."""
         names = _resolve_user_names(session)
@@ -218,7 +237,7 @@ class StatisticsPage(BasePage):
                 self._visible_users_cache.append(u.id)
         return choices
 
-    def load_statistics(self, user_id=None, filter_user=None):
+    def load_statistics(self, user_id=None, filter_user=None, filter_team=None):
         """Main data loader — role-scoped."""
         with Session(engine) as session:
             actor = get_access_context(session, user_id)
@@ -230,6 +249,7 @@ class StatisticsPage(BasePage):
 
             # Build filter choices on first load
             choices = self._build_filter_choices(session, actor, visible_ids)
+            team_choices = self._build_team_choices(session, actor)
 
             # Determine effective user filter
             if actor.is_admin or actor.is_key_user:
@@ -395,6 +415,7 @@ class StatisticsPage(BasePage):
             return (
                 scope_html,
                 gr.update(choices=choices, visible=filter_visible),
+                gr.update(choices=team_choices, visible=team_filter_visible),
                 "",  # stats_html (reserved)
                 total_likes,
                 total_dislikes,
@@ -451,6 +472,7 @@ class StatisticsPage(BasePage):
         """Return empty defaults when no actor."""
         return (
             "Keine Daten",
+            gr.update(choices=[], visible=False),
             gr.update(choices=[], visible=False),
             "",
             0, 0, 0, 0,
