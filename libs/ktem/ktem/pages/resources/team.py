@@ -214,28 +214,44 @@ class TeamManagement(BasePage):
 
             # Backward compatibility for existing databases that still have
             # the legacy `name_lower` column on team table.
+            team_id = uuid.uuid4().hex
             if _team_table_has_name_lower(session):
                 session.exec(
                     text(
                         "INSERT INTO team (id, name, name_lower, is_global, owner_user_id) VALUES (:id, :name, :name_lower, :is_global, :owner_user_id)"
                     ).bindparams(
-                        id=uuid.uuid4().hex,
+                        id=team_id,
                         name=team_name,
                         name_lower=team_name.lower(),
                         is_global=False,
                         owner_user_id=actor.user.id,
                     )
                 )
-                session.commit()
             else:
                 session.add(
                     Team(
+                        id=team_id,
                         name=team_name,
                         is_global=False,
                         owner_user_id=actor.user.id,
                     )
                 )
+            session.flush()
+
+            # Ersteller automatisch als Mitglied hinzufügen
+            access = session.exec(
+                select(UserAccess).where(UserAccess.user_id == actor.user.id)
+            ).first()
+            if access:
+                team_list = parse_team_ids(access.team_id or "")
+                if team_id not in team_list:
+                    team_list.append(team_id)
+                    access.team_id = encode_team_ids(team_list)
+                    session.add(access)
+                    session.commit()
+            else:
                 session.commit()
+
             gr.Info(f'Team "{team_name}" erstellt')
             return ""
 
