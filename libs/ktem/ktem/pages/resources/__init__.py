@@ -10,6 +10,7 @@ from ktem.authz import get_access_context
 from ktem.db.models import engine
 from sqlmodel import Session
 
+from .feedback import FeedbackPage
 from .team import TeamManagement
 from .user import UserManagement
 
@@ -31,6 +32,9 @@ class ResourcesTab(BasePage):
             with gr.Tab("Teams") as self.team_management_tab:
                 self.team_management = TeamManagement(self._app)
 
+        with gr.Tab("Feedback") as self.feedback_tab:
+            self.feedback_page = FeedbackPage(self._app)
+
         with gr.Tab("Index-Sammlungen") as self.index_management_tab:
             self.index_management = IndexManagement(self._app)
 
@@ -47,6 +51,7 @@ class ResourcesTab(BasePage):
             self.mcp_management = MCPManagement(self._app)
 
         self._admin_subtabs = [
+            self.feedback_tab,
             self.index_management_tab,
             self.llm_management_tab,
             self.emb_management_tab,
