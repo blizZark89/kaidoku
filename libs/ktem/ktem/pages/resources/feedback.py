@@ -1,7 +1,7 @@
 import gradio as gr
 import pandas as pd
 from ktem.app import BasePage
-from ktem.db.models import Conversation, engine
+from ktem.db.models import Conversation, User, engine
 from sqlmodel import Session, select
 
 
@@ -79,6 +79,10 @@ class FeedbackPage(BasePage):
         user_feedback = {}  # user -> {"likes": int, "dislikes": int}
         recent = []
         with Session(engine) as session:
+            # User-ID → Username Mapping
+            users = session.exec(select(User)).all()
+            id_to_name = {u.id: u.username for u in users}
+            
             convs = session.exec(select(Conversation)).all()
             convs_with_feedback = 0
             for c in convs:
@@ -86,7 +90,7 @@ class FeedbackPage(BasePage):
                 if not likes:
                     continue
                 convs_with_feedback += 1
-                user = c.user or "unbekannt"
+                user = id_to_name.get(c.user, c.user or "unbekannt")
                 if user not in user_feedback:
                     user_feedback[user] = {"likes": 0, "dislikes": 0, "total": 0}
                 for entry in likes:
