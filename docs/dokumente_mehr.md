@@ -1,6 +1,3 @@
-## Dokumente & System
-
-### 8. Intelligente Suche (RAG)
 
 - Inhalte werden in Vektor-Datenbanken gespeichert
 - Relevante Textstellen werden automatisch gefunden

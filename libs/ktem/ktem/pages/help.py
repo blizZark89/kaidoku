@@ -64,6 +64,19 @@ HELP_IMAGE_LIGHTBOX = """
 </div>
 """
 
+HELP_ACCORDION_CSS = """
+<style>
+/* Hilfe-Akkordeon-Titel fett + orange beim Öffnen */
+.gr-accordion > .label-wrap > span {
+    font-weight: 700 !important;
+    font-size: 15px !important;
+}
+.gr-accordion > .label-wrap.open > span {
+    color: #f97316 !important;
+}
+</style>
+"""
+
 HELP_IMAGE_LIGHTBOX_JS = """
 <script>
 (function() {
@@ -149,7 +162,7 @@ class HelpPage:
         self.key_user_guide_md = self._load_local_doc("keyuser_doku.md")
         self.admin_guide_md = self._load_local_doc("admin_doku.md")
 
-        gr.HTML(HELP_IMAGE_LIGHTBOX)
+        gr.HTML(HELP_IMAGE_LIGHTBOX + HELP_ACCORDION_CSS)
 
         about_md_dir = self.doc_dir / "about.md"
         if about_md_dir.exists():

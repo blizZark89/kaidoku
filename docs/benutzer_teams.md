@@ -1,6 +1,3 @@
-## Benutzer & Teams
-
-### 3. Benutzer
 
 Sichtbar für: Admin + Key User (Key User sieht nur eingeschränkte Ansicht)
 
