@@ -51,7 +51,6 @@ class ResourcesTab(BasePage):
             self.mcp_management = MCPManagement(self._app)
 
         self._admin_subtabs = [
-            self.feedback_tab,
             self.index_management_tab,
             self.llm_management_tab,
             self.emb_management_tab,
