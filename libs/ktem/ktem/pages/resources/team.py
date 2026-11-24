@@ -158,7 +158,6 @@ class TeamManagement(BasePage):
                 teams = [
                     t for t in all_teams
                     if getattr(t, "owner_user_id", None) == actor.user.id
-                    or t.id in actor_team_ids
                 ]
             else:
                 return [], pd.DataFrame.from_records(
