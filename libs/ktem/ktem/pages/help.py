@@ -140,7 +140,11 @@ class HelpPage:
         self.app_version = app_version
         self.changelogs_cache_dir = Path(changelogs_cache_dir)
         self.changelogs_cache_dir.mkdir(parents=True, exist_ok=True)
-        self.general_guide_md = self._load_local_doc("allgemeine_doku.md")
+        self.schnellstart_md = self._load_local_doc("schnellstart.md")
+        self.chat_suche_md = self._load_local_doc("chat_suche.md")
+        self.benutzer_teams_md = self._load_local_doc("benutzer_teams.md")
+        self.dokumente_mehr_md = self._load_local_doc("dokumente_mehr.md")
+        self.faq_fehler_md = self._load_local_doc("faq_fehler.md")
         self.user_guide_md = self._load_local_doc("user_doku.md")
         self.key_user_guide_md = self._load_local_doc("keyuser_doku.md")
         self.admin_guide_md = self._load_local_doc("admin_doku.md")
@@ -172,8 +176,20 @@ class HelpPage:
                     about_md = f"Version: {self.app_version}\n\n{about_md}"
                 gr.Markdown(about_md)
 
-        with gr.Accordion("Anleitung", open=True):
-            self.quick_guide = gr.Markdown()
+        with gr.Accordion("Schnellstart", open=True):
+            self.schnellstart_guide = gr.Markdown()
+
+        with gr.Accordion("Chat & Suche", open=False):
+            self.chat_suche_guide = gr.Markdown()
+
+        with gr.Accordion("Benutzer & Teams", open=False):
+            self.benutzer_teams_guide = gr.Markdown()
+
+        with gr.Accordion("Dokumente & System", open=False):
+            self.dokumente_mehr_guide = gr.Markdown()
+
+        with gr.Accordion("FAQ & Fehler", open=False):
+            self.faq_fehler_guide = gr.Markdown()
 
         with gr.Accordion("Rollen", open=False):
             self.roles_guide = gr.Markdown()
@@ -206,7 +222,11 @@ class HelpPage:
                 self._build_help_content,
                 inputs=[self._app.user_id],
                 outputs=[
-                    self.quick_guide,
+                    self.schnellstart_guide,
+                    self.chat_suche_guide,
+                    self.benutzer_teams_guide,
+                    self.dokumente_mehr_guide,
+                    self.faq_fehler_guide,
                     self.roles_guide,
                     self.version_history_accordion,
                 ],
@@ -216,7 +236,11 @@ class HelpPage:
                 self._build_help_content,
                 inputs=[self._app.user_id],
                 outputs=[
-                    self.quick_guide,
+                    self.schnellstart_guide,
+                    self.chat_suche_guide,
+                    self.benutzer_teams_guide,
+                    self.dokumente_mehr_guide,
+                    self.faq_fehler_guide,
                     self.roles_guide,
                     self.version_history_accordion,
                 ],
@@ -227,7 +251,11 @@ class HelpPage:
                 self._build_help_content,
                 inputs=[],
                 outputs=[
-                    self.quick_guide,
+                    self.schnellstart_guide,
+                    self.chat_suche_guide,
+                    self.benutzer_teams_guide,
+                    self.dokumente_mehr_guide,
+                    self.faq_fehler_guide,
                     self.roles_guide,
                     self.version_history_accordion,
                 ],
@@ -262,17 +290,20 @@ class HelpPage:
         return content
 
     def _build_help_content(self, user_id=None):
-        guide_general = self.general_guide_md
+        schnellstart = self.schnellstart_md
+        chat_suche = self.chat_suche_md
+        benutzer_teams = self.benutzer_teams_md
+        dokumente_mehr = self.dokumente_mehr_md
+        faq_fehler = self.faq_fehler_md
         guide_user = self.user_guide_md
         guide_key_user = self.key_user_guide_md
         guide_admin = self.admin_guide_md
-        quick_guide = guide_general
         roles_guide = "\n\n---\n\n".join(
             section for section in [guide_user, guide_key_user, guide_admin] if section
         )
 
         if not self._app.f_user_management:
-            return quick_guide, roles_guide, gr.update(visible=False)
+            return schnellstart, chat_suche, benutzer_teams, dokumente_mehr, faq_fehler, roles_guide, gr.update(visible=False)
 
         role = "user"
         with Session(engine) as session:
@@ -284,9 +315,9 @@ class HelpPage:
                     role = "key_user"
 
         if role == "admin":
-            return quick_guide, roles_guide, gr.update(visible=True)
+            return schnellstart, chat_suche, benutzer_teams, dokumente_mehr, faq_fehler, roles_guide, gr.update(visible=True)
 
         if role == "key_user":
-            return quick_guide, roles_guide, gr.update(visible=False)
+            return schnellstart, chat_suche, benutzer_teams, dokumente_mehr, faq_fehler, roles_guide, gr.update(visible=False)
 
-        return quick_guide, roles_guide, gr.update(visible=False)
+        return schnellstart, chat_suche, benutzer_teams, dokumente_mehr, faq_fehler, roles_guide, gr.update(visible=False)
