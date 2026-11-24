@@ -252,6 +252,7 @@ class StatisticsPage(BasePage):
 
             # ═══ Aggregate ═══
             names = _resolve_user_names(session)
+            existing_sources = self._get_existing_source_names(session)
             doc_citation_counts = {}  # doc_name → count
             unused_docs_set = set()  # placeholder — needs Source table data
             total_questions = 0
@@ -298,7 +299,8 @@ class StatisticsPage(BasePage):
                         # Extract source documents
                         sources = _parse_sources_from_html(html)
                         for s in sources:
-                            doc_citation_counts[s] = doc_citation_counts.get(s, 0) + 1
+                            if s in existing_sources:
+                                doc_citation_counts[s] = doc_citation_counts.get(s, 0) + 1
 
                 # Total conversations (any with messages)
                 if messages:
@@ -326,11 +328,12 @@ class StatisticsPage(BasePage):
                             sources = []
                             if idx < len(retrieval_msgs) and retrieval_msgs[idx]:
                                 sources = _parse_sources_from_html(str(retrieval_msgs[idx]))
+                            filtered_srcs = [s for s in sources if s in existing_sources]
                             all_negative.append({
                                 "Benutzer": names.get(uid, uid),
                                 "Frage": (str(msg) if msg else "")[:80],
                                 "Antwort": bot_msg[:100] if bot_msg else "-",
-                                "Quellen": ", ".join(sources[:3]) if sources else "-",
+                                "Quellen": ", ".join(filtered_srcs[:3]) if filtered_srcs else "-",
                             })
 
             # ═══ Build outputs ═══
@@ -349,8 +352,13 @@ class StatisticsPage(BasePage):
                 ["Benutzer", "Frage", "Antwort", "Quellen"]
             )
 
-            # Top docs
-            top_docs_sorted = sorted(doc_citation_counts.items(), key=lambda x: -x[1])[:15]
+            # Top docs — nur existierende Dokumente
+            existing_sources = self._get_existing_source_names(session)
+            filtered_citations = {
+                k: v for k, v in doc_citation_counts.items()
+                if k in existing_sources
+            }
+            top_docs_sorted = sorted(filtered_citations.items(), key=lambda x: -x[1])[:15]
             top_rows = [{"Dokument": d, "Zitiert in Chats": c} for d, c in top_docs_sorted]
             top_df = pd.DataFrame(top_rows) if top_rows else _df_empty(
                 ["Dokument", "Zitiert in Chats"], "Keine Daten"
@@ -401,6 +409,21 @@ class StatisticsPage(BasePage):
                 ua_section,
                 ua_visible,
             )
+
+    def _get_existing_source_names(self, session) -> set[str]:
+        """Alle aktuell existierenden Quell-Dateinamen."""
+        inspector = inspect(session.connection())
+        table_names = inspector.get_table_names()
+        sources = set()
+        for tname in table_names:
+            if tname.startswith("index__") and tname.endswith("__source"):
+                try:
+                    rows = session.exec(text(f'SELECT name FROM "{tname}"')).all()
+                    for (name,) in rows:
+                        sources.add(name)
+                except Exception:
+                    continue
+        return sources
 
     def _get_unused_docs(self, session, actor, visible_ids, cited_names):
         """Find documents that exist but have never been cited."""
